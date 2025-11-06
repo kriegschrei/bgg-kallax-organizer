@@ -28,6 +28,54 @@ app.get('/api/health', (req, res) => {
 // Helper to parse XML to JSON on server
 const parseXmlString = promisify(parseString);
 
+// Helper function to make BGG API requests with rate limiting and retry logic
+async function bggApiRequest(url, config = {}, maxRetries = 5) {
+  let retries = 0;
+  const baseDelay = 5000; // 5 seconds as recommended by BGG API wiki
+  
+  while (retries < maxRetries) {
+    try {
+      const response = await axios.get(url, config);
+      return response;
+    } catch (error) {
+      // Check if it's a rate limit error (429)
+      if (error.response?.status === 429) {
+        retries++;
+        
+        // Check for Retry-After header
+        const retryAfter = error.response?.headers['retry-after'];
+        let waitTime = baseDelay;
+        
+        if (retryAfter) {
+          // Retry-After can be in seconds (number) or HTTP date format
+          const retryAfterNum = parseInt(retryAfter);
+          if (!isNaN(retryAfterNum)) {
+            waitTime = retryAfterNum * 1000; // Convert seconds to milliseconds
+          } else {
+            // Try parsing as HTTP date
+            const retryDate = new Date(retryAfter);
+            if (!isNaN(retryDate.getTime())) {
+              waitTime = Math.max(retryDate.getTime() - Date.now(), 1000);
+            }
+          }
+        } else {
+          // Exponential backoff: 5s, 10s, 20s, 40s, 80s
+          waitTime = baseDelay * Math.pow(2, retries - 1);
+        }
+        
+        console.log(`   ⚠️  Rate limited (429). Waiting ${(waitTime / 1000).toFixed(1)}s before retry ${retries}/${maxRetries}...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+        continue;
+      }
+      
+      // For other errors, throw immediately
+      throw error;
+    }
+  }
+  
+  throw new Error(`Rate limit exceeded after ${maxRetries} retries`);
+}
+
 // Kallax cube dimensions in inches
 // Note: Using 12.8" for width/height calculations to allow clearance for maneuvering boxes
 // Visual display still shows 13"x13" to represent the actual cube dimensions
@@ -569,18 +617,13 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     
     const orientations = [];
     
-    // Primary orientation
+    // Primary orientation (respects user's stacking preference)
     orientations.push({ x: game.dims2D.x, y: game.dims2D.y });
     
     // Alternate orientation (if rotation allowed and dimensions different)
+    // Always try as fallback, never prioritize over user's preference
     if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
-      if (optimizeSpace) {
-        // In optimize mode, try alternate first if it might fit better
-        orientations.unshift({ x: game.dims2D.y, y: game.dims2D.x });
-      } else {
-        // In normal mode, try alternate as fallback
-        orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
-      }
+      orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
     }
     
     let wasPlaced = false;
@@ -732,7 +775,7 @@ app.get('/api/games/:username', async (req, res) => {
     
     // Handle 202 response (collection queued for generation)
     while (retries < maxRetries) {
-      collectionResponse = await axios.get(collectionUrl, {
+      collectionResponse = await bggApiRequest(collectionUrl, {
         headers: {
           'Authorization': `Bearer ${BGG_TOKEN}`,
           'Accept': 'application/xml'
@@ -930,7 +973,7 @@ app.get('/api/games/:username', async (req, res) => {
         // DON'T fetch versions here to save memory
       });
 
-      const thingResponse = await axios.get(
+      const thingResponse = await bggApiRequest(
         `${BGG_API_BASE}/thing?${thingParams.toString()}`,
         {
           headers: {
@@ -980,9 +1023,9 @@ app.get('/api/games/:username', async (req, res) => {
       }
       thingItems.length = 0;
 
-      // Delay between batches
+      // Delay between batches (5 seconds as recommended by BGG API wiki)
       if (i + batchSize < gameIds.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
 
@@ -1013,7 +1056,7 @@ app.get('/api/games/:username', async (req, res) => {
         });
         
         try {
-          const versionResponse = await axios.get(
+          const versionResponse = await bggApiRequest(
             `${BGG_API_BASE}/thing?${versionParams.toString()}`,
             {
               headers: {
@@ -1044,9 +1087,9 @@ app.get('/api/games/:username', async (req, res) => {
             });
           }
           
-          // Delay between batches
+          // Delay between batches (5 seconds as recommended by BGG API wiki)
           if (i + dimBatchSize < gamesMissingDimensions.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 5000));
           }
         } catch (error) {
           console.error(`   ❌ Error fetching dimensions for batch: ${error.message}`);
@@ -1374,7 +1417,7 @@ app.get('/api/collection/:username', async (req, res) => {
     console.log('   URL:', url);
     console.log('   Parameters:', { own, preordered, stats });
     
-    const response = await axios.get(url, {
+    const response = await bggApiRequest(url, {
       headers: {
         'Authorization': `Bearer ${BGG_TOKEN}`,
         'Accept': 'application/xml'
@@ -1461,7 +1504,7 @@ app.get('/api/thing', async (req, res) => {
     console.log('   IDs:', id);
     console.log('   URL:', url);
 
-    const response = await axios.get(url, {
+    const response = await bggApiRequest(url, {
       headers: {
         'Authorization': `Bearer ${BGG_TOKEN}`,
         'Accept': 'application/xml'

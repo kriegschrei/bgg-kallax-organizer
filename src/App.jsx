@@ -289,7 +289,7 @@ function App() {
           <div className="footer-section">
             <h4>Disclaimer</h4>
             <p>
-              GameGeek Cube Organizer is an independent tool not affiliated with or endorsed by BoardGameGeek or IKEA. 
+              BGCube is an independent tool not affiliated with or endorsed by BoardGameGeek or IKEA. 
               BoardGameGeek® is a trademark of BoardGameGeek, LLC. KALLAX® and IKEA® are trademarks of Inter IKEA Systems B.V.
             </p>
           </div>

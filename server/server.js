@@ -4,6 +4,21 @@ import dotenv from 'dotenv';
 import axios from 'axios';
 import { parseString } from 'xml2js';
 import { promisify } from 'util';
+import {
+  getCollection,
+  setCollection,
+  getGame,
+  setGame,
+  getVersion,
+  setVersion,
+  hashData,
+  extractCollectionData,
+  extractGameData,
+  extractVersionData,
+  cleanup,
+  getStats,
+  clearCache
+} from './cache.js';
 
 dotenv.config();
 
@@ -36,10 +51,12 @@ async function bggApiRequest(url, config = {}, maxRetries = 5) {
   while (retries < maxRetries) {
     try {
       const response = await axios.get(url, config);
+      // Success - return immediately, no delay
       return response;
     } catch (error) {
-      // Check if it's a rate limit error (429)
-      if (error.response?.status === 429) {
+      // Check if it's a rate limit or server busy error (429, 500, 503)
+      const status = error.response?.status;
+      if (status === 429 || status === 500 || status === 503) {
         retries++;
         
         // Check for Retry-After header
@@ -63,12 +80,12 @@ async function bggApiRequest(url, config = {}, maxRetries = 5) {
           waitTime = baseDelay * Math.pow(2, retries - 1);
         }
         
-        console.log(`   ⚠️  Rate limited (429). Waiting ${(waitTime / 1000).toFixed(1)}s before retry ${retries}/${maxRetries}...`);
+        console.log(`   ⚠️  Server error (${status}). Waiting ${(waitTime / 1000).toFixed(1)}s before retry ${retries}/${maxRetries}...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
       
-      // For other errors, throw immediately
+      // For other errors, throw immediately (no retry, no delay)
       throw error;
     }
   }
@@ -754,7 +771,7 @@ app.get('/api/games/:username', async (req, res) => {
     console.log('🎮 Processing games for user:', username);
     console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace });
 
-    // Step 1: Fetch collection with version info
+    // Step 1: Fetch collection with version info (check cache first)
     const collectionParams = new URLSearchParams({
       username,
       own: 1,
@@ -767,9 +784,19 @@ app.get('/api/games/:username', async (req, res) => {
     }
 
     const collectionUrl = `${BGG_API_BASE}/collection?${collectionParams.toString()}`;
-    console.log('📥 Fetching collection with version info...');
+    const collectionKey = `user:${username}:${includePreordered === 'true'}:${includeExpansions === 'true'}`;
     
+    let collection;
     let collectionResponse;
+    let collectionHash = null;
+    let cachedCollection = null;
+    
+    // Try cache first (we'll hash the response after fetching to compare)
+    console.log('📥 Checking cache for collection...');
+    
+    // We need to fetch to get the hash, but we can check if we have a cached version
+    // For now, we'll fetch and then check cache with the hash
+    
     let retries = 0;
     const maxRetries = 5;
     
@@ -797,7 +824,25 @@ app.get('/api/games/:username', async (req, res) => {
       throw new Error('Collection generation timed out. Please try again in a few moments.');
     }
 
-    const collection = await parseXmlString(collectionResponse.data);
+    // Hash the raw XML response
+    collectionHash = hashData(collectionResponse.data);
+    
+    // Check cache with hash
+    cachedCollection = getCollection(collectionKey, collectionHash);
+    
+    if (cachedCollection) {
+      console.log('   ✅ Using cached collection data');
+      // Reconstruct items from cached data (we need the full item structure for processing)
+      // For now, we'll still parse XML but use cached data for the item list structure
+      collection = await parseXmlString(collectionResponse.data);
+    } else {
+      console.log('   📥 Collection not in cache or changed, parsing and caching...');
+      collection = await parseXmlString(collectionResponse.data);
+      
+      // Extract and cache minimal collection data
+      const collectionData = extractCollectionData(collection);
+      setCollection(collectionKey, collectionHash, collectionData);
+    }
     
     if (!collection.items || !collection.items.item) {
       console.warn('⚠️  No items in collection');
@@ -953,12 +998,29 @@ app.get('/api/games/:username', async (req, res) => {
     
     const gameIds = Array.from(gameDetailsNeeded.keys());
     
+    // Check cache for games first
+    const gamesToFetch = [];
+    const cachedGames = new Map();
+    
+    console.log(`🔍 Checking cache for ${gameIds.length} games...`);
+    for (const gameId of gameIds) {
+      const cached = getGame(gameId);
+      if (cached) {
+        cachedGames.set(gameId, cached);
+      } else {
+        gamesToFetch.push(gameId);
+      }
+    }
+    
+    console.log(`   ✅ ${cachedGames.size} games from cache, ${gamesToFetch.length} need fetching`);
+    
+    // Fetch games that aren't cached
     const batchSize = 10;
     let allGames = []; // Use 'let' so we can reassign during expansion filtering
 
-    for (let i = 0; i < gameIds.length; i += batchSize) {
-      const batch = gameIds.slice(i, i + batchSize);
-      console.log(`📦 Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(gameIds.length / batchSize)}`);
+    for (let i = 0; i < gamesToFetch.length; i += batchSize) {
+      const batch = gamesToFetch.slice(i, i + batchSize);
+      console.log(`📦 Fetching batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(gamesToFetch.length / batchSize)} (${batch.length} games)`);
       
       // Check for duplicates within this batch
       const batchUnique = [...new Set(batch)];
@@ -997,6 +1059,11 @@ app.get('/api/games/:username', async (req, res) => {
         try {
           const gameId = item.$.id;
           
+          // Extract and cache game data
+          const gameData = extractGameData(item);
+          setGame(gameId, gameData);
+          cachedGames.set(gameId, gameData);
+          
           // Get all versions of this game from the collection
           const versions = gameDetailsNeeded.get(gameId) || [];
           
@@ -1023,32 +1090,102 @@ app.get('/api/games/:username', async (req, res) => {
       }
       thingItems.length = 0;
 
-      // Delay between batches (5 seconds as recommended by BGG API wiki)
-      if (i + batchSize < gameIds.length) {
-        await new Promise(resolve => setTimeout(resolve, 5000));
+      // No delay between batches - bggApiRequest handles rate limiting with retries
+    }
+    
+    // Process cached games (reconstruct from cache)
+    for (const gameId of Array.from(cachedGames.keys())) {
+      try {
+        const gameData = cachedGames.get(gameId);
+        const versions = gameDetailsNeeded.get(gameId) || [];
+        
+        // Process each version
+        versions.forEach(({versionId}) => {
+          const key = `${gameId}-${versionId}`;
+          
+          // Check version cache first, then versionMap from collection
+          let dimensions = null;
+          const cachedVersion = getVersion(gameId, versionId);
+          if (cachedVersion && cachedVersion.dimensions && !cachedVersion.dimensions.missingDimensions) {
+            dimensions = cachedVersion.dimensions;
+          } else {
+            // Fall back to versionMap from collection
+            const versionInfo = versionMap.get(key);
+            if (versionInfo) {
+              dimensions = {
+                length: parseFloat(versionInfo.length),
+                width: parseFloat(versionInfo.width),
+                depth: parseFloat(versionInfo.depth),
+                missingDimensions: false
+              };
+            }
+          }
+          
+          // Reconstruct game from cached data
+          const game = {
+            ...gameData,
+            dimensions: dimensions || {
+              length: 0,
+              width: 0,
+              depth: 0,
+              missingDimensions: true
+            }
+          };
+          
+          game.id = key;
+          game.baseGameId = gameId;
+          
+          allGames.push(game);
+        });
+      } catch (error) {
+        console.error(`Error processing cached game ${gameId}:`, error.message);
       }
     }
 
     console.log(`✅ Processed ${allGames.length} games`);
     
     // Step 2.5: Fetch dimensions for games with missing dimensions
-    const gamesMissingDimensions = allGames.filter(game => 
-      game.dimensions.missingDimensions || 
-      (game.dimensions.length === 0 && game.dimensions.width === 0 && game.dimensions.depth === 0)
-    );
+    // First, check cache for any missing dimensions
+    const gamesNeedingFetch = [];
+    for (const game of allGames) {
+      if (game.dimensions.missingDimensions || 
+          (game.dimensions.length === 0 && game.dimensions.width === 0 && game.dimensions.depth === 0)) {
+        // Extract versionId from game.id (format: "gameId-versionId")
+        // Use baseGameId which is already set on the game object
+        if (game.baseGameId && game.id) {
+          const parts = game.id.split('-');
+          if (parts.length >= 2) {
+            // Take last part as versionId (gameId is numeric, so this is safe)
+            const versionId = parts[parts.length - 1];
+            const cachedVersion = getVersion(game.baseGameId, versionId);
+            if (cachedVersion && cachedVersion.dimensions && !cachedVersion.dimensions.missingDimensions) {
+              // Found in cache!
+              game.dimensions = cachedVersion.dimensions;
+              console.log(`      ✓ Found dimensions in cache for ${game.name}: ${cachedVersion.dimensions.width}"×${cachedVersion.dimensions.length}"×${cachedVersion.dimensions.depth}"`);
+            } else {
+              gamesNeedingFetch.push(game);
+            }
+          } else {
+            gamesNeedingFetch.push(game);
+          }
+        } else {
+          gamesNeedingFetch.push(game);
+        }
+      }
+    }
     
-    if (gamesMissingDimensions.length > 0) {
-      console.log(`📏 Fetching dimensions for ${gamesMissingDimensions.length} games...`);
+    if (gamesNeedingFetch.length > 0) {
+      console.log(`📏 Fetching dimensions for ${gamesNeedingFetch.length} games...`);
       
       // Process in smaller batches to avoid memory issues
       const dimBatchSize = 5;
-      for (let i = 0; i < gamesMissingDimensions.length; i += dimBatchSize) {
-        const batch = gamesMissingDimensions.slice(i, i + dimBatchSize);
+      for (let i = 0; i < gamesNeedingFetch.length; i += dimBatchSize) {
+        const batch = gamesNeedingFetch.slice(i, i + dimBatchSize);
         const batchIds = batch.map(g => g.baseGameId).filter(Boolean);
         
         if (batchIds.length === 0) continue;
         
-        console.log(`   📦 Dimension batch ${Math.floor(i / dimBatchSize) + 1}/${Math.ceil(gamesMissingDimensions.length / dimBatchSize)}`);
+        console.log(`   📦 Dimension batch ${Math.floor(i / dimBatchSize) + 1}/${Math.ceil(gamesNeedingFetch.length / dimBatchSize)}`);
         
         const versionParams = new URLSearchParams({
           id: batchIds.join(','),
@@ -1075,39 +1212,101 @@ app.get('/api/games/:username', async (req, res) => {
             
             versionItems.forEach(item => {
               const gameId = item.$.id;
+              const versions = item.versions?.[0]?.item || [];
+              
+              // Process and cache each version
+              if (Array.isArray(versions)) {
+                versions.forEach(versionItem => {
+                  const versionData = extractVersionData(versionItem);
+                  if (versionData.versionId) {
+                    setVersion(gameId, versionData.versionId, versionData);
+                  }
+                });
+              }
+              
               const dimensions = findDimensionsFromVersions(item);
               
-              // Update all games with this base game ID
+              // Update all games with this base game ID and cache with user's versionId
               batch.forEach(game => {
-                if (game.baseGameId === gameId && dimensions && !dimensions.missingDimensions) {
-                  game.dimensions = dimensions;
-                  console.log(`      ✓ Found dimensions for ${game.name}: ${dimensions.width}"×${dimensions.length}"×${dimensions.depth}"`);
+                if (game.baseGameId === gameId) {
+                  // Extract versionId from game.id (format: "gameId-versionId")
+                  if (game.baseGameId && game.id) {
+                    const parts = game.id.split('-');
+                    if (parts.length >= 2) {
+                      // Take last part as versionId (gameId is numeric, so this is safe)
+                      const versionId = parts[parts.length - 1];
+                      
+                      if (dimensions && !dimensions.missingDimensions) {
+                        // Found dimensions from alternate version
+                        game.dimensions = dimensions;
+                        console.log(`      ✓ Found dimensions for ${game.name}: ${dimensions.width}"×${dimensions.length}"×${dimensions.depth}"`);
+                        
+                        // Cache the dimensions with the user's actual versionId
+                        const versionDataToCache = {
+                          versionId: versionId,
+                          name: null,
+                          yearPublished: null,
+                          dimensions: dimensions
+                        };
+                        setVersion(game.baseGameId, versionId, versionDataToCache);
+                      } else {
+                        // No dimensions found - cache default dimensions
+                        const defaultDimensions = {
+                          length: 12.8,
+                          width: 12.8,
+                          depth: 1.8,
+                          missingDimensions: true
+                        };
+                        
+                        const versionDataToCache = {
+                          versionId: versionId,
+                          name: null,
+                          yearPublished: null,
+                          dimensions: defaultDimensions
+                        };
+                        setVersion(game.baseGameId, versionId, versionDataToCache);
+                      }
+                    }
+                  }
                 }
               });
             });
           }
           
-          // Delay between batches (5 seconds as recommended by BGG API wiki)
-          if (i + dimBatchSize < gamesMissingDimensions.length) {
-            await new Promise(resolve => setTimeout(resolve, 5000));
-          }
+          // No delay between batches - bggApiRequest handles rate limiting with retries
         } catch (error) {
           console.error(`   ❌ Error fetching dimensions for batch: ${error.message}`);
         }
       }
     }
     
-    // Step 2.6: Apply default dimensions to any games still missing dimensions
+    // Step 2.6: Apply default dimensions to any games still missing dimensions and cache them
     let gamesWithDefaultDimensions = 0;
     allGames.forEach(game => {
       if (game.dimensions.length === 0 && game.dimensions.width === 0 && game.dimensions.depth === 0) {
-        game.dimensions = {
+        const defaultDimensions = {
           length: 12.8,
           width: 12.8,
           depth: 1.8,
           missingDimensions: true,
         };
+        game.dimensions = defaultDimensions;
         gamesWithDefaultDimensions++;
+        
+        // Cache default dimensions with the user's actual versionId
+        if (game.baseGameId && game.id) {
+          const parts = game.id.split('-');
+          if (parts.length >= 2) {
+            const versionId = parts[parts.length - 1];
+            const versionDataToCache = {
+              versionId: versionId,
+              name: null,
+              yearPublished: null,
+              dimensions: defaultDimensions
+            };
+            setVersion(game.baseGameId, versionId, versionDataToCache);
+          }
+        }
       }
     });
     
@@ -1537,6 +1736,65 @@ app.get('/api/thing', async (req, res) => {
   }
 });
 
+// Admin endpoints for cache management
+const CACHE_ADMIN_PASSWORD = process.env.CACHE_ADMIN_PASSWORD;
+
+// Middleware to check admin password
+const checkAdminAuth = (req, res, next) => {
+  const providedPassword = req.headers['x-admin-password'] || req.body.password;
+  
+  if (!CACHE_ADMIN_PASSWORD) {
+    return res.status(500).json({ error: 'Admin password not configured' });
+  }
+  
+  if (providedPassword !== CACHE_ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  next();
+};
+
+// Get cache statistics
+app.get('/api/admin/cache/stats', checkAdminAuth, (req, res) => {
+  try {
+    const stats = getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error getting cache stats:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Clear cache
+app.post('/api/admin/cache/clear', checkAdminAuth, (req, res) => {
+  try {
+    const success = clearCache();
+    if (success) {
+      res.json({ message: 'Cache cleared successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to clear cache' });
+    }
+  } catch (error) {
+    console.error('Error clearing cache:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Run cleanup
+app.post('/api/admin/cache/cleanup', checkAdminAuth, (req, res) => {
+  try {
+    const result = cleanup();
+    if (result) {
+      res.json({ message: 'Cleanup completed', result });
+    } else {
+      res.status(500).json({ error: 'Cleanup failed' });
+    }
+  } catch (error) {
+    console.error('Error running cleanup:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 BGG Kallax Organizer Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
@@ -1547,5 +1805,17 @@ app.listen(PORT, () => {
   } else {
     console.log('✅ BGG API token configured');
   }
+  
+  // Run cleanup on startup
+  console.log('🧹 Running initial cache cleanup...');
+  cleanup();
+  
+  // Schedule hourly cleanup
+  setInterval(() => {
+    console.log('🧹 Running scheduled cache cleanup...');
+    cleanup();
+  }, 3600 * 1000); // 1 hour
+  
+  console.log('✅ Cache cleanup scheduled (every hour)');
 });
 

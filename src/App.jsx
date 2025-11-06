@@ -96,7 +96,7 @@ function App() {
     <div className="app">
       <header>
         <div className="header-content">
-          <h1>GameGeek Cube Organizer</h1>
+          <h1>BGCube</h1>
           <p className="subtitle">
             Organize your <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="subtitle-link">BoardGameGeek</a> collection into <a href="https://www.ikea.com/us/en/cat/kallax-shelving-units-58285/" target="_blank" rel="noopener noreferrer" className="subtitle-link">IKEA Kallax shelving units</a>
           </p>

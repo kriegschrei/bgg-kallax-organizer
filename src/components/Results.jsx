@@ -6,6 +6,21 @@ import './Results.css';
 export default function Results({ cubes, verticalStacking }) {
   const stats = calculateStats(cubes, verticalStacking);
 
+  // Collect games with missing dimensions
+  const gamesWithMissingDimensions = [];
+  const gamesExceedingCapacity = [];
+  
+  cubes.forEach(cube => {
+    cube.games.forEach(game => {
+      if (game.dimensions?.missingDimensions) {
+        gamesWithMissingDimensions.push(game);
+      }
+      if (game.oversizedX || game.oversizedY) {
+        gamesExceedingCapacity.push(game);
+      }
+    });
+  });
+
   return (
     <div className="results">
       <h2>Packing Results</h2>
@@ -28,6 +43,23 @@ export default function Results({ cubes, verticalStacking }) {
           <span className="stat-label">Avg Space Utilization</span>
         </div>
       </div>
+
+      {(gamesWithMissingDimensions.length > 0 || gamesExceedingCapacity.length > 0) && (
+        <div className="results-warnings">
+          {gamesWithMissingDimensions.length > 0 && (
+            <div className="warning-box">
+              <strong>⚠️ Missing Dimensions:</strong> {gamesWithMissingDimensions.length} game{gamesWithMissingDimensions.length !== 1 ? 's' : ''} {gamesWithMissingDimensions.length !== 1 ? 'do' : 'does'} not have dimensions listed on BGG. 
+              Default dimensions of 13"×13"×2" were assumed and marked with a warning icon (⚠️).
+            </div>
+          )}
+          {gamesExceedingCapacity.length > 0 && (
+            <div className="warning-box">
+              <strong>📦 Games Exceeding Cube Capacity:</strong> {gamesExceedingCapacity.length} game{gamesExceedingCapacity.length !== 1 ? 's' : ''} {gamesExceedingCapacity.length !== 1 ? 'have' : 'has'} physical dimensions that exceed the capacity of a Kallax cube (13" × 13" × 15"). 
+              Pseudo-dimensions were used to fit these games, and they are marked with a box icon (📦).
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="cubes-container">
         {cubes.map((cube) => (

@@ -96,10 +96,38 @@ function App() {
     <div className="app">
       <header>
         <div className="header-content">
-          <h1>BGG Kallax Organizer</h1>
+          <h1>GameGeek Cube Organizer</h1>
           <p className="subtitle">
-            Organize your BoardGameGeek collection into IKEA Kallax cubes
+            Organize your <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="subtitle-link">BoardGameGeek</a> collection into <a href="https://www.ikea.com/us/en/cat/kallax-shelving-units-58285/" target="_blank" rel="noopener noreferrer" className="subtitle-link">IKEA Kallax shelving units</a>
           </p>
+        </div>
+        <div className="header-banner">
+          <div className="banner-item">
+            <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="banner-link">
+              <img 
+                src="/powered_by_bgg.png" 
+                alt="Powered by BoardGameGeek" 
+                className="banner-logo"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'block';
+                }}
+              />
+              <span className="banner-fallback" style={{ display: 'none' }}>
+                Powered by BoardGameGeek
+              </span>
+            </a>
+          </div>
+          <div className="banner-item">
+            <a href="https://ko-fi.com/kriegschrei" target="_blank" rel="noopener noreferrer" className="banner-link">
+              ☕ Support on Ko-Fi
+            </a>
+          </div>
+          <div className="banner-item">
+            <a href="https://github.com/kriegschrei/bgg-kallax-organizer/issues" target="_blank" rel="noopener noreferrer" className="banner-link">
+              🐛 Report Issues
+            </a>
+          </div>
         </div>
       </header>
 
@@ -248,40 +276,23 @@ function App() {
 
       {cubes && <Results cubes={cubes} verticalStacking={verticalStacking} />}
 
-      <footer>
-        <p>
-          <strong>About:</strong> This tool uses the BoardGameGeek XML API2 to fetch your collection
-          and calculates the optimal arrangement to fit your games into IKEA Kallax cube organizers
-          (13" W × 13" H × 15" D).
-        </p>
-        <p className="disclaimer">
-          ⚠️ Some games may not have dimensions listed on BGG. For these games, default dimensions
-          of 13"×13"×2" are assumed and marked with a warning icon.
-        </p>
-        <div className="bgg-attribution">
-          <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer">
-            <img 
-              src="/powered_by_bgg.png" 
-              alt="Powered by BoardGameGeek" 
-              className="bgg-logo"
-              onError={(e) => {
-                e.target.style.display = 'none';
-                e.target.nextSibling.style.display = 'block';
-              }}
-            />
-          </a>
-          <p className="bgg-fallback" style={{ display: 'none' }}>
-            Data provided by <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer">BoardGameGeek</a>
-          </p>
-        </div>
-        <div className="footer-links">
-          <a href="https://ko-fi.com/kriegschrei" target="_blank" rel="noopener noreferrer" className="footer-link">
-            ☕ Support on Ko-Fi
-          </a>
-          <span className="footer-link-separator">•</span>
-          <a href="https://github.com/kriegschrei/bgg-kallax-organizer/issues" target="_blank" rel="noopener noreferrer" className="footer-link">
-            🐛 Report Issues
-          </a>
+      <footer className="disclaimer-footer">
+        <div className="footer-content">
+          <div className="footer-section">
+            <h4>About</h4>
+            <p>
+              This tool uses the <a href="https://boardgamegeek.com/using_the_xml_api" target="_blank" rel="noopener noreferrer">BoardGameGeek XML API2</a> to fetch your collection
+              and calculates the optimal arrangement to fit your games into <a href="https://www.ikea.com/us/en/cat/kallax-shelving-units-58285/" target="_blank" rel="noopener noreferrer">IKEA Kallax shelving units</a>
+              (13" W × 13" H × 15" D).
+            </p>
+          </div>
+          <div className="footer-section">
+            <h4>Disclaimer</h4>
+            <p>
+              GameGeek Cube Organizer is an independent tool not affiliated with or endorsed by BoardGameGeek or IKEA. 
+              BoardGameGeek® is a trademark of BoardGameGeek, LLC. KALLAX® and IKEA® are trademarks of Inter IKEA Systems B.V.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

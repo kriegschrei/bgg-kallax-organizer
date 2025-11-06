@@ -28,12 +28,22 @@ function App() {
   const [allowAlternateRotation, setAllowAlternateRotation] = useState(true);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
+  const [ensureSupport, setEnsureSupport] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
   const [cubes, setCubes] = useState(null);
+
+  const handleOptimizeSpaceChange = (checked) => {
+    setOptimizeSpace(checked);
+    if (checked) {
+      // Disable and uncheck all priorities when optimize space is enabled
+      setPriorities(priorities.map(p => ({ ...p, enabled: false })));
+      setRespectSortOrder(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -58,7 +68,8 @@ function App() {
         verticalStacking,
         allowAlternateRotation,
         optimizeSpace,
-        respectSortOrder
+        respectSortOrder,
+        ensureSupport
       );
       
       if (!packedCubes || packedCubes.length === 0) {
@@ -113,89 +124,103 @@ function App() {
               />
             </div>
 
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={includePreordered}
-                  onChange={(e) => setIncludePreordered(e.target.checked)}
-                  disabled={loading}
-                />
-                Include pre-ordered games
-              </label>
-            </div>
+            <div className="checkbox-grid">
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={includePreordered}
+                    onChange={(e) => setIncludePreordered(e.target.checked)}
+                    disabled={loading}
+                  />
+                  Include Pre-ordered Games
+                </label>
+              </div>
 
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={includeExpansions}
-                  onChange={(e) => setIncludeExpansions(e.target.checked)}
-                  disabled={loading}
-                />
-                Include expansions
-              </label>
-            </div>
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={respectSortOrder}
+                    onChange={(e) => setRespectSortOrder(e.target.checked)}
+                    disabled={loading || optimizeSpace}
+                  />
+                  Respect ordering priority
+                  <span className="tooltip-trigger" data-tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space">ℹ️</span>
+                </label>
+              </div>
 
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={allowAlternateRotation}
-                  onChange={(e) => setAllowAlternateRotation(e.target.checked)}
-                  disabled={loading}
-                />
-                Allow alternate rotation for best fit
-              </label>
-            </div>
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={includeExpansions}
+                    onChange={(e) => setIncludeExpansions(e.target.checked)}
+                    disabled={loading}
+                  />
+                  Include expansions
+                </label>
+              </div>
 
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={optimizeSpace}
-                  onChange={(e) => setOptimizeSpace(e.target.checked)}
-                  disabled={loading}
-                />
-                Optimize for space (ignore alphabetical order, pack largest games first)
-              </label>
-            </div>
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={ensureSupport}
+                    onChange={(e) => setEnsureSupport(e.target.checked)}
+                    disabled={loading}
+                  />
+                  Support all games
+                  <span className="tooltip-trigger" data-tooltip="Prevents floating games, may take longer to organize">ℹ️</span>
+                </label>
+              </div>
 
-            <div className="form-group checkbox-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={respectSortOrder}
-                  onChange={(e) => setRespectSortOrder(e.target.checked)}
-                  disabled={loading || optimizeSpace}
-                />
-                Strictly respect sorting order (prevents backfilling earlier cubes)
-              </label>
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={allowAlternateRotation}
+                    onChange={(e) => setAllowAlternateRotation(e.target.checked)}
+                    disabled={loading}
+                  />
+                  Allow alternate rotation
+                  <span className="tooltip-trigger" data-tooltip="Prefer vertical or horizontal, but may rotate games for better fit">ℹ️</span>
+                </label>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={optimizeSpace}
+                    onChange={(e) => handleOptimizeSpaceChange(e.target.checked)}
+                    disabled={loading}
+                  />
+                  Optimize for space
+                  <span className="tooltip-trigger" data-tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible">ℹ️</span>
+                </label>
+              </div>
             </div>
 
             <div className="form-group">
               <label>Stacking Preference</label>
-              <div className="radio-group">
-                <label>
-                  <input
-                    type="radio"
-                    name="stacking"
-                    checked={verticalStacking}
-                    onChange={() => setVerticalStacking(true)}
-                    disabled={loading}
-                  />
-                  Vertical (standing upright)
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="stacking"
-                    checked={!verticalStacking}
-                    onChange={() => setVerticalStacking(false)}
-                    disabled={loading}
-                  />
-                  Horizontal (laying flat)
-                </label>
+              <div className="toggle-button-group">
+                <button
+                  type="button"
+                  className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
+                  onClick={() => setVerticalStacking(false)}
+                  disabled={loading}
+                >
+                  Horizontal
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-button ${verticalStacking ? 'active' : ''}`}
+                  onClick={() => setVerticalStacking(true)}
+                  disabled={loading}
+                >
+                  Vertical
+                </button>
               </div>
             </div>
 
@@ -205,7 +230,11 @@ function App() {
           </div>
 
           <div className="form-right">
-            <SortablePriorities priorities={priorities} onChange={setPriorities} />
+            <SortablePriorities 
+              priorities={priorities} 
+              onChange={setPriorities}
+              disabled={optimizeSpace}
+            />
           </div>
         </div>
       </form>
@@ -230,18 +259,29 @@ function App() {
           of 13"×13"×2" are assumed and marked with a warning icon.
         </p>
         <div className="bgg-attribution">
-          <img 
-            src="/powered_by_bgg.png" 
-            alt="Powered by BoardGameGeek" 
-            className="bgg-logo"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'block';
-            }}
-          />
+          <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer">
+            <img 
+              src="/powered_by_bgg.png" 
+              alt="Powered by BoardGameGeek" 
+              className="bgg-logo"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'block';
+              }}
+            />
+          </a>
           <p className="bgg-fallback" style={{ display: 'none' }}>
             Data provided by <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer">BoardGameGeek</a>
           </p>
+        </div>
+        <div className="footer-links">
+          <a href="https://ko-fi.com/kriegschrei" target="_blank" rel="noopener noreferrer" className="footer-link">
+            ☕ Support on Ko-Fi
+          </a>
+          <span className="footer-link-separator">•</span>
+          <a href="https://github.com/kriegschrei/bgg-kallax-organizer/issues" target="_blank" rel="noopener noreferrer" className="footer-link">
+            🐛 Report Issues
+          </a>
         </div>
       </footer>
     </div>

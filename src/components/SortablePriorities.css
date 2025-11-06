@@ -1,9 +1,128 @@
 .sortable-priorities {
-  margin: 1.5rem 0;
+  margin: 0;
 }
 
-.sortable-priorities h3 {
+.sortable-priorities-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 0.5rem;
+}
+
+.sortable-priorities-header h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.sortable-priorities-header-expanded {
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+}
+
+.sortable-priorities-header-expanded:hover {
+  background: #ecf0f1;
+  border-color: #bdc3c7;
+}
+
+.sortable-priorities-header-expanded .sortable-priorities-header {
+  margin-bottom: 0.5rem;
+}
+
+.sortable-priorities-header-expanded .expand-toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 1rem;
+  color: #5d6d7e;
+  min-width: auto;
+}
+
+.sortable-priorities-header-expanded .hint {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+.sortable-priorities-collapsed {
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 0;
+}
+
+.sortable-priorities-collapsed:hover {
+  background: #ecf0f1;
+  border-color: #bdc3c7;
+}
+
+.sortable-priorities-collapsed .sortable-priorities-header {
+  margin-bottom: 0.5rem;
+}
+
+.sortable-priorities-collapsed .expand-toggle {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 1rem;
+  color: #5d6d7e;
+  min-width: auto;
+}
+
+.sortable-priorities-collapsed .sortable-priorities-summary {
+  padding: 0;
+  background: transparent;
+  border: none;
+  margin: 0;
+}
+
+.expand-toggle {
+  background: transparent;
+  border: 1px solid #bdc3c7;
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #5d6d7e;
+  transition: all 0.2s;
+  min-width: 2rem;
+}
+
+.expand-toggle:hover {
+  background: #ecf0f1;
+  border-color: #95a5a6;
+}
+
+.sortable-priorities-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary-text {
+  font-weight: 500;
+  color: #2c3e50;
+}
+
+.summary-hint {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+}
+
+.disabled-badge {
+  color: #e67e22;
+  font-weight: 600;
+}
+
+.sortable-priorities.disabled {
+  opacity: 0.7;
 }
 
 .sortable-priorities .hint {
@@ -88,5 +207,19 @@
 
 .sortable-item.enabled .sort-order-toggle:hover {
   background: #bbdefb;
+}
+
+.sortable-item.item-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sortable-item.item-disabled .drag-handle {
+  opacity: 0.4;
+}
+
+.sortable-item.item-disabled input[type="checkbox"]:disabled,
+.sortable-item.item-disabled .sort-order-toggle:disabled {
+  cursor: not-allowed;
 }
 

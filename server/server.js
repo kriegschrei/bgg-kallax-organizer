@@ -203,6 +203,272 @@ function calculateOccupiedArea(cube) {
   return area;
 }
 
+// Find games that support a game at given position
+function findSupportingGames(x, y, width, games) {
+  if (y < GRID_PRECISION) return []; // On ground, no support needed
+  
+  const epsilon = GRID_PRECISION * 0.5;
+  const supporters = [];
+  
+  for (const game of games) {
+    const gx = game.position.x;
+    const gy = game.position.y;
+    const gw = game.packedDims.x;
+    const gh = game.packedDims.y;
+    const topY = gy + gh;
+    
+    // Check if this game's top edge touches the bottom of the placed game
+    if (Math.abs(y - topY) < epsilon) {
+      // Check if there's horizontal overlap
+      if (!(x >= gx + gw - epsilon || x + width <= gx + epsilon)) {
+        supporters.push(game);
+      }
+    }
+  }
+  
+  return supporters;
+}
+
+// Check if swapping two games would improve stability
+function trySwapForStability(cube, game1, game2, requireSupport) {
+  // Don't swap if they're the same size
+  if (Math.abs(game1.packedDims.x - game2.packedDims.x) < GRID_PRECISION) {
+    return false;
+  }
+  
+  // Determine which should be lower (wider game should be at bottom)
+  const [lowerGame, upperGame] = game1.packedDims.x > game2.packedDims.x 
+    ? [game1, game2] 
+    : [game2, game1];
+  
+  // Save original states
+  const originalLowerPos = { ...lowerGame.position };
+  const originalUpperPos = { ...upperGame.position };
+  
+  // Determine target Y levels (swap their Y positions)
+  const lowerTargetY = Math.min(originalLowerPos.y, originalUpperPos.y);
+  const upperTargetY = Math.max(originalLowerPos.y, originalUpperPos.y);
+  
+  // Remove both games temporarily
+  const index1 = cube.games.indexOf(game1);
+  const index2 = cube.games.indexOf(game2);
+  cube.games.splice(Math.max(index1, index2), 1);
+  cube.games.splice(Math.min(index1, index2), 1);
+  
+  // Try to find a position for the wider game at the lower Y level
+  let lowerNewPos = null;
+  
+  // First try the original X positions
+  for (const tryX of [originalLowerPos.x, originalUpperPos.x]) {
+    if (!hasCollision(tryX, lowerTargetY, lowerGame.packedDims.x, lowerGame.packedDims.y, cube.games)) {
+      // Check support if needed
+      if (!requireSupport || lowerTargetY < GRID_PRECISION || 
+          hasFullSupport(tryX, lowerTargetY, lowerGame.packedDims.x, cube.games)) {
+        lowerNewPos = { x: tryX, y: lowerTargetY };
+        break;
+      }
+    }
+  }
+  
+  // If original positions don't work, try scanning for a new position at this Y level
+  if (!lowerNewPos) {
+    const maxX = CUBE_SIZE - lowerGame.packedDims.x + GRID_PRECISION * 0.5;
+    for (let testX = 0; testX <= maxX; testX = roundToGrid(testX + GRID_PRECISION)) {
+      if (!hasCollision(testX, lowerTargetY, lowerGame.packedDims.x, lowerGame.packedDims.y, cube.games)) {
+        if (!requireSupport || lowerTargetY < GRID_PRECISION || 
+            hasFullSupport(testX, lowerTargetY, lowerGame.packedDims.x, cube.games)) {
+          lowerNewPos = { x: testX, y: lowerTargetY };
+          break;
+        }
+      }
+    }
+  }
+  
+  if (!lowerNewPos) {
+    // Can't place lower game, restore and fail
+    cube.games.splice(Math.min(index1, index2), 0, index1 < index2 ? game1 : game2);
+    cube.games.splice(Math.max(index1, index2), 0, index1 < index2 ? game2 : game1);
+    return false;
+  }
+  
+  // Place the lower game temporarily
+  lowerGame.position = lowerNewPos;
+  const tempCubeWithLower = [lowerGame, ...cube.games];
+  
+  // Try to find a position for the narrower game at the upper Y level
+  let upperNewPos = null;
+  
+  // First try the original X positions
+  for (const tryX of [originalUpperPos.x, originalLowerPos.x]) {
+    if (!hasCollision(tryX, upperTargetY, upperGame.packedDims.x, upperGame.packedDims.y, tempCubeWithLower)) {
+      // Check support if needed
+      if (!requireSupport || upperTargetY < GRID_PRECISION || 
+          hasFullSupport(tryX, upperTargetY, upperGame.packedDims.x, tempCubeWithLower)) {
+        upperNewPos = { x: tryX, y: upperTargetY };
+        break;
+      }
+    }
+  }
+  
+  // If original positions don't work, try scanning for a new position at this Y level
+  if (!upperNewPos) {
+    const maxX = CUBE_SIZE - upperGame.packedDims.x + GRID_PRECISION * 0.5;
+    for (let testX = 0; testX <= maxX; testX = roundToGrid(testX + GRID_PRECISION)) {
+      if (!hasCollision(testX, upperTargetY, upperGame.packedDims.x, upperGame.packedDims.y, tempCubeWithLower)) {
+        if (!requireSupport || upperTargetY < GRID_PRECISION || 
+            hasFullSupport(testX, upperTargetY, upperGame.packedDims.x, tempCubeWithLower)) {
+          upperNewPos = { x: testX, y: upperTargetY };
+          break;
+        }
+      }
+    }
+  }
+  
+  if (!upperNewPos) {
+    // Can't place upper game, restore and fail
+    cube.games.splice(Math.min(index1, index2), 0, index1 < index2 ? game1 : game2);
+    cube.games.splice(Math.max(index1, index2), 0, index1 < index2 ? game2 : game1);
+    lowerGame.position = originalLowerPos;
+    upperGame.position = originalUpperPos;
+    return false;
+  }
+  
+  // Both positions found! Commit the swap
+  upperGame.position = upperNewPos;
+  cube.games.push(lowerGame);
+  cube.games.push(upperGame);
+  return true;
+}
+
+// Check stability after placing a game
+function checkAndImproveStability(cube, placedGame, requireSupport) {
+  // Only check if game is above ground
+  if (placedGame.position.y < GRID_PRECISION) return;
+  
+  // Find all games supporting this game
+  const supporters = findSupportingGames(
+    placedGame.position.x, 
+    placedGame.position.y, 
+    placedGame.packedDims.x, 
+    cube.games.filter(g => g !== placedGame)
+  );
+  
+  if (supporters.length === 0) return;
+  
+  // Check if placed game is wider than any supporter
+  for (const supporter of supporters) {
+    if (placedGame.packedDims.x > supporter.packedDims.x + GRID_PRECISION) {
+      // Try to swap them
+      if (trySwapForStability(cube, placedGame, supporter, requireSupport)) {
+        console.log(`   ♻️  Swapped "${placedGame.name}" with "${supporter.name}" for better stability`);
+        // After successful swap, check again recursively
+        checkAndImproveStability(cube, placedGame, requireSupport);
+        break;
+      }
+    }
+  }
+}
+
+// Aggressive reorganization: try to rearrange all games in cube to fit a new game
+function tryAggressiveReorganization(cube, newGame, width, height, requireSupport, priorities, optimizeSpace) {
+  console.log(`   🔄 Attempting aggressive reorganization for "${newGame.name}"`);
+  
+  // Check if there's theoretically enough space
+  const gameArea = width * height;
+  const cubeArea = CUBE_SIZE * CUBE_SIZE;
+  const occupiedArea = calculateOccupiedArea(cube);
+  
+  if (occupiedArea + gameArea > cubeArea) {
+    console.log(`      ❌ Not enough area (${(occupiedArea + gameArea).toFixed(1)} > ${cubeArea})`);
+    return false;
+  }
+  
+  // Save original state
+  const originalGames = cube.games.map(g => ({
+    game: g,
+    position: { ...g.position },
+    packedDims: { ...g.packedDims },
+    actualDims: { ...g.actualDims },
+  }));
+  
+  // Create a list of all games to pack (existing + new)
+  const allGames = [...cube.games.map(g => ({
+    ...g,
+    isOriginal: true
+  })), {
+    ...newGame,
+    packedDims: { x: width, y: height },
+    isNew: true
+  }];
+  
+  // Sort games by:
+  // 1. If optimizeSpace: largest area first (for better packing)
+  // 2. Otherwise: keep relative order from priorities, but put wider games first within same priority
+  if (optimizeSpace) {
+    allGames.sort((a, b) => {
+      const aArea = (a.packedDims?.x || a.dims2D?.x || width) * (a.packedDims?.y || a.dims2D?.y || height);
+      const bArea = (b.packedDims?.x || b.dims2D?.x || width) * (b.packedDims?.y || b.dims2D?.y || height);
+      return bArea - aArea;
+    });
+  } else {
+    // Keep relative order but prefer wider games for stability
+    allGames.sort((a, b) => {
+      const aWidth = a.packedDims?.x || a.dims2D?.x || 0;
+      const bWidth = b.packedDims?.x || b.dims2D?.x || 0;
+      // Wider games first for better stability
+      if (Math.abs(aWidth - bWidth) > GRID_PRECISION) {
+        return bWidth - aWidth;
+      }
+      // Keep original order otherwise
+      return 0;
+    });
+  }
+  
+  // Clear the cube
+  cube.games = [];
+  
+  // Try to place all games with support requirement
+  let failedToPlace = null;
+  for (const gameToPlace of allGames) {
+    const gWidth = gameToPlace.packedDims?.x || gameToPlace.dims2D?.x || width;
+    const gHeight = gameToPlace.packedDims?.y || gameToPlace.dims2D?.y || height;
+    
+    const position = findPosition(cube, gWidth, gHeight, requireSupport);
+    
+    if (position) {
+      // Calculate z dimension
+      const sorted = [gameToPlace.dimensions.length, gameToPlace.dimensions.width, gameToPlace.dimensions.depth].sort((a, b) => b - a);
+      const depthDimension = sorted[0];
+      
+      gameToPlace.position = position;
+      gameToPlace.packedDims = { x: gWidth, y: gHeight, z: depthDimension };
+      gameToPlace.actualDims = gameToPlace.actualDims || { x: gWidth, y: gHeight, z: depthDimension };
+      cube.games.push(gameToPlace);
+    } else {
+      failedToPlace = gameToPlace;
+      break;
+    }
+  }
+  
+  // If we successfully placed all games (including the new one)
+  if (!failedToPlace) {
+    console.log(`      ✅ Reorganization successful! All ${allGames.length} games placed.`);
+    return true;
+  }
+  
+  // Reorganization failed - restore original state
+  console.log(`      ❌ Reorganization failed, could not place "${failedToPlace.name}"`);
+  cube.games = [];
+  for (const orig of originalGames) {
+    orig.game.position = orig.position;
+    orig.game.packedDims = orig.packedDims;
+    orig.game.actualDims = orig.actualDims;
+    cube.games.push(orig.game);
+  }
+  
+  return false;
+}
+
 // Try to place a game in a cube with given dimensions
 function tryPlaceGame(cube, game, width, height, requireSupport) {
   const actualWidth = width;
@@ -232,6 +498,10 @@ function tryPlaceGame(cube, game, width, height, requireSupport) {
     game.oversizedX = actualWidth > OVERSIZED_THRESHOLD;
     game.oversizedY = actualHeight > OVERSIZED_THRESHOLD;
     cube.games.push(game);
+    
+    // Check and improve stability after placement
+    checkAndImproveStability(cube, game, requireSupport);
+    
     return true;
   }
   
@@ -239,13 +509,14 @@ function tryPlaceGame(cube, game, width, height, requireSupport) {
 }
 
 // Main packing function
-function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder) {
+function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport) {
   console.log(`📦 Starting to pack ${games.length} games`);
-  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}`);
+  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, ensureSupport=${ensureSupport}`);
   
   // Determine primary order
   const primaryOrder = verticalStacking ? 'vertical' : 'horizontal';
-  const requireSupport = primaryOrder === 'horizontal';
+  // If ensureSupport is enabled, always require support. Otherwise, only for horizontal.
+  const requireSupport = ensureSupport ? true : (primaryOrder === 'horizontal');
   
   // Step 1: Calculate 2D dimensions for all games
   for (const game of games) {
@@ -344,6 +615,18 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
         }
       }
       if (wasPlaced) break;
+      
+      // If normal placement failed and ensureSupport is enabled, try aggressive reorganization
+      if (!wasPlaced && ensureSupport && requireSupport) {
+        for (const orientation of orientations) {
+          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, requireSupport, priorities, optimizeSpace)) {
+            placed.add(game.id);
+            wasPlaced = true;
+            break;
+          }
+        }
+        if (wasPlaced) break;
+      }
     }
     
     // Create new cube if not placed
@@ -416,7 +699,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
 app.get('/api/games/:username', async (req, res) => {
   try {
     const { username } = req.params;
-    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder } = req.query;
+    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport } = req.query;
     
     if (!BGG_TOKEN) {
       console.error('❌ BGG API token not configured');
@@ -850,8 +1133,9 @@ app.get('/api/games/:username', async (req, res) => {
     const allowAltRotation = allowAlternateRotation === 'true';
     const shouldOptimizeSpace = optimizeSpace === 'true';
     const strictSortOrder = respectSortOrder === 'true';
+    const shouldEnsureSupport = ensureSupport === 'true';
     
-    const packedCubes = packGamesIntoCubes(uniqueGames, parsedPriorities, isVertical, allowAltRotation, shouldOptimizeSpace, strictSortOrder);
+    const packedCubes = packGamesIntoCubes(uniqueGames, parsedPriorities, isVertical, allowAltRotation, shouldOptimizeSpace, strictSortOrder, shouldEnsureSupport);
     
     res.json({ cubes: packedCubes, totalGames: uniqueGames.length });
 

@@ -51,7 +51,7 @@ const xmlToObject = (node) => {
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // New simplified method that calls server-processed endpoint and returns packed cubes
-export const fetchPackedCubes = async (username, includePreordered = false, includeExpansions = false, priorities = [], verticalStacking = true, allowAlternateRotation = true, optimizeSpace = false, respectSortOrder = false) => {
+export const fetchPackedCubes = async (username, includePreordered = false, includeExpansions = false, priorities = [], verticalStacking = true, allowAlternateRotation = true, optimizeSpace = false, respectSortOrder = false, ensureSupport = false) => {
   try {
     console.log('📡 Frontend: Fetching packed cubes from server');
     
@@ -63,6 +63,7 @@ export const fetchPackedCubes = async (username, includePreordered = false, incl
       allowAlternateRotation: allowAlternateRotation.toString(),
       optimizeSpace: optimizeSpace.toString(),
       respectSortOrder: respectSortOrder.toString(),
+      ensureSupport: ensureSupport.toString(),
     });
     
     const response = await axios.get(`${API_BASE}/games/${username}?${params.toString()}`);

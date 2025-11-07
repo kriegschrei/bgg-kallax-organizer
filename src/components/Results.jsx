@@ -3,16 +3,15 @@ import CubeVisualization from './CubeVisualization';
 import { calculateStats } from '../services/packing';
 import './Results.css';
 
-export default function Results({ cubes, verticalStacking }) {
+export default function Results({ cubes, verticalStacking, oversizedGames = [], fitOversized = false }) {
   const stats = calculateStats(cubes, verticalStacking);
   const [missingDimsExpanded, setMissingDimsExpanded] = useState(false);
   const [exceedingCapacityExpanded, setExceedingCapacityExpanded] = useState(false);
-  const [guessedVersionsExpanded, setGuessedVersionsExpanded] = useState(true);
-  const [selectedVersionFallbackExpanded, setSelectedVersionFallbackExpanded] = useState(true);
+  const [guessedVersionsExpanded, setGuessedVersionsExpanded] = useState(false);
+  const [selectedVersionFallbackExpanded, setSelectedVersionFallbackExpanded] = useState(false);
 
   // Collect games with missing dimensions, exceeding cube capacity, and those using alternate versions
   const gamesWithMissingDimensions = [];
-  const gamesExceedingCapacity = [];
   const gamesWithGuessedVersions = [];
   const gamesUsingFallbackForSelectedVersion = [];
   
@@ -20,11 +19,8 @@ export default function Results({ cubes, verticalStacking }) {
     cube.games.forEach(game => {
       const baseGameData = { ...game, cubeId: cube.id };
 
-      if (game.dimensions?.missingDimensions) {
+      if (game.dimensions?.missingDimensions && !game.missingVersion) {
         gamesWithMissingDimensions.push(baseGameData);
-      }
-      if (game.oversizedX || game.oversizedY) {
-        gamesExceedingCapacity.push(baseGameData);
       }
       if (game.missingVersion) {
         gamesWithGuessedVersions.push({ ...baseGameData, versionsUrl: game.versionsUrl });
@@ -42,19 +38,28 @@ export default function Results({ cubes, verticalStacking }) {
   // Sort games alphabetically by name
   const sortByName = (a, b) => a.name.localeCompare(b.name);
   gamesWithMissingDimensions.sort(sortByName);
-  gamesExceedingCapacity.sort(sortByName);
   gamesWithGuessedVersions.sort(sortByName);
   gamesUsingFallbackForSelectedVersion.sort(sortByName);
+
+  const oversizedWarningGames = oversizedGames
+    ? oversizedGames.map((game) => ({
+        ...game,
+        cubeId: game.cubeId ?? null,
+        correctionUrl: game.correctionUrl ?? null,
+        versionsUrl: game.versionsUrl ?? null,
+      }))
+    : [];
+  oversizedWarningGames.sort(sortByName);
 
   const showGuessedVersionInfo = gamesWithGuessedVersions.length > 0;
   const showSelectedVersionFallback = gamesUsingFallbackForSelectedVersion.length > 0;
   const showMissingDimensions = gamesWithMissingDimensions.length > 0;
-  const showExceedingCapacity = gamesExceedingCapacity.length > 0;
+  const showOversizedWarning = oversizedWarningGames.length > 0;
   const totalWarningPanels = [
     showGuessedVersionInfo,
     showSelectedVersionFallback,
     showMissingDimensions,
-    showExceedingCapacity
+    showOversizedWarning
   ].filter(Boolean).length;
 
   return (
@@ -80,7 +85,7 @@ export default function Results({ cubes, verticalStacking }) {
         </div>
       </div>
 
-      {(showGuessedVersionInfo || showSelectedVersionFallback || showMissingDimensions || showExceedingCapacity) && (
+      {(showGuessedVersionInfo || showSelectedVersionFallback || showMissingDimensions || showOversizedWarning) && (
         <div className={`results-warnings warnings-count-${totalWarningPanels}`}>
           {showGuessedVersionInfo && (
             <div className="warning-box info-box">
@@ -90,7 +95,7 @@ export default function Results({ cubes, verticalStacking }) {
                 aria-expanded={guessedVersionsExpanded}
               >
                 <span className="warning-arrow">{guessedVersionsExpanded ? '▼' : '▶'}</span>
-                <strong>ℹ️ Guessed Version (No Version Selected) ({gamesWithGuessedVersions.length})</strong>
+                <strong>ℹ️ No Version Selected ({gamesWithGuessedVersions.length})</strong>
               </button>
               {guessedVersionsExpanded && (
                 <div className="warning-content">
@@ -164,13 +169,13 @@ export default function Results({ cubes, verticalStacking }) {
                 aria-expanded={missingDimsExpanded}
               >
                 <span className="warning-arrow">{missingDimsExpanded ? '▼' : '▶'}</span>
-                <strong>⚠️ Missing Dimensions ({gamesWithMissingDimensions.length})</strong>
+                <strong>⚠️ All Versions Missing Dimensions ({gamesWithMissingDimensions.length})</strong>
               </button>
               {missingDimsExpanded && (
                 <div className="warning-content">
                   <div className="warning-description">
-                    {gamesWithMissingDimensions.length} game{gamesWithMissingDimensions.length !== 1 ? 's' : ''} {gamesWithMissingDimensions.length !== 1 ? 'do' : 'does'} not have dimensions listed on BGG. 
-                    Default dimensions of 13"×13"×2" were assumed and marked with a warning icon (⚠️).
+                    {gamesWithMissingDimensions.length} game{gamesWithMissingDimensions.length !== 1 ? 's' : ''} {gamesWithMissingDimensions.length !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. 
+                    Default dimensions of 12.8" × 12.8" × 1.8" were assumed and marked with a warning icon (⚠️).
                   </div>
                   <ul className={`warning-game-list ${gamesWithMissingDimensions.length > 8 ? 'scrollable' : ''}`}>
                     {gamesWithMissingDimensions.map((game) => (
@@ -190,7 +195,7 @@ export default function Results({ cubes, verticalStacking }) {
               )}
             </div>
           )}
-          {gamesExceedingCapacity.length > 0 && (
+          {showOversizedWarning && (
             <div className="warning-box">
               <button 
                 className="warning-header"
@@ -198,20 +203,33 @@ export default function Results({ cubes, verticalStacking }) {
                 aria-expanded={exceedingCapacityExpanded}
               >
                 <span className="warning-arrow">{exceedingCapacityExpanded ? '▼' : '▶'}</span>
-                <strong>📦 Games Exceeding Cube Capacity ({gamesExceedingCapacity.length})</strong>
+                <strong>📦 Games Exceeding Cube Capacity ({oversizedWarningGames.length})</strong>
               </button>
               {exceedingCapacityExpanded && (
                 <div className="warning-content">
                   <div className="warning-description">
-                    {gamesExceedingCapacity.length} game{gamesExceedingCapacity.length !== 1 ? 's' : ''} {gamesExceedingCapacity.length !== 1 ? 'have' : 'has'} physical dimensions that exceed the capacity of a Kallax cube (13" × 13" × 15"). 
-                    Pseudo-dimensions were used to fit these games, and they are marked with a box icon (📦).
+                    {fitOversized
+                      ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
+                      : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}
+                    {' '}
+                    If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
                   </div>
-                  <ul className={`warning-game-list ${gamesExceedingCapacity.length > 8 ? 'scrollable' : ''}`}>
-                    {gamesExceedingCapacity.map((game) => (
-                      <li key={game.id}>
-                        {game.name} (Cube #{game.cubeId})
-                      </li>
-                    ))}
+                  <ul className={`warning-game-list ${oversizedWarningGames.length > 8 ? 'scrollable' : ''}`}>
+                    {oversizedWarningGames.map((game) => {
+                      const link = game.correctionUrl || game.versionsUrl;
+                      return (
+                        <li key={game.id}>
+                          {link ? (
+                            <a href={link} target="_blank" rel="noopener noreferrer" className="correction-link">
+                              {game.name}
+                            </a>
+                          ) : (
+                            game.name
+                          )}
+                          {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}

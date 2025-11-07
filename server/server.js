@@ -82,6 +82,13 @@ function buildCorrectionUrl(versionId) {
   return `https://boardgamegeek.com/item/correction/boardgameversion/${versionId}`;
 }
 
+function buildGameCorrectionUrl(gameId) {
+  if (!gameId) {
+    return null;
+  }
+  return `https://boardgamegeek.com/item/correction/boardgame/${gameId}`;
+}
+
 function extractVersionId(game, fallbackVersionId = null) {
   if (game?.selectedVersionId) {
     return game.selectedVersionId;
@@ -99,6 +106,23 @@ function extractVersionId(game, fallbackVersionId = null) {
     return fallbackVersionId;
   }
 
+  return null;
+}
+
+function extractBaseGameId(game) {
+  if (!game) return null;
+  if (game.baseGameId && /^\d+$/.test(game.baseGameId)) {
+    return game.baseGameId;
+  }
+  if (game.id) {
+    const idPart = game.id.split('-')[0];
+    if (idPart && /^\d+$/.test(idPart)) {
+      return idPart;
+    }
+  }
+  if (game.gameId && /^\d+$/.test(game.gameId)) {
+    return game.gameId;
+  }
   return null;
 }
 
@@ -1017,14 +1041,15 @@ function splitOversizedGroup(group, maxArea, primaryOrder) {
 }
 
 // Main packing function
-function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, groupExpansions = false, groupSeries = false) {
+function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, fitOversized = false, groupExpansions = false, groupSeries = false) {
   console.log(`📦 Starting to pack ${games.length} games`);
-  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, ensureSupport=${ensureSupport}`);
+  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, ensureSupport=${ensureSupport}, fitOversized=${fitOversized}`);
   
   // Determine primary order
   const primaryOrder = verticalStacking ? 'vertical' : 'horizontal';
   // If ensureSupport is enabled, always require support. Otherwise, only for horizontal.
   const requireSupport = ensureSupport ? true : (primaryOrder === 'horizontal');
+  const oversizedExcludedGames = [];
   
   // Step 1: Calculate 2D dimensions for all games
   for (const game of games) {
@@ -1034,14 +1059,55 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       continue;
     }
     game.dims2D = calculate2DDimensions(game.dimensions, primaryOrder);
+    game.exceedsMaxDimension = game.dims2D.x > OVERSIZED_THRESHOLD || game.dims2D.y > OVERSIZED_THRESHOLD;
+
+    if (game.exceedsMaxDimension && !fitOversized) {
+      const baseGameId = extractBaseGameId(game);
+      const correctionVersionId = extractVersionId(game, game.selectedVersionId);
+      let correctionUrl = game.correctionUrl || null;
+      if (!correctionUrl && correctionVersionId) {
+        correctionUrl = buildCorrectionUrl(correctionVersionId);
+      }
+      if (!correctionUrl && baseGameId) {
+        correctionUrl = buildGameCorrectionUrl(baseGameId);
+      }
+      const versionsUrl = game.versionsUrl || buildVersionsUrl(baseGameId || game.id, game.name);
+
+      oversizedExcludedGames.push({
+        id: game.id,
+        name: game.name,
+        status: 'excluded',
+        correctionUrl,
+        versionsUrl,
+        baseGameId: baseGameId || null,
+        dimensions: {
+          length: game.dimensions.length,
+          width: game.dimensions.width,
+          depth: game.dimensions.depth
+        }
+      });
+    }
   }
   
   // Filter valid games
-  const validGames = games.filter(g => g.dims2D && g.dims2D.x > 0 && g.dims2D.y > 0);
+  const validGames = games.filter(g => {
+    if (!g.dims2D || g.dims2D.x <= 0 || g.dims2D.y <= 0) {
+      return false;
+    }
+
+    if (g.exceedsMaxDimension && !fitOversized) {
+      return false;
+    }
+
+    return true;
+  });
   console.log(`   ✓ Valid games: ${validGames.length}/${games.length}`);
+  if (!fitOversized && oversizedExcludedGames.length > 0) {
+    console.log(`   ⚠️  Excluding ${oversizedExcludedGames.length} oversized game${oversizedExcludedGames.length !== 1 ? 's' : ''} (> ${OVERSIZED_THRESHOLD}" on X/Y)`);
+  }
   
   if (validGames.length === 0) {
-    return [];
+    return { cubes: [], oversizedExcludedGames };
   }
   
   // Step 1.5: Create groups if grouping is enabled (GROUPS TAKE PRECEDENCE)
@@ -1641,7 +1707,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     console.error(`   ⚠️  WARNING: Found ${_groupCount} games with _group property before return!`);
   }
   console.log(`✅ Packed into ${cubes.length} cubes (cleaned ${cleanupCount} properties)`);
-  return cubes;
+  return { cubes, oversizedExcludedGames };
 }
 
 // New endpoint that returns processed JSON with packed cubes
@@ -1651,7 +1717,7 @@ app.get('/api/games/:username', async (req, res) => {
   const requestId = req.query.requestId || `${username}-${Date.now()}`;
   
   try {
-    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, groupExpansions, groupSeries, skipVersionCheck } = req.query;
+    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, fitOversized, groupExpansions, groupSeries, skipVersionCheck } = req.query;
     const shouldSkipVersionCheck = skipVersionCheck === 'true';
     
     if (!BGG_TOKEN) {
@@ -1663,7 +1729,7 @@ app.get('/api/games/:username', async (req, res) => {
     }
 
     console.log('🎮 Processing games for user:', username);
-    console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace, groupExpansions, groupSeries });
+    console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace, fitOversized, groupExpansions, groupSeries });
     
     sendProgress(requestId, 'Starting to process your collection...', { step: 'init' });
 
@@ -2435,6 +2501,7 @@ app.get('/api/games/:username', async (req, res) => {
     const shouldOptimizeSpace = optimizeSpace === 'true';
     const strictSortOrder = respectSortOrder === 'true';
     const shouldEnsureSupport = ensureSupport === 'true';
+    const shouldFitOversized = fitOversized === 'true';
     const shouldGroupExpansions = !shouldOptimizeSpace && groupExpansions === 'true' && includeExpansions === 'true';
     const shouldGroupSeries = !shouldOptimizeSpace && groupSeries === 'true';
 
@@ -2442,7 +2509,18 @@ app.get('/api/games/:username', async (req, res) => {
       console.log('   ℹ️  Optimize for space enabled – grouping options disabled for this run');
     }
     
-    const packedCubes = packGamesIntoCubes(uniqueGames, parsedPriorities, isVertical, allowAltRotation, shouldOptimizeSpace, strictSortOrder, shouldEnsureSupport, shouldGroupExpansions, shouldGroupSeries);
+    const { cubes: packedCubes, oversizedExcludedGames } = packGamesIntoCubes(
+      uniqueGames,
+      parsedPriorities,
+      isVertical,
+      allowAltRotation,
+      shouldOptimizeSpace,
+      strictSortOrder,
+      shouldEnsureSupport,
+      shouldFitOversized,
+      shouldGroupExpansions,
+      shouldGroupSeries
+    );
     
     sendProgress(requestId, `Complete! Packed into ${packedCubes.length} cubes`, { step: 'complete', cubes: packedCubes.length, games: uniqueGames.length });
     
@@ -2631,7 +2709,9 @@ app.get('/api/games/:username', async (req, res) => {
                 missingVersion: !!game.missingVersion,
                 versionsUrl: game.versionsUrl || null,
                 usedAlternateVersionDims: !!game.usedAlternateVersionDims,
-                correctionUrl: game.correctionUrl || null
+              correctionUrl: game.correctionUrl || null,
+              versionsUrl: game.versionsUrl || null,
+              selectedVersionId: game.selectedVersionId || null
               };
               
               // Explicitly verify _group and _groupId are NOT in cleanGame
@@ -2695,7 +2775,9 @@ app.get('/api/games/:username', async (req, res) => {
               missingVersion: !!game.missingVersion,
               versionsUrl: game.versionsUrl || null,
               usedAlternateVersionDims: !!game.usedAlternateVersionDims,
-              correctionUrl: game.correctionUrl || null
+              correctionUrl: game.correctionUrl || null,
+              versionsUrl: game.versionsUrl || null,
+              selectedVersionId: game.selectedVersionId || null
             };
             
             // Verify _group is NOT in cleanGame (it shouldn't be)
@@ -2772,8 +2854,45 @@ app.get('/api/games/:username', async (req, res) => {
       if (finalCheckCount > 0) {
         console.error(`   ⚠️  WARNING: Found ${finalCheckCount} _group properties in clean copies!`);
       }
+
+      const oversizedStuffedGames = [];
+      const stuffedSeen = new Set();
+      for (const cube of cleanCubes) {
+        for (const game of cube.games) {
+          if ((game.oversizedX || game.oversizedY) && !stuffedSeen.has(game.id)) {
+            let correctionUrl = game.correctionUrl || null;
+            if (!correctionUrl) {
+              const versionId = extractVersionId(game, game.selectedVersionId);
+              if (versionId) {
+                correctionUrl = buildCorrectionUrl(versionId);
+              }
+            }
+            if (!correctionUrl) {
+              const baseGameId = extractBaseGameId(game);
+              if (baseGameId) {
+                correctionUrl = buildGameCorrectionUrl(baseGameId);
+              }
+            }
+            const baseGameId = extractBaseGameId(game);
+            oversizedStuffedGames.push({
+              id: game.id,
+              name: game.name,
+              status: 'stuffed',
+              cubeId: cube.id,
+              correctionUrl,
+              versionsUrl: game.versionsUrl || (baseGameId ? buildVersionsUrl(baseGameId, game.name) : null),
+            });
+            stuffedSeen.add(game.id);
+          }
+        }
+      }
+
+      const oversizedGames = [
+        ...oversizedStuffedGames,
+        ...((oversizedExcludedGames && Array.isArray(oversizedExcludedGames)) ? oversizedExcludedGames : []),
+      ];
       
-      res.json({ cubes: cleanCubes, totalGames: uniqueGames.length, dimensionSummary });
+      res.json({ cubes: cleanCubes, totalGames: uniqueGames.length, dimensionSummary, oversizedGames });
       console.log('   ✅ JSON response sent successfully');
       
     } catch (jsonError) {

@@ -55,9 +55,14 @@ function sendProgress(requestId, message, data = {}) {
   }
 }
 
+// Helper function to normalize username to lowercase for case-insensitive operations
+function normalizeUsername(username) {
+  return username ? username.toLowerCase() : username;
+}
+
 // SSE endpoint for progress updates
 app.get('/api/games/:username/progress', (req, res) => {
-  const { username } = req.params;
+  const username = normalizeUsername(req.params.username);
   const requestId = req.query.requestId || `${username}-${Date.now()}`;
   
   // Set up SSE headers
@@ -817,10 +822,11 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
 
 // New endpoint that returns processed JSON with packed cubes
 app.get('/api/games/:username', async (req, res) => {
-  const requestId = req.query.requestId || `${req.params.username}-${Date.now()}`;
+  // Normalize username to lowercase for case-insensitive caching
+  const username = normalizeUsername(req.params.username);
+  const requestId = req.query.requestId || `${username}-${Date.now()}`;
   
   try {
-    const { username } = req.params;
     const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport } = req.query;
     
     if (!BGG_TOKEN) {
@@ -1689,7 +1695,8 @@ function extractDimensions(item) {
 // Keep old endpoints for backward compatibility
 app.get('/api/collection/:username', async (req, res) => {
   try {
-    const { username } = req.params;
+    // Normalize username to lowercase for case-insensitive caching
+    const username = normalizeUsername(req.params.username);
     const { own, preordered, stats } = req.query;
     
     if (!BGG_TOKEN) {

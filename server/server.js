@@ -31,6 +31,30 @@ const BGG_TOKEN = process.env.BGG_API_TOKEN;
 app.use(cors());
 app.use(express.json());
 
+// Increase timeout for long-running requests (2 minutes)
+app.timeout = 120000; // 2 minutes in milliseconds
+app.use((req, res, next) => {
+  req.setTimeout(120000);
+  res.setTimeout(120000);
+  next();
+});
+
+// Store progress for SSE connections
+const progressStore = new Map();
+
+// Helper function to send progress updates via SSE
+function sendProgress(requestId, message, data = {}) {
+  const res = progressStore.get(requestId);
+  if (res && !res.writableEnded && res.writable) {
+    try {
+      res.write(`data: ${JSON.stringify({ message, ...data, timestamp: Date.now() })}\n\n`);
+    } catch (error) {
+      // Connection may have closed, clean up
+      progressStore.delete(requestId);
+    }
+  }
+}
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -38,6 +62,55 @@ app.get('/api/health', (req, res) => {
     tokenConfigured: !!BGG_TOKEN,
     message: BGG_TOKEN ? 'BGG token is configured' : 'BGG token is not configured. Please set BGG_API_TOKEN in .env file'
   });
+});
+
+// SSE endpoint for progress updates
+app.get('/api/games/:username/progress', (req, res) => {
+  const { username } = req.params;
+  // Use request ID from query param or header, or generate one
+  const requestId = req.query.requestId || req.headers['x-request-id'] || `${username}-${Date.now()}`;
+  
+  // Set up SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+  
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ status: 'connected', requestId, message: 'Connected to progress stream' })}\n\n`);
+  
+  // Store the response object for this request ID
+  progressStore.set(requestId, res);
+  
+  // Send keep-alive every 10 seconds to prevent connection timeout
+  const keepAliveInterval = setInterval(() => {
+    if (!res.writableEnded && res.writable) {
+      res.write(`: keep-alive\n\n`);
+    } else {
+      clearInterval(keepAliveInterval);
+      progressStore.delete(requestId);
+    }
+  }, 10000);
+  
+  // Clean up on client disconnect
+  req.on('close', () => {
+    clearInterval(keepAliveInterval);
+    progressStore.delete(requestId);
+    if (!res.writableEnded) {
+      res.end();
+    }
+  });
+  
+  // Clean up after 5 minutes if still connected
+  setTimeout(() => {
+    if (progressStore.has(requestId)) {
+      clearInterval(keepAliveInterval);
+      progressStore.delete(requestId);
+      if (!res.writableEnded) {
+        res.end();
+      }
+    }
+  }, 300000); // 5 minutes
 });
 
 // Helper to parse XML to JSON on server
@@ -768,8 +841,14 @@ app.get('/api/games/:username', async (req, res) => {
       });
     }
 
+    // Generate request ID for progress tracking (from query, header, or generate)
+    const requestId = req.query.requestId || req.headers['x-request-id'] || `${username}-${Date.now()}`;
+
     console.log('🎮 Processing games for user:', username);
     console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace });
+    
+    // Send initial progress
+    sendProgress(requestId, 'Starting to process your collection...', { step: 'init' });
 
     // Step 1: Fetch collection with version info (check cache first)
     const collectionParams = new URLSearchParams({
@@ -793,6 +872,7 @@ app.get('/api/games/:username', async (req, res) => {
     
     // Try cache first (we'll hash the response after fetching to compare)
     console.log('📥 Checking cache for collection...');
+    sendProgress(requestId, 'Fetching your collection from BoardGameGeek...', { step: 'collection' });
     
     // We need to fetch to get the hash, but we can check if we have a cached version
     // For now, we'll fetch and then check cache with the hash
@@ -832,11 +912,13 @@ app.get('/api/games/:username', async (req, res) => {
     
     if (cachedCollection) {
       console.log('   ✅ Using cached collection data');
+      sendProgress(requestId, 'Using cached collection data', { step: 'collection', cached: true });
       // Reconstruct items from cached data (we need the full item structure for processing)
       // For now, we'll still parse XML but use cached data for the item list structure
       collection = await parseXmlString(collectionResponse.data);
     } else {
       console.log('   📥 Collection not in cache or changed, parsing and caching...');
+      sendProgress(requestId, 'Processing collection data...', { step: 'collection', cached: false });
       collection = await parseXmlString(collectionResponse.data);
       
       // Extract and cache minimal collection data
@@ -854,6 +936,7 @@ app.get('/api/games/:username', async (req, res) => {
       : [collection.items.item];
 
     console.log(`   Found ${items.length} items in collection`);
+    sendProgress(requestId, `Found ${items.length} items in your collection`, { step: 'collection', count: items.length });
 
     // Filter expansions if needed (check both subtype and categories)
     if (includeExpansions !== 'true') {
@@ -1003,6 +1086,7 @@ app.get('/api/games/:username', async (req, res) => {
     const cachedGames = new Map();
     
     console.log(`🔍 Checking cache for ${gameIds.length} games...`);
+    sendProgress(requestId, `Checking cache for ${gameIds.length} games...`, { step: 'games', total: gameIds.length });
     for (const gameId of gameIds) {
       const cached = getGame(gameId);
       if (cached) {
@@ -1013,6 +1097,11 @@ app.get('/api/games/:username', async (req, res) => {
     }
     
     console.log(`   ✅ ${cachedGames.size} games from cache, ${gamesToFetch.length} need fetching`);
+    sendProgress(requestId, `Found ${cachedGames.size} games in cache, fetching ${gamesToFetch.length}...`, { 
+      step: 'games', 
+      cached: cachedGames.size, 
+      fetching: gamesToFetch.length 
+    });
     
     // Fetch games that aren't cached
     const batchSize = 10;
@@ -1020,7 +1109,15 @@ app.get('/api/games/:username', async (req, res) => {
 
     for (let i = 0; i < gamesToFetch.length; i += batchSize) {
       const batch = gamesToFetch.slice(i, i + batchSize);
-      console.log(`📦 Fetching batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(gamesToFetch.length / batchSize)} (${batch.length} games)`);
+      const batchNum = Math.floor(i / batchSize) + 1;
+      const totalBatches = Math.ceil(gamesToFetch.length / batchSize);
+      console.log(`📦 Fetching batch ${batchNum}/${totalBatches} (${batch.length} games)`);
+      sendProgress(requestId, `Fetching game data (batch ${batchNum}/${totalBatches})...`, { 
+        step: 'games', 
+        batch: batchNum, 
+        totalBatches: totalBatches,
+        progress: Math.round((i / gamesToFetch.length) * 100)
+      });
       
       // Check for duplicates within this batch
       const batchUnique = [...new Set(batch)];
@@ -1143,6 +1240,7 @@ app.get('/api/games/:username', async (req, res) => {
     }
 
     console.log(`✅ Processed ${allGames.length} games`);
+    sendProgress(requestId, `Processed ${allGames.length} games`, { step: 'games', count: allGames.length });
     
     // Step 2.5: Fetch dimensions for games with missing dimensions
     // First, check cache for any missing dimensions
@@ -1176,6 +1274,10 @@ app.get('/api/games/:username', async (req, res) => {
     
     if (gamesNeedingFetch.length > 0) {
       console.log(`📏 Fetching dimensions for ${gamesNeedingFetch.length} games...`);
+      sendProgress(requestId, `Fetching dimensions for ${gamesNeedingFetch.length} games...`, { 
+        step: 'dimensions', 
+        total: gamesNeedingFetch.length 
+      });
       
       // Process in smaller batches to avoid memory issues
       const dimBatchSize = 5;
@@ -1185,7 +1287,15 @@ app.get('/api/games/:username', async (req, res) => {
         
         if (batchIds.length === 0) continue;
         
-        console.log(`   📦 Dimension batch ${Math.floor(i / dimBatchSize) + 1}/${Math.ceil(gamesNeedingFetch.length / dimBatchSize)}`);
+        const dimBatchNum = Math.floor(i / dimBatchSize) + 1;
+        const dimTotalBatches = Math.ceil(gamesNeedingFetch.length / dimBatchSize);
+        console.log(`   📦 Dimension batch ${dimBatchNum}/${dimTotalBatches}`);
+        sendProgress(requestId, `Fetching dimensions (batch ${dimBatchNum}/${dimTotalBatches})...`, { 
+          step: 'dimensions', 
+          batch: dimBatchNum, 
+          totalBatches: dimTotalBatches,
+          progress: Math.round((i / gamesNeedingFetch.length) * 100)
+        });
         
         const versionParams = new URLSearchParams({
           id: batchIds.join(','),
@@ -1370,6 +1480,7 @@ app.get('/api/games/:username', async (req, res) => {
     }
     
     // Step 3: Pack games into cubes
+    sendProgress(requestId, 'Packing games into cubes...', { step: 'packing', count: uniqueGames.length });
     const parsedPriorities = priorities ? JSON.parse(priorities) : [];
     const isVertical = verticalStacking === 'true';
     const allowAltRotation = allowAlternateRotation === 'true';
@@ -1379,12 +1490,37 @@ app.get('/api/games/:username', async (req, res) => {
     
     const packedCubes = packGamesIntoCubes(uniqueGames, parsedPriorities, isVertical, allowAltRotation, shouldOptimizeSpace, strictSortOrder, shouldEnsureSupport);
     
+    sendProgress(requestId, `Complete! Packed ${uniqueGames.length} games into ${packedCubes.length} cube(s)`, { 
+      step: 'complete', 
+      cubes: packedCubes.length, 
+      games: uniqueGames.length 
+    });
+    
     res.json({ cubes: packedCubes, totalGames: uniqueGames.length });
+    
+    // Clean up progress store after a delay
+    setTimeout(() => {
+      if (progressStore.has(requestId)) {
+        progressStore.delete(requestId);
+      }
+    }, 5000);
 
   } catch (error) {
     console.error('❌ Error processing games:', error.message);
     console.error('   Stack trace:', error.stack);
+    
+    // Try to send error progress if requestId exists
+    const requestId = req.headers['x-request-id'] || `${req.params.username}-${Date.now()}`;
+    sendProgress(requestId, `Error: ${error.message}`, { step: 'error', error: error.message });
+    
     res.status(500).json({ error: error.message });
+    
+    // Clean up progress store
+    setTimeout(() => {
+      if (progressStore.has(requestId)) {
+        progressStore.delete(requestId);
+      }
+    }, 5000);
   }
 });
 

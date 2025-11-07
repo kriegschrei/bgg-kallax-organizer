@@ -3,6 +3,14 @@ import axios from 'axios';
 // Use backend proxy instead of calling BGG directly
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Create axios instance with extended timeout for long-running requests
+const apiClient = axios.create({
+  timeout: 120000, // 2 minutes (120 seconds)
+  headers: {
+    'Connection': 'keep-alive',
+  }
+});
+
 // Helper to parse XML to JSON
 const parseXML = (xmlString) => {
   const parser = new DOMParser();
@@ -51,7 +59,55 @@ const xmlToObject = (node) => {
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // New simplified method that calls server-processed endpoint and returns packed cubes
-export const fetchPackedCubes = async (username, includePreordered = false, includeExpansions = false, priorities = [], verticalStacking = true, allowAlternateRotation = true, optimizeSpace = false, respectSortOrder = false, ensureSupport = false) => {
+// Supports SSE progress updates via onProgress callback
+export const fetchPackedCubes = async (
+  username, 
+  includePreordered = false, 
+  includeExpansions = false, 
+  priorities = [], 
+  verticalStacking = true, 
+  allowAlternateRotation = true, 
+  optimizeSpace = false, 
+  respectSortOrder = false, 
+  ensureSupport = false,
+  onProgress = null // Callback for progress updates: (progress) => void
+) => {
+  // Generate request ID for progress tracking
+  const requestId = `${username}-${Date.now()}`;
+  
+  // Set up SSE connection for progress updates if callback provided
+  let eventSource = null;
+  if (onProgress) {
+    try {
+      // Pass request ID as query parameter so SSE endpoint can match it
+      eventSource = new EventSource(`${API_BASE}/games/${username}/progress?requestId=${encodeURIComponent(requestId)}`);
+      
+      eventSource.onmessage = (event) => {
+        try {
+          // Skip keep-alive pings (lines starting with :)
+          if (event.data.startsWith(':')) {
+            return;
+          }
+          const data = JSON.parse(event.data);
+          if (onProgress) {
+            onProgress(data);
+          }
+          console.log('📊 Progress:', data.message, data);
+        } catch (e) {
+          // Ignore parse errors for keep-alive messages
+        }
+      };
+      
+      eventSource.onerror = (error) => {
+        console.warn('SSE connection error:', error);
+        // Don't close - let it reconnect automatically
+      };
+    } catch (error) {
+      console.warn('Failed to establish SSE connection:', error);
+      // Continue without progress updates
+    }
+  }
+  
   try {
     console.log('📡 Frontend: Fetching packed cubes from server');
     
@@ -66,11 +122,27 @@ export const fetchPackedCubes = async (username, includePreordered = false, incl
       ensureSupport: ensureSupport.toString(),
     });
     
-    const response = await axios.get(`${API_BASE}/games/${username}?${params.toString()}`);
+    // Add request ID as query parameter and header for progress tracking
+    params.append('requestId', requestId);
+    const response = await apiClient.get(`${API_BASE}/games/${username}?${params.toString()}`, {
+      headers: {
+        'X-Request-ID': requestId
+      }
+    });
+    
+    // Close SSE connection when done
+    if (eventSource) {
+      eventSource.close();
+    }
     
     console.log('✅ Frontend: Received', response.data.totalGames, 'games in', response.data.cubes.length, 'cubes');
     return response.data.cubes;
   } catch (error) {
+    // Close SSE connection on error
+    if (eventSource) {
+      eventSource.close();
+    }
+    
     console.error('❌ Frontend: Error fetching packed cubes');
     console.error('   Error:', error.message);
     throw error;

@@ -55,6 +55,26 @@ function sendProgress(requestId, message, data = {}) {
   }
 }
 
+// Helper to create BGG-style slug from a game name
+function slugifyName(name) {
+  if (!name || typeof name !== 'string') {
+    return 'game';
+  }
+
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '') || 'game';
+}
+
+function buildVersionsUrl(gameId, gameName) {
+  const slug = slugifyName(gameName);
+  return `https://boardgamegeek.com/boardgame/${gameId}/${slug}/versions`;
+}
+
 // Helper function to normalize username to lowercase for case-insensitive operations
 function normalizeUsername(username) {
   return username ? username.toLowerCase() : username;
@@ -1604,7 +1624,8 @@ app.get('/api/games/:username', async (req, res) => {
   const requestId = req.query.requestId || `${username}-${Date.now()}`;
   
   try {
-    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, groupExpansions, groupSeries } = req.query;
+    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, groupExpansions, groupSeries, skipVersionCheck } = req.query;
+    const shouldSkipVersionCheck = skipVersionCheck === 'true';
     
     if (!BGG_TOKEN) {
       console.error('❌ BGG API token not configured');
@@ -1709,6 +1730,8 @@ app.get('/api/games/:username', async (req, res) => {
     console.log(`   Found ${items.length} items in collection`);
     sendProgress(requestId, `Found ${items.length} games in your collection`, { step: 'collection', count: items.length });
 
+    const missingVersionGames = new Map();
+
     // Filter expansions if needed (check both subtype and categories)
     if (includeExpansions !== 'true') {
       const beforeFilter = items.length;
@@ -1795,6 +1818,17 @@ app.get('/api/games/:username', async (req, res) => {
     items.forEach(item => {
       const gameId = item.$.objectid;
       const versionItem = item.version?.[0];
+      const gameName = item.name?.[0]?._ || item.name?.[0] || `ID:${gameId}`;
+
+      if (!versionItem || !versionItem.item || versionItem.item.length === 0) {
+        if (!missingVersionGames.has(gameId)) {
+          missingVersionGames.set(gameId, {
+            id: gameId,
+            name: gameName,
+            versionsUrl: buildVersionsUrl(gameId, gameName)
+          });
+        }
+      }
       
       if (versionItem && versionItem.item && versionItem.item.length > 0) {
         const versionId = versionItem.item[0].$?.id || 'default';
@@ -1831,6 +1865,27 @@ app.get('/api/games/:username', async (req, res) => {
     
     console.log(`   ${versionMap.size} game versions have dimensions from collection`);
     console.log(`   ${gamesNeedingVersions.length} games need version lookup`);
+
+    if (!shouldSkipVersionCheck && missingVersionGames.size > 0) {
+      const warningGames = Array.from(missingVersionGames.values()).sort((a, b) => a.name.localeCompare(b.name));
+      const warningMessage = `${warningGames.length} game${warningGames.length !== 1 ? 's' : ''} do not have a specific BoardGameGeek version selected. Selecting a version helps ensure accurate dimensions.`;
+      const secondaryMessage = 'We can try to guess dimensions by checking the most recent English version first. This can take a while and may still require manual adjustments later.';
+
+      sendProgress(requestId, 'Missing game versions detected. Waiting for user confirmation...', { step: 'warning', warningType: 'missing_versions' });
+
+      res.json({
+        status: 'missing_versions',
+        requestId,
+        message: warningMessage,
+        details: secondaryMessage,
+        games: warningGames
+      });
+
+      setTimeout(() => {
+        progressStore.delete(requestId);
+      }, 5000);
+      return;
+    }
 
     // Step 2: Build a map to track which collection items need which game details
     // Key is gameId, value is array of {collectionItem, versionId}

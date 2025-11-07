@@ -240,6 +240,122 @@ header h1 {
   width: 100%;
 }
 
+.search-panel.card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.search-panel {
+  transition: box-shadow 0.2s ease;
+}
+
+.search-panel.collapsed {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 5;
+}
+
+.search-panel-header {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0;
+}
+
+.search-panel-toggle {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background-color: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.search-panel-toggle:hover:not(:disabled) {
+  background-color: rgba(52, 152, 219, 0.08);
+}
+
+.search-panel-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.search-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.search-panel-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.search-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-panel-badge {
+  background: rgba(52, 152, 219, 0.12);
+  color: #21618c;
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.search-panel-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.search-panel.collapsed .search-panel-icon {
+  transform: rotate(-90deg);
+}
+
+.search-panel-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.search-panel-tag {
+  background: rgba(52, 152, 219, 0.12);
+  color: #21618c;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.search-panel-body {
+  padding: 1.5rem;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding-top 0.3s ease, padding-bottom 0.3s ease;
+  max-height: 2500px;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.search-panel.collapsed .search-panel-body {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  pointer-events: none;
+}
+
+.search-panel-form {
+  margin: 0;
+}
+
 
 .spinner {
   border: 4px solid #f3f3f3;

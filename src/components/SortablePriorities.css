@@ -163,6 +163,7 @@
   margin-right: 1rem;
   cursor: grab;
   padding: 0 0.5rem;
+  touch-action: none; /* Prevents default touch behaviors (scrolling) from interfering with drag */
 }
 
 .drag-handle:active {

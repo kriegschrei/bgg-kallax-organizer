@@ -1,3 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=sora@1,500,700&display=swap');
+
+:root {
+  --font-display: 'Sora', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', 'Segoe UI', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  color: #2c3e50;
+}
+
 .app {
   min-height: 100vh;
 }
@@ -69,6 +82,7 @@ header {
 }
 
 header h1 {
+  font-family: var(--font-display);
   font-size: 3rem;
   margin-bottom: 0.75rem;
   color: white;
@@ -134,31 +148,18 @@ header h1 {
   color: #2c3e50;
 }
 
-.checkbox-grid {
+.toggle-list {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.checkbox-group {
-  margin-bottom: 0;
-}
-
-.checkbox-group label {
-  display: flex;
-  align-items: center;
-  font-weight: normal;
-  cursor: pointer;
-  gap: 0.5rem;
-  position: relative;
+  gap: 1.2rem;
+  margin-bottom: 2rem;
 }
 
 .tooltip-trigger {
   cursor: help;
   font-size: 0.9rem;
   color: #7f8c8d;
-  margin-left: auto;
+  margin-left: 0;
   position: relative;
 }
 
@@ -434,7 +435,7 @@ header h1 {
     padding-top: 2rem;
   }
   
-  .checkbox-grid {
+  .toggle-list {
     grid-template-columns: 1fr;
   }
 

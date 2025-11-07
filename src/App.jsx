@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import SortablePriorities from './components/SortablePriorities';
+import ToggleSwitch from './components/ToggleSwitch';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
 import { fetchPackedCubes } from './services/bggApi';
@@ -387,113 +388,81 @@ function App() {
                   />
                 </div>
 
-                <div className="checkbox-grid">
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={includePreordered}
-                        onChange={(e) => setIncludePreordered(e.target.checked)}
-                        disabled={loading}
-                      />
-                      Include Pre-ordered Games
-                    </label>
-                  </div>
+                <div className="toggle-list">
+                  <ToggleSwitch
+                    id="includePreordered"
+                    label="Include Pre-ordered Games"
+                    checked={includePreordered}
+                    onChange={setIncludePreordered}
+                    disabled={loading}
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={respectSortOrder}
-                        onChange={(e) => setRespectSortOrder(e.target.checked)}
-                        disabled={loading || optimizeSpace}
-                      />
-                      Respect ordering priority
-                      <span className="tooltip-trigger" data-tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space">ℹ️</span>
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="respectSortOrder"
+                    label="Respect ordering priority"
+                    checked={respectSortOrder}
+                    onChange={setRespectSortOrder}
+                    disabled={loading || optimizeSpace}
+                    tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space"
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={includeExpansions}
-                        onChange={(e) => {
-                          setIncludeExpansions(e.target.checked);
-                          if (!e.target.checked) {
-                            setGroupExpansions(false); // Disable grouping when expansions are disabled
-                          }
-                        }}
-                        disabled={loading}
-                      />
-                      Include expansions
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="includeExpansions"
+                    label="Include expansions"
+                    checked={includeExpansions}
+                    onChange={(next) => {
+                      setIncludeExpansions(next);
+                      if (!next) {
+                        setGroupExpansions(false); // Disable grouping when expansions are disabled
+                      }
+                    }}
+                    disabled={loading}
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={groupExpansions}
-                        onChange={(e) => setGroupExpansions(e.target.checked)}
-                        disabled={loading || !includeExpansions || optimizeSpace}
-                      />
-                      Group expansions with base game
-                      <span className="tooltip-trigger" data-tooltip="Keep expansions with their base game in the same cube when possible">ℹ️</span>
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="groupExpansions"
+                    label="Group expansions with base game"
+                    checked={groupExpansions}
+                    onChange={setGroupExpansions}
+                    disabled={loading || !includeExpansions || optimizeSpace}
+                    tooltip="Keep expansions with their base game in the same cube when possible"
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={groupSeries}
-                        onChange={(e) => setGroupSeries(e.target.checked)}
-                        disabled={loading || optimizeSpace}
-                      />
-                      Group series
-                      <span className="tooltip-trigger" data-tooltip="Keep games from the same series/family together in the same cube when possible">ℹ️</span>
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="groupSeries"
+                    label="Group series"
+                    checked={groupSeries}
+                    onChange={setGroupSeries}
+                    disabled={loading || optimizeSpace}
+                    tooltip="Keep games from the same series/family together in the same cube when possible"
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={fitOversized}
-                        onChange={(e) => setFitOversized(e.target.checked)}
-                        disabled={loading}
-                      />
-                      Fit oversized games
-                      <span className="tooltip-trigger" data-tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches.">ℹ️</span>
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="fitOversized"
+                    label="Fit oversized games"
+                    checked={fitOversized}
+                    onChange={setFitOversized}
+                    disabled={loading}
+                    tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={allowAlternateRotation}
-                        onChange={(e) => setAllowAlternateRotation(e.target.checked)}
-                        disabled={loading}
-                      />
-                      Allow alternate rotation
-                      <span className="tooltip-trigger" data-tooltip="Prefer vertical or horizontal, but may rotate games for better fit">ℹ️</span>
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="allowAlternateRotation"
+                    label="Allow alternate rotation"
+                    checked={allowAlternateRotation}
+                    onChange={setAllowAlternateRotation}
+                    disabled={loading}
+                    tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
+                  />
 
-                  <div className="checkbox-group">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={optimizeSpace}
-                        onChange={(e) => handleOptimizeSpaceChange(e.target.checked)}
-                        disabled={loading}
-                      />
-                      Optimize for space
-                      <span className="tooltip-trigger" data-tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible">ℹ️</span>
-                    </label>
-                  </div>
+                  <ToggleSwitch
+                    id="optimizeSpace"
+                    label="Optimize for space"
+                    checked={optimizeSpace}
+                    onChange={handleOptimizeSpaceChange}
+                    disabled={loading}
+                    tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible"
+                  />
                 </div>
 
                 <div className="form-group">

@@ -369,7 +369,7 @@ function hasFullSupport(x, y, width, games) {
 }
 
 // Find a valid position for a game in a cube
-function findPosition(cube, width, height, requireSupport) {
+function findPosition(cube, width, height) {
   const maxX = CUBE_SIZE - width + GRID_PRECISION * 0.5;
   const maxY = CUBE_SIZE - height + GRID_PRECISION * 0.5;
   
@@ -382,10 +382,8 @@ function findPosition(cube, width, height, requireSupport) {
       }
       
       // Check support if required
-      if (requireSupport && y >= GRID_PRECISION) {
-        if (!hasFullSupport(x, y, width, cube.games)) {
-          continue;
-        }
+      if (y >= GRID_PRECISION && !hasFullSupport(x, y, width, cube.games)) {
+        continue;
       }
       
       return { x: roundToGrid(x), y: roundToGrid(y) };
@@ -431,7 +429,7 @@ function findSupportingGames(x, y, width, games) {
 }
 
 // Check if swapping two games would improve stability
-function trySwapForStability(cube, game1, game2, requireSupport) {
+function trySwapForStability(cube, game1, game2) {
   // Don't swap if they're the same size
   if (Math.abs(game1.packedDims.x - game2.packedDims.x) < GRID_PRECISION) {
     return false;
@@ -462,8 +460,7 @@ function trySwapForStability(cube, game1, game2, requireSupport) {
   // First try the original X positions
   for (const tryX of [originalLowerPos.x, originalUpperPos.x]) {
     if (!hasCollision(tryX, lowerTargetY, lowerGame.packedDims.x, lowerGame.packedDims.y, cube.games)) {
-      // Check support if needed
-      if (!requireSupport || lowerTargetY < GRID_PRECISION || 
+      if (lowerTargetY < GRID_PRECISION || 
           hasFullSupport(tryX, lowerTargetY, lowerGame.packedDims.x, cube.games)) {
         lowerNewPos = { x: tryX, y: lowerTargetY };
         break;
@@ -476,7 +473,7 @@ function trySwapForStability(cube, game1, game2, requireSupport) {
     const maxX = CUBE_SIZE - lowerGame.packedDims.x + GRID_PRECISION * 0.5;
     for (let testX = 0; testX <= maxX; testX = roundToGrid(testX + GRID_PRECISION)) {
       if (!hasCollision(testX, lowerTargetY, lowerGame.packedDims.x, lowerGame.packedDims.y, cube.games)) {
-        if (!requireSupport || lowerTargetY < GRID_PRECISION || 
+        if (lowerTargetY < GRID_PRECISION || 
             hasFullSupport(testX, lowerTargetY, lowerGame.packedDims.x, cube.games)) {
           lowerNewPos = { x: testX, y: lowerTargetY };
           break;
@@ -502,8 +499,7 @@ function trySwapForStability(cube, game1, game2, requireSupport) {
   // First try the original X positions
   for (const tryX of [originalUpperPos.x, originalLowerPos.x]) {
     if (!hasCollision(tryX, upperTargetY, upperGame.packedDims.x, upperGame.packedDims.y, tempCubeWithLower)) {
-      // Check support if needed
-      if (!requireSupport || upperTargetY < GRID_PRECISION || 
+      if (upperTargetY < GRID_PRECISION || 
           hasFullSupport(tryX, upperTargetY, upperGame.packedDims.x, tempCubeWithLower)) {
         upperNewPos = { x: tryX, y: upperTargetY };
         break;
@@ -516,7 +512,7 @@ function trySwapForStability(cube, game1, game2, requireSupport) {
     const maxX = CUBE_SIZE - upperGame.packedDims.x + GRID_PRECISION * 0.5;
     for (let testX = 0; testX <= maxX; testX = roundToGrid(testX + GRID_PRECISION)) {
       if (!hasCollision(testX, upperTargetY, upperGame.packedDims.x, upperGame.packedDims.y, tempCubeWithLower)) {
-        if (!requireSupport || upperTargetY < GRID_PRECISION || 
+        if (upperTargetY < GRID_PRECISION || 
             hasFullSupport(testX, upperTargetY, upperGame.packedDims.x, tempCubeWithLower)) {
           upperNewPos = { x: testX, y: upperTargetY };
           break;
@@ -542,7 +538,7 @@ function trySwapForStability(cube, game1, game2, requireSupport) {
 }
 
 // Check stability after placing a game
-function checkAndImproveStability(cube, placedGame, requireSupport) {
+function checkAndImproveStability(cube, placedGame) {
   // Only check if game is above ground
   if (placedGame.position.y < GRID_PRECISION) return;
   
@@ -560,10 +556,10 @@ function checkAndImproveStability(cube, placedGame, requireSupport) {
   for (const supporter of supporters) {
     if (placedGame.packedDims.x > supporter.packedDims.x + GRID_PRECISION) {
       // Try to swap them
-      if (trySwapForStability(cube, placedGame, supporter, requireSupport)) {
+      if (trySwapForStability(cube, placedGame, supporter)) {
         console.log(`   ♻️  Swapped "${placedGame.name}" with "${supporter.name}" for better stability`);
         // After successful swap, check again recursively
-        checkAndImproveStability(cube, placedGame, requireSupport);
+        checkAndImproveStability(cube, placedGame);
         break;
       }
     }
@@ -571,7 +567,7 @@ function checkAndImproveStability(cube, placedGame, requireSupport) {
 }
 
 // Aggressive reorganization: try to rearrange all games in cube to fit a new game
-function tryAggressiveReorganization(cube, newGame, width, height, requireSupport, priorities, optimizeSpace) {
+function tryAggressiveReorganization(cube, newGame, width, height, priorities, optimizeSpace) {
   console.log(`   🔄 Attempting aggressive reorganization for "${newGame.name}"`);
   
   // Check if there's theoretically enough space
@@ -628,13 +624,13 @@ function tryAggressiveReorganization(cube, newGame, width, height, requireSuppor
   // Clear the cube
   cube.games = [];
   
-  // Try to place all games with support requirement
+  // Try to place all games while enforcing support
   let failedToPlace = null;
   for (const gameToPlace of allGames) {
     const gWidth = gameToPlace.packedDims?.x || gameToPlace.dims2D?.x || width;
     const gHeight = gameToPlace.packedDims?.y || gameToPlace.dims2D?.y || height;
     
-    const position = findPosition(cube, gWidth, gHeight, requireSupport);
+    const position = findPosition(cube, gWidth, gHeight);
     
     if (position) {
       // Calculate z dimension
@@ -671,7 +667,7 @@ function tryAggressiveReorganization(cube, newGame, width, height, requireSuppor
 }
 
 // Try to place a game in a cube with given dimensions
-function tryPlaceGame(cube, game, width, height, requireSupport) {
+function tryPlaceGame(cube, game, width, height) {
   const actualWidth = width;
   const actualHeight = height;
   const packedWidth = Math.min(width, CUBE_SIZE);
@@ -690,7 +686,7 @@ function tryPlaceGame(cube, game, width, height, requireSupport) {
     return false;
   }
   
-  const position = findPosition(cube, packedWidth, packedHeight, requireSupport);
+  const position = findPosition(cube, packedWidth, packedHeight);
   
   if (position) {
     game.position = position;
@@ -701,7 +697,7 @@ function tryPlaceGame(cube, game, width, height, requireSupport) {
     cube.games.push(game);
     
     // Check and improve stability after placement
-    checkAndImproveStability(cube, game, requireSupport);
+    checkAndImproveStability(cube, game);
     
     return true;
   }
@@ -1041,14 +1037,13 @@ function splitOversizedGroup(group, maxArea, primaryOrder) {
 }
 
 // Main packing function
-function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, fitOversized = false, groupExpansions = false, groupSeries = false) {
+function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, fitOversized = false, groupExpansions = false, groupSeries = false) {
   console.log(`📦 Starting to pack ${games.length} games`);
-  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, ensureSupport=${ensureSupport}, fitOversized=${fitOversized}`);
+  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, fitOversized=${fitOversized}`);
   
   // Determine primary order
   const primaryOrder = verticalStacking ? 'vertical' : 'horizontal';
-  // If ensureSupport is enabled, always require support. Otherwise, only for horizontal.
-  const requireSupport = ensureSupport ? true : (primaryOrder === 'horizontal');
+  // Always enforce full support to prevent floating games
   const oversizedExcludedGames = [];
   
   // Step 1: Calculate 2D dimensions for all games
@@ -1286,7 +1281,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
   const placed = new Set();
   
   // Helper function to try placing a group together
-  function tryPlaceGroup(cube, group, requireSupport) {
+  function tryPlaceGroup(cube, group) {
     // Check if all games in group can fit in this cube
     const tempCube = { games: [...cube.games], rows: [] };
     const groupPlaced = [];
@@ -1309,7 +1304,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       
       let gamePlaced = false;
       for (const orientation of orientations) {
-        if (tryPlaceGame(tempCube, game, orientation.x, orientation.y, requireSupport)) {
+        if (tryPlaceGame(tempCube, game, orientation.x, orientation.y)) {
           groupPlaced.push(game);
           gamePlaced = true;
           break;
@@ -1368,7 +1363,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       
       // Try to place group in existing cubes
       for (const cube of cubesToCheck) {
-        if (tryPlaceGroup(cube, group, requireSupport)) {
+      if (tryPlaceGroup(cube, group)) {
           groupPlaced = true;
           console.log(`   ✅ Placed group "${groupId}" (${group.length} games) together`);
           break;
@@ -1378,7 +1373,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       // Create new cube for group if it doesn't fit anywhere
       if (!groupPlaced) {
         const newCube = { games: [], rows: [] };
-        if (tryPlaceGroup(newCube, group, requireSupport)) {
+        if (tryPlaceGroup(newCube, group)) {
           cubes.push(newCube);
           const baseGame = getGroupRepresentative(group);
           console.log(`   Created cube ${cubes.length} for group "${groupId}" (${group.length} games) starting with "${baseGame.name}"`);
@@ -1471,7 +1466,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     // Try to place in existing cubes
     for (const cube of cubesToCheck) {
       for (const orientation of orientations) {
-        if (tryPlaceGame(cube, game, orientation.x, orientation.y, requireSupport)) {
+        if (tryPlaceGame(cube, game, orientation.x, orientation.y)) {
           placed.add(game.id);
           wasPlaced = true;
           break;
@@ -1479,10 +1474,10 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       }
       if (wasPlaced) break;
       
-      // If normal placement failed and ensureSupport is enabled, try aggressive reorganization
-      if (!wasPlaced && ensureSupport && requireSupport) {
+      // If normal placement failed, try aggressive reorganization
+      if (!wasPlaced) {
         for (const orientation of orientations) {
-          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, requireSupport, priorities, optimizeSpace)) {
+          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, priorities, optimizeSpace)) {
             placed.add(game.id);
             wasPlaced = true;
             break;
@@ -1497,7 +1492,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       const newCube = { games: [], rows: [] };
       
       for (const orientation of orientations) {
-        if (tryPlaceGame(newCube, game, orientation.x, orientation.y, requireSupport)) {
+        if (tryPlaceGame(newCube, game, orientation.x, orientation.y)) {
           placed.add(game.id);
           cubes.push(newCube);
           console.log(`   Created cube ${cubes.length} for "${game.name}"`);
@@ -1550,7 +1545,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     // Try to place in existing cubes
     for (const cube of cubesToCheck) {
       for (const orientation of orientations) {
-        if (tryPlaceGame(cube, game, orientation.x, orientation.y, requireSupport)) {
+        if (tryPlaceGame(cube, game, orientation.x, orientation.y)) {
           placed.add(game.id);
           wasPlaced = true;
           break;
@@ -1558,10 +1553,10 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       }
       if (wasPlaced) break;
       
-      // If normal placement failed and ensureSupport is enabled, try aggressive reorganization
-      if (!wasPlaced && ensureSupport && requireSupport) {
+      // If normal placement failed, try aggressive reorganization
+      if (!wasPlaced) {
         for (const orientation of orientations) {
-          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, requireSupport, priorities, optimizeSpace)) {
+          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, priorities, optimizeSpace)) {
             placed.add(game.id);
             wasPlaced = true;
             break;
@@ -1576,7 +1571,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       const newCube = { games: [], rows: [] };
       
       for (const orientation of orientations) {
-        if (tryPlaceGame(newCube, game, orientation.x, orientation.y, requireSupport)) {
+        if (tryPlaceGame(newCube, game, orientation.x, orientation.y)) {
           placed.add(game.id);
           cubes.push(newCube);
           console.log(`   Created cube ${cubes.length} for "${game.name}"`);
@@ -1717,7 +1712,7 @@ app.get('/api/games/:username', async (req, res) => {
   const requestId = req.query.requestId || `${username}-${Date.now()}`;
   
   try {
-    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, fitOversized, groupExpansions, groupSeries, skipVersionCheck } = req.query;
+    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, fitOversized, groupExpansions, groupSeries, skipVersionCheck } = req.query;
     const shouldSkipVersionCheck = skipVersionCheck === 'true';
     
     if (!BGG_TOKEN) {
@@ -2500,7 +2495,6 @@ app.get('/api/games/:username', async (req, res) => {
     const allowAltRotation = allowAlternateRotation === 'true';
     const shouldOptimizeSpace = optimizeSpace === 'true';
     const strictSortOrder = respectSortOrder === 'true';
-    const shouldEnsureSupport = ensureSupport === 'true';
     const shouldFitOversized = fitOversized === 'true';
     const shouldGroupExpansions = !shouldOptimizeSpace && groupExpansions === 'true' && includeExpansions === 'true';
     const shouldGroupSeries = !shouldOptimizeSpace && groupSeries === 'true';
@@ -2516,7 +2510,6 @@ app.get('/api/games/:username', async (req, res) => {
       allowAltRotation,
       shouldOptimizeSpace,
       strictSortOrder,
-      shouldEnsureSupport,
       shouldFitOversized,
       shouldGroupExpansions,
       shouldGroupSeries

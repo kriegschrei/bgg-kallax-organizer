@@ -32,12 +32,14 @@ function App() {
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
   const [ensureSupport, setEnsureSupport] = useState(false);
+  const [fitOversized, setFitOversized] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
   const [cubes, setCubes] = useState(null);
+  const [oversizedGames, setOversizedGames] = useState([]);
   const [missingVersionWarning, setMissingVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
 
@@ -61,6 +63,7 @@ function App() {
     setLoading(true);
     setError(null);
     setCubes(null);
+    setOversizedGames([]);
     setProgress('Fetching your collection from BoardGameGeek...');
     setMissingVersionWarning(null);
 
@@ -79,6 +82,7 @@ function App() {
         optimizeSpace,
         respectSortOrder,
         ensureSupport,
+        fitOversized,
         groupExpansions: effectiveGroupExpansions,
         groupSeries: effectiveGroupSeries,
       };
@@ -96,6 +100,7 @@ function App() {
         optimizeSpace,
         respectSortOrder,
         ensureSupport,
+        fitOversized,
         effectiveGroupExpansions,
         effectiveGroupSeries,
         (progress) => {
@@ -122,6 +127,7 @@ function App() {
       setProgress('Rendering results...');
 
       setCubes(response.cubes);
+      setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
 
@@ -148,6 +154,7 @@ function App() {
     setError(null);
     setProgress('Attempting fallback dimension lookup. This may take a little while...');
     setMissingVersionWarning(null);
+    setOversizedGames([]);
 
     try {
       const response = await fetchPackedCubes(
@@ -160,6 +167,7 @@ function App() {
         lastRequestConfig.optimizeSpace,
         lastRequestConfig.respectSortOrder,
         lastRequestConfig.ensureSupport,
+        lastRequestConfig.fitOversized,
         lastRequestConfig.groupExpansions,
         lastRequestConfig.groupSeries,
         (progress) => {
@@ -178,6 +186,7 @@ function App() {
 
       setProgress('Rendering results...');
       setCubes(response.cubes);
+      setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
     } catch (err) {
@@ -334,6 +343,19 @@ function App() {
                 <label>
                   <input
                     type="checkbox"
+                    checked={fitOversized}
+                    onChange={(e) => setFitOversized(e.target.checked)}
+                    disabled={loading}
+                  />
+                  Fit oversized games
+                  <span className="tooltip-trigger" data-tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches.">ℹ️</span>
+                </label>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
                     checked={allowAlternateRotation}
                     onChange={(e) => setAllowAlternateRotation(e.target.checked)}
                     disabled={loading}
@@ -410,7 +432,14 @@ function App() {
         />
       )}
 
-      {cubes && <Results cubes={cubes} verticalStacking={verticalStacking} />}
+      {cubes && (
+        <Results
+          cubes={cubes}
+          verticalStacking={verticalStacking}
+          oversizedGames={oversizedGames}
+          fitOversized={fitOversized}
+        />
+      )}
 
       <footer className="disclaimer-footer">
         <div className="footer-content">

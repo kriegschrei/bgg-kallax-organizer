@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import SortablePriorities from './components/SortablePriorities';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
@@ -21,6 +21,31 @@ const DEFAULT_PRIORITIES = [
   { field: 'bggRating', enabled: false, order: 'desc' }, // Higher rating is better
 ];
 
+const DEFAULT_ENABLED_PRIORITY_FIELDS = DEFAULT_PRIORITIES
+  .filter((priority) => priority.enabled)
+  .map((priority) => priority.field);
+
+const DEFAULT_PRIORITIES_BY_FIELD = DEFAULT_PRIORITIES.reduce((accumulator, priority) => {
+  accumulator[priority.field] = priority;
+  return accumulator;
+}, {});
+
+const PRIORITY_LABELS = {
+  name: 'Name',
+  categories: 'Categories',
+  families: 'Families',
+  bggRank: 'BGG Rank',
+  minPlayers: 'Min Players',
+  maxPlayers: 'Max Players',
+  bestPlayerCount: 'Best Player Count',
+  minPlaytime: 'Min Playtime',
+  maxPlaytime: 'Max Playtime',
+  age: 'Age',
+  communityAge: 'Community Age',
+  weight: 'Weight',
+  bggRating: 'BGG Rating',
+};
+
 function App() {
   const [username, setUsername] = useState('');
   const [includePreordered, setIncludePreordered] = useState(false);
@@ -41,14 +66,85 @@ function App() {
   const [oversizedGames, setOversizedGames] = useState([]);
   const [missingVersionWarning, setMissingVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
 
   const handleOptimizeSpaceChange = (checked) => {
     setOptimizeSpace(checked);
     if (checked) {
       // Disable all manual sorting controls when optimize space is enabled
-      setPriorities(priorities.map(p => ({ ...p, enabled: false })));
+      setPriorities((prev) => prev.map((p) => ({ ...p, enabled: false })));
       setRespectSortOrder(false);
     }
+  };
+
+  const activeFilterLabels = useMemo(() => {
+    const labels = [];
+    const pushLabel = (condition, label) => {
+      if (condition) {
+        labels.push(label);
+      }
+    };
+
+    pushLabel(includePreordered, 'Pre-ordered games');
+    pushLabel(includeExpansions, 'Include expansions');
+    pushLabel(groupExpansions, 'Group expansions');
+    pushLabel(groupSeries, 'Group series');
+    pushLabel(respectSortOrder, 'Respect priority order');
+    pushLabel(optimizeSpace, 'Optimize for space');
+    pushLabel(fitOversized, 'Fit oversized games');
+    pushLabel(!verticalStacking, 'Horizontal stacking');
+    pushLabel(!allowAlternateRotation, 'Lock rotation');
+
+    priorities.forEach((priority) => {
+      const defaultConfig = DEFAULT_PRIORITIES_BY_FIELD[priority.field];
+      const baseLabel = PRIORITY_LABELS[priority.field] || priority.field;
+      const orderLabel = priority.order === 'desc' ? ' (desc)' : '';
+
+      if (!defaultConfig) {
+        if (priority.enabled) {
+          labels.push(`Priority: ${baseLabel}${orderLabel}`);
+        }
+        return;
+      }
+
+      if (!defaultConfig.enabled && priority.enabled) {
+        labels.push(`Priority: ${baseLabel}${orderLabel}`);
+      }
+
+      if (defaultConfig.enabled && !priority.enabled) {
+        labels.push(`Priority disabled: ${baseLabel}`);
+      }
+
+      if (
+        priority.enabled &&
+        defaultConfig.enabled &&
+        priority.order !== defaultConfig.order
+      ) {
+        labels.push(`Priority order: ${baseLabel}${orderLabel}`);
+      }
+    });
+
+    return labels;
+  }, [
+    allowAlternateRotation,
+    fitOversized,
+    groupExpansions,
+    groupSeries,
+    includeExpansions,
+    includePreordered,
+    optimizeSpace,
+    priorities,
+    respectSortOrder,
+    verticalStacking,
+  ]);
+
+  const activeFilterCount = activeFilterLabels.length;
+
+  const toggleFiltersCollapsed = () => {
+    if (loading) {
+      return;
+    }
+    setFiltersCollapsed((prev) => !prev);
   };
 
   const handleSubmit = async (e) => {
@@ -65,6 +161,7 @@ function App() {
     setOversizedGames([]);
     setProgress('Fetching your collection from BoardGameGeek...');
     setMissingVersionWarning(null);
+    setFiltersCollapsed(true);
 
     try {
       const trimmedUsername = username.trim();
@@ -152,6 +249,7 @@ function App() {
     setProgress('Attempting fallback dimension lookup. This may take a little while...');
     setMissingVersionWarning(null);
     setOversizedGames([]);
+    setFiltersCollapsed(true);
 
     try {
       const response = await fetchPackedCubes(
@@ -238,167 +336,204 @@ function App() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="card">
-        <div className="form-layout">
-          <div className="form-left">
-            <div className="form-group">
-              <label htmlFor="username">BoardGameGeek Username</label>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your BGG username"
-                disabled={loading}
-              />
-            </div>
-
-            <div className="checkbox-grid">
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={includePreordered}
-                    onChange={(e) => setIncludePreordered(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Include Pre-ordered Games
-                </label>
-              </div>
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={respectSortOrder}
-                    onChange={(e) => setRespectSortOrder(e.target.checked)}
-                    disabled={loading || optimizeSpace}
-                  />
-                  Respect ordering priority
-                  <span className="tooltip-trigger" data-tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space">ℹ️</span>
-                </label>
-              </div>
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={includeExpansions}
-                    onChange={(e) => {
-                      setIncludeExpansions(e.target.checked);
-                      if (!e.target.checked) {
-                        setGroupExpansions(false); // Disable grouping when expansions are disabled
-                      }
-                    }}
-                    disabled={loading}
-                  />
-                  Include expansions
-                </label>
-              </div>
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={groupExpansions}
-                    onChange={(e) => setGroupExpansions(e.target.checked)}
-                    disabled={loading || !includeExpansions || optimizeSpace}
-                  />
-                  Group expansions with base game
-                  <span className="tooltip-trigger" data-tooltip="Keep expansions with their base game in the same cube when possible">ℹ️</span>
-                </label>
-              </div>
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={groupSeries}
-                    onChange={(e) => setGroupSeries(e.target.checked)}
-                    disabled={loading || optimizeSpace}
-                  />
-                  Group series
-                  <span className="tooltip-trigger" data-tooltip="Keep games from the same series/family together in the same cube when possible">ℹ️</span>
-                </label>
-              </div>
-
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={fitOversized}
-                    onChange={(e) => setFitOversized(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Fit oversized games
-                  <span className="tooltip-trigger" data-tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches.">ℹ️</span>
-                </label>
-              </div>
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={allowAlternateRotation}
-                    onChange={(e) => setAllowAlternateRotation(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Allow alternate rotation
-                  <span className="tooltip-trigger" data-tooltip="Prefer vertical or horizontal, but may rotate games for better fit">ℹ️</span>
-                </label>
-              </div>
-
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={optimizeSpace}
-                    onChange={(e) => handleOptimizeSpaceChange(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Optimize for space
-                  <span className="tooltip-trigger" data-tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible">ℹ️</span>
-                </label>
+      <section className={`card search-panel ${filtersCollapsed ? 'collapsed' : ''}`}>
+        <div className="search-panel-header">
+          <button
+            type="button"
+            className="search-panel-toggle"
+            onClick={toggleFiltersCollapsed}
+            aria-expanded={!filtersCollapsed}
+            aria-controls="search-panel-content"
+            disabled={loading}
+            title={filtersCollapsed ? 'Show search options' : 'Hide search options'}
+          >
+            <div className="search-panel-title-row">
+              <span className="search-panel-title">Search Options</span>
+              <div className="search-panel-controls">
+                {activeFilterCount > 0 && (
+                  <span className="search-panel-badge" aria-label={`${activeFilterCount} active filters`}>
+                    {activeFilterCount}
+                  </span>
+                )}
+                <span className="search-panel-icon" aria-hidden>
+                  ▾
+                </span>
               </div>
             </div>
-
-            <div className="form-group">
-              <label>Stacking Preference</label>
-              <div className="toggle-button-group">
-                <button
-                  type="button"
-                  className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
-                  onClick={() => setVerticalStacking(false)}
-                  disabled={loading}
-                >
-                  Horizontal
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-button ${verticalStacking ? 'active' : ''}`}
-                  onClick={() => setVerticalStacking(true)}
-                  disabled={loading}
-                >
-                  Vertical
-                </button>
+            {filtersCollapsed && activeFilterCount > 0 && (
+              <div className="search-panel-tags" aria-label="Active filters">
+                {activeFilterLabels.map((label) => (
+                  <span key={label} className="search-panel-tag">
+                    {label}
+                  </span>
+                ))}
               </div>
-            </div>
-
-            <button type="submit" disabled={loading}>
-              {loading ? 'Processing...' : 'Organize Collection'}
-            </button>
-          </div>
-
-          <div className="form-right">
-            <SortablePriorities 
-              priorities={priorities} 
-              onChange={setPriorities}
-              disabled={optimizeSpace}
-            />
-          </div>
+            )}
+          </button>
         </div>
-      </form>
+        <div className="search-panel-body" id="search-panel-content">
+          <form onSubmit={handleSubmit} className="search-panel-form">
+            <div className="form-layout">
+              <div className="form-left">
+                <div className="form-group">
+                  <label htmlFor="username">BoardGameGeek Username</label>
+                  <input
+                    type="text"
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your BGG username"
+                    disabled={loading}
+                  />
+                </div>
+
+                <div className="checkbox-grid">
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={includePreordered}
+                        onChange={(e) => setIncludePreordered(e.target.checked)}
+                        disabled={loading}
+                      />
+                      Include Pre-ordered Games
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={respectSortOrder}
+                        onChange={(e) => setRespectSortOrder(e.target.checked)}
+                        disabled={loading || optimizeSpace}
+                      />
+                      Respect ordering priority
+                      <span className="tooltip-trigger" data-tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space">ℹ️</span>
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={includeExpansions}
+                        onChange={(e) => {
+                          setIncludeExpansions(e.target.checked);
+                          if (!e.target.checked) {
+                            setGroupExpansions(false); // Disable grouping when expansions are disabled
+                          }
+                        }}
+                        disabled={loading}
+                      />
+                      Include expansions
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={groupExpansions}
+                        onChange={(e) => setGroupExpansions(e.target.checked)}
+                        disabled={loading || !includeExpansions || optimizeSpace}
+                      />
+                      Group expansions with base game
+                      <span className="tooltip-trigger" data-tooltip="Keep expansions with their base game in the same cube when possible">ℹ️</span>
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={groupSeries}
+                        onChange={(e) => setGroupSeries(e.target.checked)}
+                        disabled={loading || optimizeSpace}
+                      />
+                      Group series
+                      <span className="tooltip-trigger" data-tooltip="Keep games from the same series/family together in the same cube when possible">ℹ️</span>
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={fitOversized}
+                        onChange={(e) => setFitOversized(e.target.checked)}
+                        disabled={loading}
+                      />
+                      Fit oversized games
+                      <span className="tooltip-trigger" data-tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches.">ℹ️</span>
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={allowAlternateRotation}
+                        onChange={(e) => setAllowAlternateRotation(e.target.checked)}
+                        disabled={loading}
+                      />
+                      Allow alternate rotation
+                      <span className="tooltip-trigger" data-tooltip="Prefer vertical or horizontal, but may rotate games for better fit">ℹ️</span>
+                    </label>
+                  </div>
+
+                  <div className="checkbox-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={optimizeSpace}
+                        onChange={(e) => handleOptimizeSpaceChange(e.target.checked)}
+                        disabled={loading}
+                      />
+                      Optimize for space
+                      <span className="tooltip-trigger" data-tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible">ℹ️</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Stacking Preference</label>
+                  <div className="toggle-button-group">
+                    <button
+                      type="button"
+                      className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
+                      onClick={() => setVerticalStacking(false)}
+                      disabled={loading}
+                    >
+                      Horizontal
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-button ${verticalStacking ? 'active' : ''}`}
+                      onClick={() => setVerticalStacking(true)}
+                      disabled={loading}
+                    >
+                      Vertical
+                    </button>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={loading}>
+                  {loading ? 'Processing...' : 'Organize Collection'}
+                </button>
+              </div>
+
+              <div className="form-right">
+                <SortablePriorities 
+                  priorities={priorities} 
+                  onChange={setPriorities}
+                  disabled={optimizeSpace}
+                />
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
 
       {loading && (
         <div className="loading">

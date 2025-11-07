@@ -31,7 +31,6 @@ function App() {
   const [allowAlternateRotation, setAllowAlternateRotation] = useState(true);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
-  const [ensureSupport, setEnsureSupport] = useState(false);
   const [fitOversized, setFitOversized] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
   
@@ -81,7 +80,6 @@ function App() {
         allowAlternateRotation,
         optimizeSpace,
         respectSortOrder,
-        ensureSupport,
         fitOversized,
         groupExpansions: effectiveGroupExpansions,
         groupSeries: effectiveGroupSeries,
@@ -99,7 +97,6 @@ function App() {
         allowAlternateRotation,
         optimizeSpace,
         respectSortOrder,
-        ensureSupport,
         fitOversized,
         effectiveGroupExpansions,
         effectiveGroupSeries,
@@ -166,7 +163,6 @@ function App() {
         lastRequestConfig.allowAlternateRotation,
         lastRequestConfig.optimizeSpace,
         lastRequestConfig.respectSortOrder,
-        lastRequestConfig.ensureSupport,
         lastRequestConfig.fitOversized,
         lastRequestConfig.groupExpansions,
         lastRequestConfig.groupSeries,
@@ -326,18 +322,6 @@ function App() {
                 </label>
               </div>
 
-              <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={ensureSupport}
-                    onChange={(e) => setEnsureSupport(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Support all games
-                  <span className="tooltip-trigger" data-tooltip="Prevents floating games, may take longer to organize">ℹ️</span>
-                </label>
-              </div>
 
               <div className="checkbox-group">
                 <label>

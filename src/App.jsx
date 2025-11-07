@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import SortablePriorities from './components/SortablePriorities';
 import Results from './components/Results';
+import MissingVersionsWarning from './components/MissingVersionsWarning';
 import { fetchPackedCubes } from './services/bggApi';
 import './App.css';
 
@@ -37,6 +38,8 @@ function App() {
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
   const [cubes, setCubes] = useState(null);
+  const [missingVersionWarning, setMissingVersionWarning] = useState(null);
+  const [lastRequestConfig, setLastRequestConfig] = useState(null);
 
   const handleOptimizeSpaceChange = (checked) => {
     setOptimizeSpace(checked);
@@ -59,12 +62,16 @@ function App() {
     setError(null);
     setCubes(null);
     setProgress('Fetching your collection from BoardGameGeek...');
+    setMissingVersionWarning(null);
 
     try {
-      // Get fully processed and packed cubes from server with progress updates
-      const packedCubes = await fetchPackedCubes(
-        username.trim(), 
-        includePreordered, 
+      const trimmedUsername = username.trim();
+      const effectiveGroupExpansions = groupExpansions && !optimizeSpace;
+      const effectiveGroupSeries = groupSeries && !optimizeSpace;
+
+      const requestConfig = {
+        username: trimmedUsername,
+        includePreordered,
         includeExpansions,
         priorities,
         verticalStacking,
@@ -72,8 +79,25 @@ function App() {
         optimizeSpace,
         respectSortOrder,
         ensureSupport,
-        groupExpansions && !optimizeSpace,
-        groupSeries && !optimizeSpace,
+        groupExpansions: effectiveGroupExpansions,
+        groupSeries: effectiveGroupSeries,
+      };
+
+      setLastRequestConfig(requestConfig);
+
+      // Get fully processed and packed cubes from server with progress updates
+      const response = await fetchPackedCubes(
+        trimmedUsername,
+        includePreordered,
+        includeExpansions,
+        priorities,
+        verticalStacking,
+        allowAlternateRotation,
+        optimizeSpace,
+        respectSortOrder,
+        ensureSupport,
+        effectiveGroupExpansions,
+        effectiveGroupSeries,
         (progress) => {
           // Update progress message from SSE updates
           if (progress && progress.message) {
@@ -82,7 +106,14 @@ function App() {
         }
       );
       
-      if (!packedCubes || packedCubes.length === 0) {
+      if (response?.status === 'missing_versions') {
+        setLoading(false);
+        setProgress('');
+        setMissingVersionWarning({ ...response, username: trimmedUsername });
+        return;
+      }
+      
+      if (!response || !response.cubes || response.cubes.length === 0) {
         setError('No owned games found for this user');
         setLoading(false);
         return;
@@ -90,10 +121,65 @@ function App() {
 
       setProgress('Rendering results...');
 
-      setCubes(packedCubes);
+      setCubes(response.cubes);
       setProgress('');
       setLoading(false);
 
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
+      setLoading(false);
+      setProgress('');
+    }
+  };
+
+  const handleWarningCancel = () => {
+    setMissingVersionWarning(null);
+    setProgress('');
+    setError('Processing cancelled. Please select versions for the highlighted games on BoardGameGeek and try again.');
+  };
+
+  const handleWarningContinue = async () => {
+    if (!lastRequestConfig) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setProgress('Attempting fallback dimension lookup. This may take a little while...');
+    setMissingVersionWarning(null);
+
+    try {
+      const response = await fetchPackedCubes(
+        lastRequestConfig.username,
+        lastRequestConfig.includePreordered,
+        lastRequestConfig.includeExpansions,
+        lastRequestConfig.priorities,
+        lastRequestConfig.verticalStacking,
+        lastRequestConfig.allowAlternateRotation,
+        lastRequestConfig.optimizeSpace,
+        lastRequestConfig.respectSortOrder,
+        lastRequestConfig.ensureSupport,
+        lastRequestConfig.groupExpansions,
+        lastRequestConfig.groupSeries,
+        (progress) => {
+          if (progress && progress.message) {
+            setProgress(progress.message);
+          }
+        },
+        { skipVersionCheck: true }
+      );
+
+      if (!response || !response.cubes || response.cubes.length === 0) {
+        setError('No owned games found for this user');
+        setLoading(false);
+        return;
+      }
+
+      setProgress('Rendering results...');
+      setCubes(response.cubes);
+      setProgress('');
+      setLoading(false);
     } catch (err) {
       console.error('Error:', err);
       setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
@@ -313,6 +399,15 @@ function App() {
           <div className="spinner"></div>
           <p>{progress}</p>
         </div>
+      )}
+
+      {missingVersionWarning && (
+        <MissingVersionsWarning
+          warning={missingVersionWarning}
+          onContinue={handleWarningContinue}
+          onCancel={handleWarningCancel}
+          isProcessing={loading}
+        />
       )}
 
       {cubes && <Results cubes={cubes} verticalStacking={verticalStacking} />}

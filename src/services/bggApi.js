@@ -72,9 +72,10 @@ export const fetchPackedCubes = async (
   ensureSupport = false,
   groupExpansions = false,
   groupSeries = false,
-  onProgress = null // Optional callback for progress updates
+  onProgress = null, // Optional callback for progress updates
+  extraParams = {}
 ) => {
-  const requestId = `${username}-${Date.now()}`;
+  const requestId = extraParams.requestId || `${username}-${Date.now()}`;
   let eventSource = null;
   
   try {
@@ -119,6 +120,14 @@ export const fetchPackedCubes = async (
       groupSeries: groupSeries.toString(),
       requestId: requestId, // Pass requestId to match with SSE
     });
+    Object.entries(extraParams).forEach(([key, value]) => {
+      if (key === 'requestId') {
+        return;
+      }
+      if (value !== undefined && value !== null) {
+        params.set(key, value.toString());
+      }
+    });
     
     const response = await apiClient.get(`${API_BASE}/games/${username}?${params.toString()}`);
     
@@ -127,8 +136,12 @@ export const fetchPackedCubes = async (
       eventSource.close();
     }
     
-    console.log('✅ Frontend: Received', response.data.totalGames, 'games in', response.data.cubes.length, 'cubes');
-    return response.data.cubes;
+    if (response.data?.status === 'missing_versions') {
+      console.log('⚠️ Frontend: Missing versions detected for', response.data.games?.length || 0, 'games');
+    } else {
+      console.log('✅ Frontend: Received', response.data.totalGames, 'games in', response.data.cubes?.length || 0, 'cubes');
+    }
+    return response.data;
   } catch (error) {
     // Close SSE connection on error
     if (eventSource) {

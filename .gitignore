@@ -23,3 +23,18 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
+.env
+
+# Dependencies
+node_modules
+
+# Logs
+*.log
+npm-debug.log*
+
+# Databases
+cache/bgg-cache.db
+cache/bgg-cache.db-shm
+cache/bgg-cache.db-wal
+

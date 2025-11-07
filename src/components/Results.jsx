@@ -7,25 +7,55 @@ export default function Results({ cubes, verticalStacking }) {
   const stats = calculateStats(cubes, verticalStacking);
   const [missingDimsExpanded, setMissingDimsExpanded] = useState(false);
   const [exceedingCapacityExpanded, setExceedingCapacityExpanded] = useState(false);
+  const [guessedVersionsExpanded, setGuessedVersionsExpanded] = useState(true);
+  const [selectedVersionFallbackExpanded, setSelectedVersionFallbackExpanded] = useState(true);
 
-  // Collect games with missing dimensions and their cube IDs
+  // Collect games with missing dimensions, exceeding cube capacity, and those using alternate versions
   const gamesWithMissingDimensions = [];
   const gamesExceedingCapacity = [];
+  const gamesWithGuessedVersions = [];
+  const gamesUsingFallbackForSelectedVersion = [];
   
   cubes.forEach(cube => {
     cube.games.forEach(game => {
+      const baseGameData = { ...game, cubeId: cube.id };
+
       if (game.dimensions?.missingDimensions) {
-        gamesWithMissingDimensions.push({ ...game, cubeId: cube.id });
+        gamesWithMissingDimensions.push(baseGameData);
       }
       if (game.oversizedX || game.oversizedY) {
-        gamesExceedingCapacity.push({ ...game, cubeId: cube.id });
+        gamesExceedingCapacity.push(baseGameData);
+      }
+      if (game.missingVersion) {
+        gamesWithGuessedVersions.push({ ...baseGameData, versionsUrl: game.versionsUrl });
+      }
+      if (game.usedAlternateVersionDims) {
+        gamesUsingFallbackForSelectedVersion.push({
+          ...baseGameData,
+          versionsUrl: game.versionsUrl,
+          correctionUrl: game.correctionUrl,
+        });
       }
     });
   });
 
   // Sort games alphabetically by name
-  gamesWithMissingDimensions.sort((a, b) => a.name.localeCompare(b.name));
-  gamesExceedingCapacity.sort((a, b) => a.name.localeCompare(b.name));
+  const sortByName = (a, b) => a.name.localeCompare(b.name);
+  gamesWithMissingDimensions.sort(sortByName);
+  gamesExceedingCapacity.sort(sortByName);
+  gamesWithGuessedVersions.sort(sortByName);
+  gamesUsingFallbackForSelectedVersion.sort(sortByName);
+
+  const showGuessedVersionInfo = gamesWithGuessedVersions.length > 0;
+  const showSelectedVersionFallback = gamesUsingFallbackForSelectedVersion.length > 0;
+  const showMissingDimensions = gamesWithMissingDimensions.length > 0;
+  const showExceedingCapacity = gamesExceedingCapacity.length > 0;
+  const totalWarningPanels = [
+    showGuessedVersionInfo,
+    showSelectedVersionFallback,
+    showMissingDimensions,
+    showExceedingCapacity
+  ].filter(Boolean).length;
 
   return (
     <div className="results">
@@ -50,8 +80,82 @@ export default function Results({ cubes, verticalStacking }) {
         </div>
       </div>
 
-      {(gamesWithMissingDimensions.length > 0 || gamesExceedingCapacity.length > 0) && (
-        <div className="results-warnings">
+      {(showGuessedVersionInfo || showSelectedVersionFallback || showMissingDimensions || showExceedingCapacity) && (
+        <div className={`results-warnings warnings-count-${totalWarningPanels}`}>
+          {showGuessedVersionInfo && (
+            <div className="warning-box info-box">
+              <button
+                className="warning-header"
+                onClick={() => setGuessedVersionsExpanded(!guessedVersionsExpanded)}
+                aria-expanded={guessedVersionsExpanded}
+              >
+                <span className="warning-arrow">{guessedVersionsExpanded ? '▼' : '▶'}</span>
+                <strong>ℹ️ Guessed Version (No Version Selected) ({gamesWithGuessedVersions.length})</strong>
+              </button>
+              {guessedVersionsExpanded && (
+                <div className="warning-content">
+                  <div className="warning-description">
+                    No specific BoardGameGeek version was selected for these game{gamesWithGuessedVersions.length !== 1 ? 's' : ''}. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.
+                  </div>
+                  <ul className={`warning-game-list ${gamesWithGuessedVersions.length > 8 ? 'scrollable' : ''}`}>
+                    {gamesWithGuessedVersions.map((game) => (
+                      <li key={game.id}>
+                        {game.versionsUrl ? (
+                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                            {game.name}
+                          </a>
+                        ) : (
+                          game.name
+                        )}
+                        {` (Cube #${game.cubeId})`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          {showSelectedVersionFallback && (
+            <div className="warning-box selected-version-box">
+              <button
+                className="warning-header"
+                onClick={() => setSelectedVersionFallbackExpanded(!selectedVersionFallbackExpanded)}
+                aria-expanded={selectedVersionFallbackExpanded}
+              >
+                <span className="warning-arrow">{selectedVersionFallbackExpanded ? '▼' : '▶'}</span>
+                <strong>🛠️ Selected Version Missing Dimensions ({gamesUsingFallbackForSelectedVersion.length})</strong>
+              </button>
+              {selectedVersionFallbackExpanded && (
+                <div className="warning-content">
+                  <div className="warning-description">
+                    The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact.
+                  </div>
+                  <ul className={`warning-game-list ${gamesUsingFallbackForSelectedVersion.length > 8 ? 'scrollable' : ''}`}>
+                    {gamesUsingFallbackForSelectedVersion.map((game) => (
+                      <li key={game.id}>
+                        {game.versionsUrl ? (
+                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                            {game.name}
+                          </a>
+                        ) : (
+                          game.name
+                        )}
+                        {` (Cube #${game.cubeId})`}
+                        {game.correctionUrl && (
+                          <>
+                            {` — `}
+                            <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="correction-link">
+                              Submit dimensions
+                            </a>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           {gamesWithMissingDimensions.length > 0 && (
             <div className="warning-box">
               <button 
@@ -71,7 +175,14 @@ export default function Results({ cubes, verticalStacking }) {
                   <ul className={`warning-game-list ${gamesWithMissingDimensions.length > 8 ? 'scrollable' : ''}`}>
                     {gamesWithMissingDimensions.map((game) => (
                       <li key={game.id}>
-                        {game.name} (Cube #{game.cubeId})
+                        {game.correctionUrl ? (
+                          <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="correction-link">
+                            {game.name}
+                          </a>
+                        ) : (
+                          game.name
+                        )}
+                        {` (Cube #${game.cubeId})`}
                       </li>
                     ))}
                   </ul>

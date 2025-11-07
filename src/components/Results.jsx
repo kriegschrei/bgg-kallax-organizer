@@ -1,25 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import CubeVisualization from './CubeVisualization';
 import { calculateStats } from '../services/packing';
 import './Results.css';
 
 export default function Results({ cubes, verticalStacking }) {
   const stats = calculateStats(cubes, verticalStacking);
+  const [missingDimsExpanded, setMissingDimsExpanded] = useState(false);
+  const [exceedingCapacityExpanded, setExceedingCapacityExpanded] = useState(false);
 
-  // Collect games with missing dimensions
+  // Collect games with missing dimensions and their cube IDs
   const gamesWithMissingDimensions = [];
   const gamesExceedingCapacity = [];
   
   cubes.forEach(cube => {
     cube.games.forEach(game => {
       if (game.dimensions?.missingDimensions) {
-        gamesWithMissingDimensions.push(game);
+        gamesWithMissingDimensions.push({ ...game, cubeId: cube.id });
       }
       if (game.oversizedX || game.oversizedY) {
-        gamesExceedingCapacity.push(game);
+        gamesExceedingCapacity.push({ ...game, cubeId: cube.id });
       }
     });
   });
+
+  // Sort games alphabetically by name
+  gamesWithMissingDimensions.sort((a, b) => a.name.localeCompare(b.name));
+  gamesExceedingCapacity.sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div className="results">
@@ -48,14 +54,56 @@ export default function Results({ cubes, verticalStacking }) {
         <div className="results-warnings">
           {gamesWithMissingDimensions.length > 0 && (
             <div className="warning-box">
-              <strong>⚠️ Missing Dimensions:</strong> {gamesWithMissingDimensions.length} game{gamesWithMissingDimensions.length !== 1 ? 's' : ''} {gamesWithMissingDimensions.length !== 1 ? 'do' : 'does'} not have dimensions listed on BGG. 
-              Default dimensions of 13"×13"×2" were assumed and marked with a warning icon (⚠️).
+              <button 
+                className="warning-header"
+                onClick={() => setMissingDimsExpanded(!missingDimsExpanded)}
+                aria-expanded={missingDimsExpanded}
+              >
+                <span className="warning-arrow">{missingDimsExpanded ? '▼' : '▶'}</span>
+                <strong>⚠️ Missing Dimensions ({gamesWithMissingDimensions.length})</strong>
+              </button>
+              {missingDimsExpanded && (
+                <div className="warning-content">
+                  <div className="warning-description">
+                    {gamesWithMissingDimensions.length} game{gamesWithMissingDimensions.length !== 1 ? 's' : ''} {gamesWithMissingDimensions.length !== 1 ? 'do' : 'does'} not have dimensions listed on BGG. 
+                    Default dimensions of 13"×13"×2" were assumed and marked with a warning icon (⚠️).
+                  </div>
+                  <ul className={`warning-game-list ${gamesWithMissingDimensions.length > 8 ? 'scrollable' : ''}`}>
+                    {gamesWithMissingDimensions.map((game) => (
+                      <li key={game.id}>
+                        {game.name} (Cube #{game.cubeId})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
           {gamesExceedingCapacity.length > 0 && (
             <div className="warning-box">
-              <strong>📦 Games Exceeding Cube Capacity:</strong> {gamesExceedingCapacity.length} game{gamesExceedingCapacity.length !== 1 ? 's' : ''} {gamesExceedingCapacity.length !== 1 ? 'have' : 'has'} physical dimensions that exceed the capacity of a Kallax cube (13" × 13" × 15"). 
-              Pseudo-dimensions were used to fit these games, and they are marked with a box icon (📦).
+              <button 
+                className="warning-header"
+                onClick={() => setExceedingCapacityExpanded(!exceedingCapacityExpanded)}
+                aria-expanded={exceedingCapacityExpanded}
+              >
+                <span className="warning-arrow">{exceedingCapacityExpanded ? '▼' : '▶'}</span>
+                <strong>📦 Games Exceeding Cube Capacity ({gamesExceedingCapacity.length})</strong>
+              </button>
+              {exceedingCapacityExpanded && (
+                <div className="warning-content">
+                  <div className="warning-description">
+                    {gamesExceedingCapacity.length} game{gamesExceedingCapacity.length !== 1 ? 's' : ''} {gamesExceedingCapacity.length !== 1 ? 'have' : 'has'} physical dimensions that exceed the capacity of a Kallax cube (13" × 13" × 15"). 
+                    Pseudo-dimensions were used to fit these games, and they are marked with a box icon (📦).
+                  </div>
+                  <ul className={`warning-game-list ${gamesExceedingCapacity.length > 8 ? 'scrollable' : ''}`}>
+                    {gamesExceedingCapacity.map((game) => (
+                      <li key={game.id}>
+                        {game.name} (Cube #{game.cubeId})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -3,6 +3,14 @@ import axios from 'axios';
 // Use backend proxy instead of calling BGG directly
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
+// Create axios instance with extended timeout for long-running requests (2 minutes)
+const apiClient = axios.create({
+  timeout: 120000, // 2 minutes
+  headers: {
+    'Connection': 'keep-alive',
+  }
+});
+
 // Helper to parse XML to JSON
 const parseXML = (xmlString) => {
   const parser = new DOMParser();
@@ -51,9 +59,50 @@ const xmlToObject = (node) => {
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // New simplified method that calls server-processed endpoint and returns packed cubes
-export const fetchPackedCubes = async (username, includePreordered = false, includeExpansions = false, priorities = [], verticalStacking = true, allowAlternateRotation = true, optimizeSpace = false, respectSortOrder = false, ensureSupport = false) => {
+// Supports SSE progress updates via onProgress callback
+export const fetchPackedCubes = async (
+  username, 
+  includePreordered = false, 
+  includeExpansions = false, 
+  priorities = [], 
+  verticalStacking = true, 
+  allowAlternateRotation = true, 
+  optimizeSpace = false, 
+  respectSortOrder = false, 
+  ensureSupport = false,
+  onProgress = null // Optional callback for progress updates
+) => {
+  const requestId = `${username}-${Date.now()}`;
+  let eventSource = null;
+  
   try {
     console.log('📡 Frontend: Fetching packed cubes from server');
+    
+    // Set up SSE connection for progress updates if callback provided
+    if (onProgress) {
+      eventSource = new EventSource(`${API_BASE}/games/${username}/progress?requestId=${requestId}`);
+      
+      eventSource.onmessage = (event) => {
+        try {
+          // Skip keep-alive pings (they start with ':')
+          if (event.data.startsWith(':')) {
+            return;
+          }
+          const data = JSON.parse(event.data);
+          if (onProgress) {
+            onProgress(data);
+          }
+          console.log('📊 Progress:', data.message, data);
+        } catch (e) {
+          // Ignore parse errors for keep-alive messages
+        }
+      };
+      
+      eventSource.onerror = (error) => {
+        console.warn('SSE connection error:', error);
+        // Don't close - let it reconnect automatically
+      };
+    }
     
     const params = new URLSearchParams({
       includePreordered: includePreordered.toString(),
@@ -64,13 +113,24 @@ export const fetchPackedCubes = async (username, includePreordered = false, incl
       optimizeSpace: optimizeSpace.toString(),
       respectSortOrder: respectSortOrder.toString(),
       ensureSupport: ensureSupport.toString(),
+      requestId: requestId, // Pass requestId to match with SSE
     });
     
-    const response = await axios.get(`${API_BASE}/games/${username}?${params.toString()}`);
+    const response = await apiClient.get(`${API_BASE}/games/${username}?${params.toString()}`);
+    
+    // Close SSE connection
+    if (eventSource) {
+      eventSource.close();
+    }
     
     console.log('✅ Frontend: Received', response.data.totalGames, 'games in', response.data.cubes.length, 'cubes');
     return response.data.cubes;
   } catch (error) {
+    // Close SSE connection on error
+    if (eventSource) {
+      eventSource.close();
+    }
+    
     console.error('❌ Frontend: Error fetching packed cubes');
     console.error('   Error:', error.message);
     throw error;

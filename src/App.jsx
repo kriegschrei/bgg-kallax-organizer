@@ -59,7 +59,7 @@ function App() {
     setProgress('Fetching your collection from BoardGameGeek...');
 
     try {
-      // Get fully processed and packed cubes from server
+      // Get fully processed and packed cubes from server with progress updates
       const packedCubes = await fetchPackedCubes(
         username.trim(), 
         includePreordered, 
@@ -69,7 +69,13 @@ function App() {
         allowAlternateRotation,
         optimizeSpace,
         respectSortOrder,
-        ensureSupport
+        ensureSupport,
+        (progress) => {
+          // Update progress message from SSE updates
+          if (progress && progress.message) {
+            setProgress(progress.message);
+          }
+        }
       );
       
       if (!packedCubes || packedCubes.length === 0) {

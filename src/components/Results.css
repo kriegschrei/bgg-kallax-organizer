@@ -39,9 +39,15 @@
 
 .results-warnings {
   margin: 1.5rem 0;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+  align-items: flex-start;
+}
+
+.results-warnings > .warning-box {
+  flex: 1 1 280px;
+  max-width: 100%;
 }
 
 .warning-box {
@@ -53,8 +59,7 @@
   color: #856404;
   line-height: 1.6;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  display: block;
 }
 
 .warning-header {
@@ -139,13 +144,75 @@
   background: rgba(133, 100, 4, 0.5);
 }
 
+.warning-box.info-box {
+  background: #e8f4fd;
+  border: 1px solid #2196f3;
+  border-left: 4px solid #2196f3;
+  color: #0b5394;
+}
+
+.warning-box.info-box .warning-header,
+.warning-box.info-box .warning-header strong,
+.warning-box.info-box .warning-description,
+.warning-box.info-box .warning-arrow {
+  color: #0b5394;
+}
+
+.warning-box.info-box .warning-header:hover {
+  background-color: rgba(33, 150, 243, 0.12);
+}
+
+.warning-box.info-box .warning-game-list {
+  color: #0b5394;
+}
+
+.warning-box.info-box .warning-game-list a {
+  color: #0b5394;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.warning-box.selected-version-box {
+  background: #e6f6f2;
+  border: 1px solid #26a69a;
+  border-left: 4px solid #26a69a;
+  color: #0f4c45;
+}
+
+.warning-box.selected-version-box .warning-header,
+.warning-box.selected-version-box .warning-header strong,
+.warning-box.selected-version-box .warning-description,
+.warning-box.selected-version-box .warning-arrow {
+  color: #0f4c45;
+}
+
+.warning-box.selected-version-box .warning-header:hover {
+  background-color: rgba(38, 166, 154, 0.12);
+}
+
+.warning-box.selected-version-box .warning-game-list {
+  color: #0f4c45;
+}
+
+.warning-box.selected-version-box .warning-game-list a {
+  color: #0f4c45;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.warning-box .correction-link {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
 @media (max-width: 768px) {
   .cubes-container {
     grid-template-columns: 1fr;
   }
   
   .results-warnings {
-    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 }
 

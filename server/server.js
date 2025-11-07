@@ -75,6 +75,33 @@ function buildVersionsUrl(gameId, gameName) {
   return `https://boardgamegeek.com/boardgame/${gameId}/${slug}/versions`;
 }
 
+function buildCorrectionUrl(versionId) {
+  if (!versionId) {
+    return null;
+  }
+  return `https://boardgamegeek.com/item/correction/boardgameversion/${versionId}`;
+}
+
+function extractVersionId(game, fallbackVersionId = null) {
+  if (game?.selectedVersionId) {
+    return game.selectedVersionId;
+  }
+
+  if (game?.id && typeof game.id === 'string' && game.id.includes('-')) {
+    const parts = game.id.split('-');
+    const possibleVersionId = parts[parts.length - 1];
+    if (possibleVersionId && possibleVersionId !== 'default' && possibleVersionId !== 'no-version') {
+      return possibleVersionId;
+    }
+  }
+
+  if (fallbackVersionId && fallbackVersionId !== 'default' && fallbackVersionId !== 'no-version') {
+    return fallbackVersionId;
+  }
+
+  return null;
+}
+
 // Helper function to normalize username to lowercase for case-insensitive operations
 function normalizeUsername(username) {
   return username ? username.toLowerCase() : username;
@@ -1986,7 +2013,21 @@ app.get('/api/games/:username', async (req, res) => {
             const key = `${gameId}-${versionId}`;
             const versionInfo = versionMap.get(key);
             const game = processGameItem(item, versionInfo, versionId);
-            
+
+            const missingVersionInfo = missingVersionGames.get(gameId);
+            game.missingVersion = !!missingVersionInfo;
+            if (missingVersionInfo) {
+              game.versionsUrl = missingVersionInfo.versionsUrl;
+            }
+
+            const normalizedVersionId = extractVersionId(game, versionId);
+            game.selectedVersionId = normalizedVersionId;
+            if (!game.versionsUrl) {
+              game.versionsUrl = buildVersionsUrl(gameId, item.name?.[0]?._ || item.name?.[0] || `ID:${gameId}`);
+            }
+            game.usedAlternateVersionDims = false;
+            game.correctionUrl = null;
+
             // Use gameId-versionId as unique ID
             game.id = key;
             // Preserve baseGameId from processGameItem (for expansions)
@@ -2077,7 +2118,39 @@ app.get('/api/games/:username', async (req, res) => {
             }
           };
           
+          const missingVersionInfo = missingVersionGames.get(gameId);
+          game.missingVersion = !!missingVersionInfo;
+          if (missingVersionInfo) {
+            game.versionsUrl = missingVersionInfo.versionsUrl;
+          }
+
           game.id = key;
+
+          const normalizedVersionId = extractVersionId(game, versionId);
+          game.selectedVersionId = normalizedVersionId;
+          if (!game.versionsUrl) {
+            game.versionsUrl = buildVersionsUrl(gameId, game.name || `ID:${gameId}`);
+          }
+          game.usedAlternateVersionDims = false;
+          game.correctionUrl = null;
+
+          if (game.dimensions?.missingDimensions || (game.dimensions.length === 0 && game.dimensions.width === 0 && game.dimensions.depth === 0)) {
+            const versionIdForCorrection = extractVersionId(game, versionId);
+            if (versionIdForCorrection) {
+              game.correctionUrl = buildCorrectionUrl(versionIdForCorrection);
+            }
+          }
+
+          if (cachedVersion?.usedAlternateVersionDims) {
+            game.usedAlternateVersionDims = true;
+            const versionIdForCorrection = extractVersionId(game, versionId);
+            if (versionIdForCorrection) {
+              game.correctionUrl = buildCorrectionUrl(versionIdForCorrection);
+            } else {
+              game.correctionUrl = null;
+            }
+            console.log(`      ↺ Using cached alternate-version dimensions for ${game.name} (version ${versionIdForCorrection || 'default'})`);
+          }
           
           // Verify no _group properties slipped in
           if (game._group !== undefined || '_group' in game) {
@@ -2204,9 +2277,21 @@ app.get('/api/games/:username', async (req, res) => {
                           versionId: versionId,
                           name: null,
                           yearPublished: null,
-                          dimensions: dimensions
+                          dimensions: dimensions,
+                          usedAlternateVersionDims: !game.missingVersion
                         };
                         setVersion(game.baseGameId, versionId, versionDataToCache);
+
+                        if (!game.missingVersion) {
+                          game.usedAlternateVersionDims = true;
+                          const versionIdForCorrection = extractVersionId(game, versionId);
+                          if (versionIdForCorrection) {
+                            game.correctionUrl = buildCorrectionUrl(versionIdForCorrection);
+                          } else {
+                            game.correctionUrl = null;
+                          }
+                          console.log(`      🔄 Used alternate version dimensions for selected version of ${game.name} (version ${versionIdForCorrection || 'default'})`);
+                        }
                       } else {
                         // No dimensions found - cache default dimensions
                         const defaultDimensions = {
@@ -2220,9 +2305,17 @@ app.get('/api/games/:username', async (req, res) => {
                           versionId: versionId,
                           name: null,
                           yearPublished: null,
-                          dimensions: defaultDimensions
+                          dimensions: defaultDimensions,
+                          usedAlternateVersionDims: false
                         };
                         setVersion(game.baseGameId, versionId, versionDataToCache);
+                        game.usedAlternateVersionDims = false;
+                        const versionIdForCorrection = extractVersionId(game, versionId);
+                        if (versionIdForCorrection) {
+                          game.correctionUrl = buildCorrectionUrl(versionIdForCorrection);
+                        } else {
+                          game.correctionUrl = null;
+                        }
                       }
                     }
                   }
@@ -2249,6 +2342,12 @@ app.get('/api/games/:username', async (req, res) => {
           missingDimensions: true,
         };
         game.dimensions = defaultDimensions;
+        game.usedAlternateVersionDims = false;
+        if (game.selectedVersionId) {
+          game.correctionUrl = buildCorrectionUrl(game.selectedVersionId);
+        } else {
+          game.correctionUrl = null;
+        }
         gamesWithDefaultDimensions++;
         
         // Cache default dimensions with the user's actual versionId
@@ -2260,7 +2359,8 @@ app.get('/api/games/:username', async (req, res) => {
               versionId: versionId,
               name: null,
               yearPublished: null,
-              dimensions: defaultDimensions
+              dimensions: defaultDimensions,
+              usedAlternateVersionDims: false
             };
             setVersion(game.baseGameId, versionId, versionDataToCache);
           }
@@ -2527,7 +2627,11 @@ app.get('/api/games/:username', async (req, res) => {
                 bggRating: game.bggRating,
                 baseGameId: game.baseGameId,
                 isExpansion: game.isExpansion,
-                familyIds: game.familyIds ? [...(game.familyIds || [])] : []
+                familyIds: game.familyIds ? [...(game.familyIds || [])] : [],
+                missingVersion: !!game.missingVersion,
+                versionsUrl: game.versionsUrl || null,
+                usedAlternateVersionDims: !!game.usedAlternateVersionDims,
+                correctionUrl: game.correctionUrl || null
               };
               
               // Explicitly verify _group and _groupId are NOT in cleanGame
@@ -2587,7 +2691,11 @@ app.get('/api/games/:username', async (req, res) => {
               bggRating: game.bggRating,
               baseGameId: game.baseGameId,
               isExpansion: game.isExpansion,
-              familyIds: game.familyIds ? [...(game.familyIds || [])] : []
+              familyIds: game.familyIds ? [...(game.familyIds || [])] : [],
+              missingVersion: !!game.missingVersion,
+              versionsUrl: game.versionsUrl || null,
+              usedAlternateVersionDims: !!game.usedAlternateVersionDims,
+              correctionUrl: game.correctionUrl || null
             };
             
             // Verify _group is NOT in cleanGame (it shouldn't be)
@@ -2611,6 +2719,32 @@ app.get('/api/games/:username', async (req, res) => {
       
       console.log(`   ✅ Clean copies created for ${gameCount} games in ${cleanCubes.length} cubes`);
       console.log('   📤 Attempting JSON serialization...');
+
+      const dimensionSummary = {
+        guessedVersionCount: 0,
+        selectedVersionFallbackCount: 0,
+        missingDimensionCount: 0,
+        exceedingCapacityCount: 0,
+      };
+
+      for (const cube of cleanCubes) {
+        for (const game of cube.games) {
+          if (game.missingVersion) {
+            dimensionSummary.guessedVersionCount++;
+          }
+          if (game.usedAlternateVersionDims) {
+            dimensionSummary.selectedVersionFallbackCount++;
+          }
+          if (game.dimensions?.missingDimensions) {
+            dimensionSummary.missingDimensionCount++;
+          }
+          if (game.oversizedX || game.oversizedY) {
+            dimensionSummary.exceedingCapacityCount++;
+          }
+        }
+      }
+
+      console.log('   ℹ️ Dimension summary:', dimensionSummary);
       
       // Final check - make absolutely sure no _group properties exist
       let finalCheckCount = 0;
@@ -2639,7 +2773,7 @@ app.get('/api/games/:username', async (req, res) => {
         console.error(`   ⚠️  WARNING: Found ${finalCheckCount} _group properties in clean copies!`);
       }
       
-      res.json({ cubes: cleanCubes, totalGames: uniqueGames.length });
+      res.json({ cubes: cleanCubes, totalGames: uniqueGames.length, dimensionSummary });
       console.log('   ✅ JSON response sent successfully');
       
     } catch (jsonError) {
@@ -2713,6 +2847,8 @@ function processGameItem(item, versionInfo = null, versionId = null) {
   const isExpansion = baseGameId !== null || 
     item.$.type === 'boardgameexpansion' ||
     categories.includes('Expansion for Base-game');
+
+  const resolvedBaseGameId = baseGameId || gameId;
 
   // Extract stats
   const stats = item.statistics?.[0]?.ratings?.[0];
@@ -2817,7 +2953,7 @@ function processGameItem(item, versionInfo = null, versionId = null) {
     weight,
     bggRating,
     // Grouping fields
-    baseGameId,   // ID of base game if this is an expansion
+    baseGameId: resolvedBaseGameId,   // Use base game ID or self ID for grouping/cache
     isExpansion,  // True if this game is an expansion
     familyIds,    // Array of family/series IDs for grouping
     // DISCARD: descriptions, designers, publishers, artists, yearpublished, 

@@ -70,6 +70,8 @@ export const fetchPackedCubes = async (
   optimizeSpace = false, 
   respectSortOrder = false, 
   ensureSupport = false,
+  groupExpansions = false,
+  groupSeries = false,
   onProgress = null // Optional callback for progress updates
 ) => {
   const requestId = `${username}-${Date.now()}`;
@@ -113,6 +115,8 @@ export const fetchPackedCubes = async (
       optimizeSpace: optimizeSpace.toString(),
       respectSortOrder: respectSortOrder.toString(),
       ensureSupport: ensureSupport.toString(),
+      groupExpansions: groupExpansions.toString(),
+      groupSeries: groupSeries.toString(),
       requestId: requestId, // Pass requestId to match with SSE
     });
     

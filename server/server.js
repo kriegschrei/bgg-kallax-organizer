@@ -638,8 +638,339 @@ function tryPlaceGame(cube, game, width, height, requireSupport) {
   return false;
 }
 
+// ============================================================================
+// GROUPING FUNCTIONS
+// ============================================================================
+
+// Helper function to detect circular references in an object
+function detectCircularRefs(obj, path = 'root', visited = new WeakSet(), maxDepth = 10) {
+  if (maxDepth <= 0) return false;
+  
+  if (obj === null || typeof obj !== 'object') {
+    return false;
+  }
+  
+  if (visited.has(obj)) {
+    console.error(`   🔄 CIRCULAR REFERENCE DETECTED at path: ${path}`);
+    return true;
+  }
+  
+  visited.add(obj);
+  
+  if (Array.isArray(obj)) {
+    for (let i = 0; i < Math.min(obj.length, 5); i++) { // Only check first 5 items
+      if (detectCircularRefs(obj[i], `${path}[${i}]`, visited, maxDepth - 1)) {
+        return true;
+      }
+    }
+  } else {
+    const keys = Object.keys(obj).slice(0, 10); // Only check first 10 keys
+    for (const key of keys) {
+      if (key === '_group') {
+        console.error(`   ⚠️  Found _group property at ${path}.${key}`);
+      }
+      if (detectCircularRefs(obj[key], `${path}.${key}`, visited, maxDepth - 1)) {
+        return true;
+      }
+    }
+  }
+  
+  visited.delete(obj);
+  return false;
+}
+
+// Group expansions with their base games
+function groupExpansionsWithBaseGames(games, allGameIds) {
+  console.log(`   🔍 Grouping expansions: checking ${games.length} games for circular refs...`);
+  
+  // Check for circular refs before grouping
+  let circularRefCount = 0;
+  for (let i = 0; i < Math.min(games.length, 10); i++) {
+    if (detectCircularRefs(games[i], `games[${i}]`)) {
+      circularRefCount++;
+      if (circularRefCount <= 3) {
+        console.error(`   ❌ Found circular ref in game "${games[i].name || 'unknown'}" (id: ${games[i].id})`);
+      }
+    }
+  }
+  if (circularRefCount > 0) {
+    console.error(`   ⚠️  WARNING: Found ${circularRefCount} games with circular references before grouping!`);
+  }
+  
+  const groups = new Map(); // groupId (baseGameId) -> Game[]
+  const expansionGameIds = new Set();
+  
+  // Helper to extract base game ID from versioned ID
+  const getBaseId = (game) => {
+    // For versioned games, ID format is "gameId-versionId", extract just gameId
+    if (game.id && game.id.includes('-')) {
+      const parts = game.id.split('-');
+      // Check if first part is numeric (it's a game ID)
+      if (/^\d+$/.test(parts[0])) {
+        return parts[0];
+      }
+    }
+    return game.id;
+  };
+  
+  // First pass: identify expansions and create groups
+  for (const game of games) {
+    if (game.isExpansion && game.baseGameId) {
+      const baseId = game.baseGameId;
+      
+      // Only group if base game is in the collection
+      // Check if baseGameId matches any game's base ID in the collection
+      const baseGameInCollection = allGameIds.has(baseId) || 
+        Array.from(allGameIds).some(id => {
+          const gameBaseId = getBaseId({ id });
+          return gameBaseId === baseId;
+        });
+      
+      if (baseGameInCollection) {
+        if (!groups.has(baseId)) {
+          groups.set(baseId, []);
+        }
+        groups.get(baseId).push(game);
+        expansionGameIds.add(game.id);
+      }
+    }
+  }
+  
+  // Second pass: add base games to their groups
+  for (const game of games) {
+    if (game.isExpansion) continue; // Skip expansions in this pass
+    
+    const gameBaseId = getBaseId(game);
+    
+    // Check if this game's base ID matches any expansion group
+    if (groups.has(gameBaseId)) {
+      const group = groups.get(gameBaseId);
+      // Check if base game is already in the group
+      const baseGameInGroup = group.some(g => {
+        if (g.isExpansion) return false;
+        const gBaseId = getBaseId(g);
+        return gBaseId === gameBaseId;
+      });
+      
+      if (!baseGameInGroup) {
+        // Insert base game at the beginning of the group
+        group.unshift(game);
+      }
+    }
+  }
+  
+  // Filter out groups that only have expansions (base game not in collection)
+  const validGroups = new Map();
+  for (const [groupId, groupGames] of groups.entries()) {
+    // Check if group has at least one non-expansion game (base game)
+    const hasBaseGame = groupGames.some(g => {
+      if (g.isExpansion) return false;
+      const gBaseId = getBaseId(g);
+      return gBaseId === groupId;
+    });
+    
+    if (hasBaseGame && groupGames.length > 1) {
+      // Only create group if it has base game + at least one expansion
+      validGroups.set(groupId, groupGames);
+    }
+  }
+  
+  return { groups: validGroups, expansionGameIds };
+}
+
+// Group games by series/family
+function groupGamesBySeries(games, excludeExpansionGroups = new Set()) {
+  const familyGroups = new Map(); // familyId -> Game[]
+  const gameToFamilies = new Map(); // gameId -> Set<familyId>
+  
+  // First pass: collect all family memberships
+  for (const game of games) {
+    // Skip games that are already in expansion groups if excludeExpansionGroups is enabled
+    if (excludeExpansionGroups.has(game.id)) {
+      continue;
+    }
+    
+    if (game.familyIds && game.familyIds.length > 0) {
+      const families = new Set();
+      for (const familyId of game.familyIds) {
+        if (!familyGroups.has(familyId)) {
+          familyGroups.set(familyId, []);
+        }
+        families.add(familyId);
+      }
+      gameToFamilies.set(game.id, families);
+    }
+  }
+  
+  // Second pass: assign games to families
+  // For games in multiple families, choose the most specific one (smallest group)
+  for (const game of games) {
+    if (excludeExpansionGroups.has(game.id)) {
+      continue;
+    }
+    
+    const families = gameToFamilies.get(game.id);
+    if (families && families.size > 0) {
+      // If game is in multiple families, choose the one with fewest members
+      // (more specific/smaller series)
+      let chosenFamily = null;
+      let minSize = Infinity;
+      
+      for (const familyId of families) {
+        const currentSize = familyGroups.get(familyId)?.length || 0;
+        if (currentSize < minSize) {
+          minSize = currentSize;
+          chosenFamily = familyId;
+        }
+      }
+      
+      if (chosenFamily) {
+        familyGroups.get(chosenFamily).push(game);
+      }
+    }
+  }
+  
+  // Filter out groups with only one game (no grouping benefit)
+  const validGroups = new Map();
+  for (const [familyId, groupGames] of familyGroups.entries()) {
+    if (groupGames.length > 1) {
+      validGroups.set(familyId, groupGames);
+    }
+  }
+  
+  return validGroups;
+}
+
+// Create game groups based on options
+function createGameGroups(games, groupExpansions, groupSeries) {
+  const allGameIds = new Set(games.map(g => g.id));
+  
+  // Step 1: Group expansions if enabled
+  let expansionGroups = new Map();
+  let expansionGameIds = new Set();
+  
+  if (groupExpansions) {
+    const expansionResult = groupExpansionsWithBaseGames(games, allGameIds);
+    expansionGroups = expansionResult.groups;
+    expansionGameIds = expansionResult.expansionGameIds;
+    console.log(`   📦 Created ${expansionGroups.size} expansion groups`);
+  }
+  
+  // Step 2: Group by series if enabled (excluding games already in expansion groups)
+  let seriesGroups = new Map();
+  
+  if (groupSeries) {
+    seriesGroups = groupGamesBySeries(games, expansionGameIds);
+    console.log(`   📚 Created ${seriesGroups.size} series groups`);
+  }
+  
+  // Step 3: Combine groups (expansion groups take priority)
+  const finalGroups = new Map();
+  const groupedGameIds = new Set();
+  
+  // Add expansion groups first
+  for (const [groupId, groupGames] of expansionGroups.entries()) {
+    finalGroups.set(`expansion:${groupId}`, groupGames);
+    for (const game of groupGames) {
+      groupedGameIds.add(game.id);
+    }
+  }
+  
+  // Add series groups (only for games not in expansion groups)
+  for (const [familyId, groupGames] of seriesGroups.entries()) {
+    // Filter out games already in expansion groups
+    const filteredGames = groupGames.filter(g => !groupedGameIds.has(g.id));
+    if (filteredGames.length > 1) {
+      finalGroups.set(`series:${familyId}`, filteredGames);
+      for (const game of filteredGames) {
+        groupedGameIds.add(game.id);
+      }
+    }
+  }
+  
+  // Find standalone games (not in any group)
+  const standaloneGames = games.filter(g => !groupedGameIds.has(g.id));
+  
+  return {
+    groups: finalGroups,
+    standaloneGames,
+    groupedGameIds
+  };
+}
+
+// Calculate total area of a group
+function calculateGroupArea(group, primaryOrder) {
+  let totalArea = 0;
+  
+  for (const game of group) {
+    if (game.dims2D) {
+      totalArea += game.dims2D.x * game.dims2D.y;
+    }
+  }
+  
+  return totalArea;
+}
+
+// Split oversized groups into smaller groups that fit in a cube
+function splitOversizedGroup(group, maxArea, primaryOrder) {
+  const CUBE_AREA = CUBE_SIZE * CUBE_SIZE; // 12.8 * 12.8 = 163.84 sq in, but we use 16384 for safety
+  const MAX_GROUP_AREA = maxArea || (CUBE_SIZE * CUBE_SIZE * 0.95); // 95% of cube area to leave some margin
+  
+  // Calculate current area
+  const currentArea = calculateGroupArea(group, primaryOrder);
+  
+  if (currentArea <= MAX_GROUP_AREA) {
+    return [group]; // Group fits, no splitting needed
+  }
+  
+  console.log(`   ✂️  Splitting oversized group (${group.length} games, ${currentArea.toFixed(1)} sq in > ${MAX_GROUP_AREA.toFixed(1)})`);
+  
+  // Sort games by area (descending) - keep largest games together
+  const sortedGames = [...group].sort((a, b) => {
+    const areaA = (a.dims2D?.x || 0) * (a.dims2D?.y || 0);
+    const areaB = (b.dims2D?.x || 0) * (b.dims2D?.y || 0);
+    return areaB - areaA;
+  });
+  
+  // Identify base game (first non-expansion, or first game if all are expansions)
+  const baseGameIndex = sortedGames.findIndex(g => !g.isExpansion);
+  const baseGame = baseGameIndex >= 0 ? sortedGames[baseGameIndex] : sortedGames[0];
+  
+  // Remove base game from sorted list
+  const otherGames = sortedGames.filter((g, i) => i !== (baseGameIndex >= 0 ? baseGameIndex : 0));
+  
+  // Create first group with base game
+  const subGroups = [[baseGame]];
+  let currentGroupArea = (baseGame.dims2D?.x || 0) * (baseGame.dims2D?.y || 0);
+  
+  // Distribute remaining games
+  for (const game of otherGames) {
+    const gameArea = (game.dims2D?.x || 0) * (game.dims2D?.y || 0);
+    
+    // Try to add to existing groups (starting with first group to keep base game group together)
+    let added = false;
+    for (let i = 0; i < subGroups.length; i++) {
+      const groupArea = calculateGroupArea(subGroups[i], primaryOrder);
+      if (groupArea + gameArea <= MAX_GROUP_AREA) {
+        subGroups[i].push(game);
+        added = true;
+        break;
+      }
+    }
+    
+    // If doesn't fit in any existing group, create new group
+    if (!added) {
+      subGroups.push([game]);
+    }
+  }
+  
+  console.log(`      → Split into ${subGroups.length} sub-groups`);
+  
+  return subGroups;
+}
+
 // Main packing function
-function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport) {
+function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, groupExpansions = false, groupSeries = false) {
   console.log(`📦 Starting to pack ${games.length} games`);
   console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, ensureSupport=${ensureSupport}`);
   
@@ -666,35 +997,324 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     return [];
   }
   
-  // Step 2: Sort games
-  if (optimizeSpace) {
-    // Sort by area descending, then dimensions, then name
-    validGames.sort((a, b) => {
-      const areaA = a.dims2D.x * a.dims2D.y;
-      const areaB = b.dims2D.x * b.dims2D.y;
-      if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
-      
-      const maxA = Math.max(a.dims2D.x, a.dims2D.y);
-      const maxB = Math.max(b.dims2D.x, b.dims2D.y);
-      if (Math.abs(maxA - maxB) > 0.01) return maxB - maxA;
-      
-      const minA = Math.min(a.dims2D.x, a.dims2D.y);
-      const minB = Math.min(b.dims2D.x, b.dims2D.y);
-      if (Math.abs(minA - minB) > 0.01) return minB - minA;
-      
-      return (a.name || '').localeCompare(b.name || '');
-    });
-    console.log('   Sorted by area (optimized)');
-  } else {
-    validGames.sort((a, b) => compareGames(a, b, priorities));
-    console.log('   Sorted by priorities');
+  // Step 1.5: Create groups if grouping is enabled (GROUPS TAKE PRECEDENCE)
+  let gameGroups = new Map();
+  let standaloneGames = [...validGames];
+  const MAX_GROUP_AREA = CUBE_SIZE * CUBE_SIZE * 0.95; // 95% of cube area
+  
+  if (groupExpansions || groupSeries) {
+    console.log(`   🔗 Creating game groups (expansions: ${groupExpansions}, series: ${groupSeries})...`);
+    const groupingResult = createGameGroups(validGames, groupExpansions, groupSeries);
+    
+    // Split oversized groups
+    const splitGroups = new Map();
+    for (const [groupId, group] of groupingResult.groups.entries()) {
+      const subGroups = splitOversizedGroup(group, MAX_GROUP_AREA, primaryOrder);
+      if (subGroups.length === 1) {
+        splitGroups.set(groupId, subGroups[0]);
+      } else {
+        // Multiple sub-groups, rename them
+        subGroups.forEach((subGroup, index) => {
+          splitGroups.set(`${groupId}_split${index}`, subGroup);
+        });
+      }
+    }
+    
+    gameGroups = splitGroups;
+    standaloneGames = groupingResult.standaloneGames;
+    
+    // Store group ID on each game for packing logic (but not the group array to avoid circular refs)
+    console.log(`   🔍 Checking for circular refs in ${gameGroups.size} groups...`);
+    for (const [groupId, group] of gameGroups.entries()) {
+      // Check if the group array itself creates a circular ref
+      for (let i = 0; i < group.length; i++) {
+        const game = group[i];
+        
+        // CRITICAL: Check if accessing game properties creates circular ref
+        try {
+          // Test accessing the game object
+          const testAccess = game.name;
+          
+          // Check if game already has _group (shouldn't happen, but check)
+          if (game._group !== undefined || '_group' in game) {
+            console.error(`   ❌ ERROR: Game "${game.name}" (id: ${game.id}) ALREADY HAS _group before we set _groupId!`);
+            console.error(`      Group: ${groupId}, Index in group: ${i}`);
+            delete game._group;
+          }
+          
+          // Set only _groupId, NEVER _group
+          game._groupId = groupId;
+          
+          // Verify we didn't accidentally create a circular ref
+          // If game._group points to group, and group contains game, that's circular
+          if (game._group === group || (game._group && Array.isArray(game._group) && game._group.includes(game))) {
+            console.error(`   ❌ CRITICAL: Circular ref detected! game._group points to group containing game!`);
+            delete game._group;
+          }
+        } catch (e) {
+          console.error(`   ❌ Error processing game "${game?.name || 'unknown'}" in group ${groupId}:`, e.message);
+        }
+      }
+    }
+    
+    // After setting _groupId, check if any circular refs were created
+    console.log(`   🔍 Verifying no circular refs were created...`);
+    let postGroupCircularRefs = 0;
+    for (const [groupId, group] of gameGroups.entries()) {
+      for (const game of group) {
+        if (detectCircularRefs(game, `group[${groupId}].game[${game.id}]`)) {
+          postGroupCircularRefs++;
+          if (postGroupCircularRefs <= 3) {
+            console.error(`   ❌ Found circular ref in game "${game.name}" after setting _groupId!`);
+          }
+        }
+      }
+    }
+    if (postGroupCircularRefs > 0) {
+      console.error(`   ⚠️  WARNING: Found ${postGroupCircularRefs} games with circular references after grouping!`);
+    }
+    
+    console.log(`   ✓ Created ${gameGroups.size} groups, ${standaloneGames.length} standalone games`);
+    
+    // Immediately clean up any _group properties that might have been set (defensive)
+    let cleanupCount1 = 0;
+    for (const game of validGames) {
+      if (game._group !== undefined) {
+        console.error(`   ⚠️  Found _group on "${game.name}" during initial cleanup!`);
+        delete game._group;
+        cleanupCount1++;
+      }
+    }
+    if (cleanupCount1 > 0) {
+      console.log(`   🧹 Initial cleanup removed ${cleanupCount1} _group properties`);
+    }
+  }
+  
+  // Step 2: Sort groups and standalone games separately
+  // Groups are sorted as units, standalone games are sorted individually
+  // Helper function to get representative game for a group (base game or first game)
+  function getGroupRepresentative(group) {
+    // For expansion groups, prefer the base game (non-expansion)
+    const baseGame = group.find(g => !g.isExpansion);
+    return baseGame || group[0];
+  }
+  
+  // Calculate total area of a group
+  function getGroupTotalArea(group) {
+    let totalArea = 0;
+    for (const game of group) {
+      if (game.dims2D) {
+        totalArea += game.dims2D.x * game.dims2D.y;
+      }
+    }
+    return totalArea;
+  }
+  
+  // Sort groups as units
+  const sortedGroups = [];
+  if (gameGroups.size > 0) {
+    for (const [groupId, group] of gameGroups.entries()) {
+      sortedGroups.push({ groupId, group });
+    }
+    
+    if (optimizeSpace) {
+      // Sort groups by total area (largest first) when optimizing for space
+      sortedGroups.sort((a, b) => {
+        const areaA = getGroupTotalArea(a.group);
+        const areaB = getGroupTotalArea(b.group);
+        if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
+        
+        // If areas are equal, compare by representative game
+        const repA = getGroupRepresentative(a.group);
+        const repB = getGroupRepresentative(b.group);
+        return (repA.name || '').localeCompare(repB.name || '');
+      });
+      console.log(`   Sorted ${sortedGroups.length} groups by total area (optimized)`);
+    } else {
+      // Sort groups by their representative game using user priorities
+      sortedGroups.sort((a, b) => {
+        const repA = getGroupRepresentative(a.group);
+        const repB = getGroupRepresentative(b.group);
+        return compareGames(repA, repB, priorities);
+      });
+      console.log(`   Sorted ${sortedGroups.length} groups by priorities`);
+    }
+  }
+  
+  // Sort standalone games
+  if (standaloneGames.length > 0) {
+    if (optimizeSpace) {
+      // Sort by area descending, then dimensions, then name
+      standaloneGames.sort((a, b) => {
+        const areaA = a.dims2D.x * a.dims2D.y;
+        const areaB = b.dims2D.x * b.dims2D.y;
+        if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
+        
+        const maxA = Math.max(a.dims2D.x, a.dims2D.y);
+        const maxB = Math.max(b.dims2D.x, b.dims2D.y);
+        if (Math.abs(maxA - maxB) > 0.01) return maxB - maxA;
+        
+        const minA = Math.min(a.dims2D.x, a.dims2D.y);
+        const minB = Math.min(b.dims2D.x, b.dims2D.y);
+        if (Math.abs(minA - minB) > 0.01) return minB - minA;
+        
+        return (a.name || '').localeCompare(b.name || '');
+      });
+      console.log(`   Sorted ${standaloneGames.length} standalone games by area (optimized)`);
+    } else {
+      standaloneGames.sort((a, b) => compareGames(a, b, priorities));
+      console.log(`   Sorted ${standaloneGames.length} standalone games by priorities`);
+    }
   }
   
   // Step 3: Pack games into cubes
+  // PRIORITY: Groups first (in sorted order), then standalone games (in sorted order)
   const cubes = [];
   const placed = new Set();
   
-  for (const game of validGames) {
+  // Helper function to try placing a group together
+  function tryPlaceGroup(cube, group, requireSupport) {
+    // Check if all games in group can fit in this cube
+    const tempCube = { games: [...cube.games], rows: [] };
+    const groupPlaced = [];
+    
+    // Sort group by size (largest first) for better packing within the group
+    const sortedGroup = [...group].sort((a, b) => {
+      const areaA = (a.dims2D?.x || 0) * (a.dims2D?.y || 0);
+      const areaB = (b.dims2D?.x || 0) * (b.dims2D?.y || 0);
+      return areaB - areaA;
+    });
+    
+    for (const game of sortedGroup) {
+      if (placed.has(game.id)) continue;
+      
+      const orientations = [];
+      orientations.push({ x: game.dims2D.x, y: game.dims2D.y });
+      if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+        orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
+      }
+      
+      let gamePlaced = false;
+      for (const orientation of orientations) {
+        if (tryPlaceGame(tempCube, game, orientation.x, orientation.y, requireSupport)) {
+          groupPlaced.push(game);
+          gamePlaced = true;
+          break;
+        }
+      }
+      
+      if (!gamePlaced) {
+        // Can't place this game, abort group placement
+        return false;
+      }
+    }
+    
+    // All games in group can be placed, commit to cube
+    cube.games = tempCube.games;
+    for (const game of groupPlaced) {
+      placed.add(game.id);
+    }
+    
+    return true;
+  }
+  
+  // FIRST: Place all groups in sorted order (GROUPS TAKE PRECEDENCE)
+  if (sortedGroups.length > 0) {
+    for (const { groupId, group } of sortedGroups) {
+      // Check if all games in group are already placed
+      if (group.every(g => placed.has(g.id))) {
+        continue;
+      }
+      
+      let groupPlaced = false;
+      
+      // Determine which cubes to check based on optimizeSpace and respectSortOrder
+      let cubesToCheck = [];
+      if (optimizeSpace) {
+        // When optimizing for space, try all cubes to find best fit
+        // Sort cubes by available space (descending) to prefer cubes with more space
+        cubesToCheck = [...cubes].sort((a, b) => {
+          const occupiedA = calculateOccupiedArea(a);
+          const occupiedB = calculateOccupiedArea(b);
+          return occupiedB - occupiedA; // More space first (less occupied)
+        });
+      } else if (respectSortOrder) {
+        // Strict sort order: only check last cube
+        if (cubes.length > 0) {
+          cubesToCheck = [cubes[cubes.length - 1]];
+        }
+      } else {
+        // Check current and previous cube
+        if (cubes.length > 0) {
+          cubesToCheck = [cubes[cubes.length - 1]];
+          if (cubes.length > 1) {
+            cubesToCheck.unshift(cubes[cubes.length - 2]);
+          }
+        }
+      }
+      
+      // Try to place group in existing cubes
+      for (const cube of cubesToCheck) {
+        if (tryPlaceGroup(cube, group, requireSupport)) {
+          groupPlaced = true;
+          console.log(`   ✅ Placed group "${groupId}" (${group.length} games) together`);
+          break;
+        }
+      }
+      
+      // Create new cube for group if it doesn't fit anywhere
+      if (!groupPlaced) {
+        const newCube = { games: [], rows: [] };
+        if (tryPlaceGroup(newCube, group, requireSupport)) {
+          cubes.push(newCube);
+          const baseGame = getGroupRepresentative(group);
+          console.log(`   Created cube ${cubes.length} for group "${groupId}" (${group.length} games) starting with "${baseGame.name}"`);
+          groupPlaced = true;
+        } else {
+          // Group too large or can't be placed together - add games to standalone list
+          console.log(`   ⚠️  Group "${groupId}" couldn't be placed together, will pack individually`);
+        }
+      }
+    }
+  }
+  
+  // Collect any games from groups that couldn't be placed together
+  // These need to be packed individually after standalone games
+  const unplacedGroupGames = [];
+  if (sortedGroups.length > 0) {
+    for (const { groupId, group } of sortedGroups) {
+      for (const game of group) {
+        if (!placed.has(game.id)) {
+          unplacedGroupGames.push(game);
+        }
+      }
+    }
+  }
+  
+  // Sort unplaced group games using the same logic as standalone games
+  if (unplacedGroupGames.length > 0) {
+    if (optimizeSpace) {
+      unplacedGroupGames.sort((a, b) => {
+        const areaA = a.dims2D.x * a.dims2D.y;
+        const areaB = b.dims2D.x * b.dims2D.y;
+        if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
+        const maxA = Math.max(a.dims2D.x, a.dims2D.y);
+        const maxB = Math.max(b.dims2D.x, b.dims2D.y);
+        if (Math.abs(maxA - maxB) > 0.01) return maxB - maxA;
+        const minA = Math.min(a.dims2D.x, a.dims2D.y);
+        const minB = Math.min(b.dims2D.x, b.dims2D.y);
+        if (Math.abs(minA - minB) > 0.01) return minB - minA;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    } else {
+      unplacedGroupGames.sort((a, b) => compareGames(a, b, priorities));
+    }
+    // Add to standalone games (after all standalone games are processed)
+    console.log(`   Adding ${unplacedGroupGames.length} unplaced group games to pack individually`);
+  }
+  
+  // SECOND: Pack standalone games (in sorted order)
+  for (const game of standaloneGames) {
     if (placed.has(game.id)) continue;
     
     const orientations = [];
@@ -713,8 +1333,92 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     // Determine which cubes to check
     let cubesToCheck = [];
     if (optimizeSpace) {
-      // Check all cubes
-      cubesToCheck = [...cubes];
+      // When optimizing for space, try all cubes to find best fit
+      // Sort cubes by available space (descending) to prefer cubes with more space
+      cubesToCheck = [...cubes].sort((a, b) => {
+        const occupiedA = calculateOccupiedArea(a);
+        const occupiedB = calculateOccupiedArea(b);
+        return occupiedB - occupiedA; // More space first (less occupied)
+      });
+    } else if (respectSortOrder) {
+      // Only check last cube
+      if (cubes.length > 0) {
+        cubesToCheck = [cubes[cubes.length - 1]];
+      }
+    } else {
+      // Check current and previous cube
+      if (cubes.length > 0) {
+        cubesToCheck = [cubes[cubes.length - 1]];
+        if (cubes.length > 1) {
+          cubesToCheck.unshift(cubes[cubes.length - 2]);
+        }
+      }
+    }
+    
+    // Try to place in existing cubes
+    for (const cube of cubesToCheck) {
+      for (const orientation of orientations) {
+        if (tryPlaceGame(cube, game, orientation.x, orientation.y, requireSupport)) {
+          placed.add(game.id);
+          wasPlaced = true;
+          break;
+        }
+      }
+      if (wasPlaced) break;
+      
+      // If normal placement failed and ensureSupport is enabled, try aggressive reorganization
+      if (!wasPlaced && ensureSupport && requireSupport) {
+        for (const orientation of orientations) {
+          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, requireSupport, priorities, optimizeSpace)) {
+            placed.add(game.id);
+            wasPlaced = true;
+            break;
+          }
+        }
+        if (wasPlaced) break;
+      }
+    }
+    
+    // Create new cube if not placed
+    if (!wasPlaced) {
+      const newCube = { games: [], rows: [] };
+      
+      for (const orientation of orientations) {
+        if (tryPlaceGame(newCube, game, orientation.x, orientation.y, requireSupport)) {
+          placed.add(game.id);
+          cubes.push(newCube);
+          console.log(`   Created cube ${cubes.length} for "${game.name}"`);
+          break;
+        }
+      }
+    }
+  }
+  
+  // THIRD: Pack any games from groups that couldn't be placed together (in sorted order)
+  for (const game of unplacedGroupGames) {
+    if (placed.has(game.id)) continue;
+    
+    const orientations = [];
+    
+    // Primary orientation (respects user's stacking preference)
+    orientations.push({ x: game.dims2D.x, y: game.dims2D.y });
+    
+    // Alternate orientation (if rotation allowed and dimensions different)
+    if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+      orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
+    }
+    
+    let wasPlaced = false;
+    
+    // Determine which cubes to check
+    let cubesToCheck = [];
+    if (optimizeSpace) {
+      // When optimizing for space, try all cubes to find best fit
+      cubesToCheck = [...cubes].sort((a, b) => {
+        const occupiedA = calculateOccupiedArea(a);
+        const occupiedB = calculateOccupiedArea(b);
+        return occupiedB - occupiedA; // More space first (less occupied)
+      });
     } else if (respectSortOrder) {
       // Only check last cube
       if (cubes.length > 0) {
@@ -774,6 +1478,12 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     const cube = cubes[i];
     cube.id = i + 1;
     
+    // Clean up temporary properties from all games in this cube FIRST
+    for (const game of cube.games) {
+      delete game._group;
+      delete game._groupId;
+    }
+    
     // Group games by Y position
     const gamesByY = new Map();
     for (const game of cube.games) {
@@ -794,6 +1504,10 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       for (const game of rowGames) {
         game.orientedDims = { ...game.packedDims };
         game.actualOrientedDims = { ...game.actualDims };
+        
+        // Ensure temporary grouping properties are removed (defensive cleanup)
+        delete game._group;
+        delete game._groupId;
       }
       
       const maxHeight = Math.max(...rowGames.map(g => g.packedDims.y));
@@ -816,7 +1530,70 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     console.log(`   Cube ${cube.id}: ${cube.games.length} games, ${utilization}% utilized`);
   }
   
-  console.log(`✅ Packed into ${cubes.length} cubes`);
+  // Final cleanup pass: remove temporary properties from all games in all cubes
+  // This ensures we catch any games that might have been missed
+  // Use a Set to track cleaned games to avoid processing the same object twice
+  const cleanedGames = new WeakSet();
+  let cleanupCount = 0;
+  let _groupCount = 0;
+  
+  for (const cube of cubes) {
+    for (const game of cube.games) {
+      if (!cleanedGames.has(game)) {
+        // Force delete and nullify to break any references
+        if ('_group' in game) {
+          _groupCount++;
+          console.error(`   ❌ FOUND _group on game "${game.name}" (id: ${game.id}) in cube ${cube.id}!`);
+          try {
+            const groupRef = game._group;
+            console.error(`      _group is:`, Array.isArray(groupRef) ? `Array with ${groupRef.length} items` : typeof groupRef);
+            delete game._group;
+            // Verify it's actually deleted
+            if ('_group' in game) {
+              console.error(`      ⚠️  _group still exists after delete!`);
+              game._group = undefined;
+              delete game._group;
+            }
+            cleanupCount++;
+          } catch (e) {
+            console.error(`      ❌ Error deleting _group:`, e.message);
+          }
+        }
+        if ('_groupId' in game) {
+          delete game._groupId;
+          cleanupCount++;
+        }
+        cleanedGames.add(game);
+      }
+    }
+    // Also clean up games in rows (they're the same objects, but be thorough)
+    for (const row of cube.rows) {
+      for (const game of row.games) {
+        if (!cleanedGames.has(game)) {
+          if ('_group' in game) {
+            _groupCount++;
+            console.error(`   ❌ FOUND _group on game "${game.name}" (id: ${game.id}) in row!`);
+            try {
+              delete game._group;
+              cleanupCount++;
+            } catch (e) {
+              console.error(`      ❌ Error deleting _group:`, e.message);
+            }
+          }
+          if ('_groupId' in game) {
+            delete game._groupId;
+            cleanupCount++;
+          }
+          cleanedGames.add(game);
+        }
+      }
+    }
+  }
+  
+  if (_groupCount > 0) {
+    console.error(`   ⚠️  WARNING: Found ${_groupCount} games with _group property before return!`);
+  }
+  console.log(`✅ Packed into ${cubes.length} cubes (cleaned ${cleanupCount} properties)`);
   return cubes;
 }
 
@@ -827,7 +1604,7 @@ app.get('/api/games/:username', async (req, res) => {
   const requestId = req.query.requestId || `${username}-${Date.now()}`;
   
   try {
-    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport } = req.query;
+    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, ensureSupport, groupExpansions, groupSeries } = req.query;
     
     if (!BGG_TOKEN) {
       console.error('❌ BGG API token not configured');
@@ -838,7 +1615,7 @@ app.get('/api/games/:username', async (req, res) => {
     }
 
     console.log('🎮 Processing games for user:', username);
-    console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace });
+    console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace, groupExpansions, groupSeries });
     
     sendProgress(requestId, 'Starting to process your collection...', { step: 'init' });
 
@@ -1157,7 +1934,14 @@ app.get('/api/games/:username', async (req, res) => {
             
             // Use gameId-versionId as unique ID
             game.id = key;
-            game.baseGameId = gameId;
+            // Preserve baseGameId from processGameItem (for expansions)
+            // baseGameId is only set for expansions (pointing to their base game)
+            // For regular games, it should remain null
+            // Don't overwrite it - processGameItem already sets it correctly
+            if (!game.baseGameId && game.isExpansion) {
+              // This shouldn't happen, but if an expansion doesn't have baseGameId, something is wrong
+              console.warn(`   ⚠️  Expansion "${game.name}" (${game.id}) doesn't have baseGameId`);
+            }
             
             allGames.push(game);
           });
@@ -1179,6 +1963,14 @@ app.get('/api/games/:username', async (req, res) => {
     for (const gameId of Array.from(cachedGames.keys())) {
       try {
         const gameData = cachedGames.get(gameId);
+        
+        // CRITICAL: Check if cached game data has _group property (shouldn't happen, but check)
+        if (gameData && (gameData._group !== undefined || '_group' in gameData)) {
+          console.error(`   ❌ WARNING: Cached game data for ${gameId} has _group property!`);
+          console.error(`      Game name: ${gameData.name || 'unknown'}`);
+          delete gameData._group;
+        }
+        
         const versions = gameDetailsNeeded.get(gameId) || [];
         
         // Process each version
@@ -1203,9 +1995,25 @@ app.get('/api/games/:username', async (req, res) => {
             }
           }
           
-          // Reconstruct game from cached data
+          // Reconstruct game from cached data - explicitly exclude _group and _groupId
           const game = {
-            ...gameData,
+            id: gameData.id,
+            name: gameData.name,
+            categories: gameData.categories,
+            families: gameData.families,
+            bggRank: gameData.bggRank,
+            minPlayers: gameData.minPlayers,
+            maxPlayers: gameData.maxPlayers,
+            bestPlayerCount: gameData.bestPlayerCount,
+            minPlaytime: gameData.minPlaytime,
+            maxPlaytime: gameData.maxPlaytime,
+            age: gameData.age,
+            communityAge: gameData.communityAge,
+            weight: gameData.weight,
+            bggRating: gameData.bggRating,
+            baseGameId: gameData.baseGameId || null,
+            isExpansion: gameData.isExpansion || false,
+            familyIds: gameData.familyIds || [],
             dimensions: dimensions || {
               length: 0,
               width: 0,
@@ -1215,7 +2023,15 @@ app.get('/api/games/:username', async (req, res) => {
           };
           
           game.id = key;
-          game.baseGameId = gameId;
+          
+          // Verify no _group properties slipped in
+          if (game._group !== undefined || '_group' in game) {
+            console.error(`   ❌ ERROR: Reconstructed game "${game.name}" (${game.id}) has _group property!`);
+            delete game._group;
+          }
+          if (game._groupId !== undefined || '_groupId' in game) {
+            delete game._groupId;
+          }
           
           allGames.push(game);
         });
@@ -1464,12 +2280,318 @@ app.get('/api/games/:username', async (req, res) => {
     const shouldOptimizeSpace = optimizeSpace === 'true';
     const strictSortOrder = respectSortOrder === 'true';
     const shouldEnsureSupport = ensureSupport === 'true';
+    const shouldGroupExpansions = !shouldOptimizeSpace && groupExpansions === 'true' && includeExpansions === 'true';
+    const shouldGroupSeries = !shouldOptimizeSpace && groupSeries === 'true';
+
+    if (shouldOptimizeSpace && (groupExpansions === 'true' || groupSeries === 'true')) {
+      console.log('   ℹ️  Optimize for space enabled – grouping options disabled for this run');
+    }
     
-    const packedCubes = packGamesIntoCubes(uniqueGames, parsedPriorities, isVertical, allowAltRotation, shouldOptimizeSpace, strictSortOrder, shouldEnsureSupport);
+    const packedCubes = packGamesIntoCubes(uniqueGames, parsedPriorities, isVertical, allowAltRotation, shouldOptimizeSpace, strictSortOrder, shouldEnsureSupport, shouldGroupExpansions, shouldGroupSeries);
     
     sendProgress(requestId, `Complete! Packed into ${packedCubes.length} cubes`, { step: 'complete', cubes: packedCubes.length, games: uniqueGames.length });
     
-    res.json({ cubes: packedCubes, totalGames: uniqueGames.length });
+    // CRITICAL: Check for circular refs BEFORE attempting serialization
+    console.log('   🔍 Deep circular reference check before serialization...');
+    console.log(`   Checking ${packedCubes.length} cubes...`);
+    
+    let lastGoodCube = -1;
+    let lastGoodRow = -1;
+    let lastGoodGame = -1;
+    
+    // Iterate through cubes, rows, and games to find the problematic one
+    for (let cubeIdx = 0; cubeIdx < packedCubes.length; cubeIdx++) {
+      const cube = packedCubes[cubeIdx];
+      console.log(`   Checking cube ${cubeIdx + 1}/${packedCubes.length} (id: ${cube.id})...`);
+      
+      // Check games directly on cube
+      if (cube.games && Array.isArray(cube.games)) {
+        for (let gameIdx = 0; gameIdx < cube.games.length; gameIdx++) {
+          const game = cube.games[gameIdx];
+          try {
+            // Try to serialize just this game to see if it has circular refs
+            JSON.stringify(game, (key, value) => {
+              if (key === '_group') {
+                console.error(`   ❌ FOUND _group property on game "${game.name}" (id: ${game.id}) in cube ${cubeIdx + 1}, game index ${gameIdx}`);
+                console.error(`      Path: cube[${cubeIdx}].games[${gameIdx}].${key}`);
+                return undefined; // Remove _group from serialization
+              }
+              if (key === '_groupId') {
+                return undefined; // Remove _groupId too
+              }
+              return value;
+            });
+            lastGoodGame = gameIdx;
+            lastGoodCube = cubeIdx;
+          } catch (e) {
+            console.error(`   ❌ CIRCULAR REF ERROR at cube ${cubeIdx + 1}, game index ${gameIdx}`);
+            console.error(`      Game: "${game?.name || 'unknown'}" (id: ${game?.id || 'unknown'})`);
+            console.error(`      Error: ${e.message}`);
+            console.error(`      Last good position: cube ${lastGoodCube + 1}, game ${lastGoodGame}`);
+            
+            // Try to identify the circular path
+            const allProps = Object.getOwnPropertyNames(game);
+            console.error(`      Game properties: ${allProps.slice(0, 20).join(', ')}`);
+            if (allProps.includes('_group')) {
+              console.error(`      ⚠️  _group property exists!`);
+              try {
+                const groupValue = game._group;
+                console.error(`      _group type: ${typeof groupValue}, isArray: ${Array.isArray(groupValue)}`);
+                if (Array.isArray(groupValue)) {
+                  console.error(`      _group length: ${groupValue.length}`);
+                  if (groupValue.includes(game)) {
+                    console.error(`      ❌ CIRCULAR: _group array contains the game itself!`);
+                  }
+                }
+              } catch (e2) {
+                console.error(`      Error inspecting _group: ${e2.message}`);
+              }
+            }
+            
+            // Don't throw, continue to check others
+          }
+        }
+      }
+      
+      // Check games in rows
+      if (cube.rows && Array.isArray(cube.rows)) {
+        for (let rowIdx = 0; rowIdx < cube.rows.length; rowIdx++) {
+          const row = cube.rows[rowIdx];
+          if (row.games && Array.isArray(row.games)) {
+            for (let gameIdx = 0; gameIdx < row.games.length; gameIdx++) {
+              const game = row.games[gameIdx];
+              try {
+                // Try to serialize just this game
+                JSON.stringify(game, (key, value) => {
+                  if (key === '_group') {
+                    console.error(`   ❌ FOUND _group property on game "${game.name}" (id: ${game.id}) in cube ${cubeIdx + 1}, row ${rowIdx}, game index ${gameIdx}`);
+                    console.error(`      Path: cube[${cubeIdx}].rows[${rowIdx}].games[${gameIdx}].${key}`);
+                    return undefined;
+                  }
+                  if (key === '_groupId') {
+                    return undefined;
+                  }
+                  return value;
+                });
+                lastGoodRow = rowIdx;
+                lastGoodGame = gameIdx;
+              } catch (e) {
+                console.error(`   ❌ CIRCULAR REF ERROR at cube ${cubeIdx + 1}, row ${rowIdx}, game index ${gameIdx}`);
+                console.error(`      Game: "${game?.name || 'unknown'}" (id: ${game?.id || 'unknown'})`);
+                console.error(`      Error: ${e.message}`);
+                console.error(`      Last good position: cube ${lastGoodCube + 1}, row ${lastGoodRow}, game ${lastGoodGame}`);
+                
+                // Try to identify the circular path
+                const allProps = Object.getOwnPropertyNames(game);
+                console.error(`      Game properties: ${allProps.slice(0, 20).join(', ')}`);
+                if (allProps.includes('_group')) {
+                  console.error(`      ⚠️  _group property exists!`);
+                  try {
+                    const groupValue = game._group;
+                    console.error(`      _group type: ${typeof groupValue}, isArray: ${Array.isArray(groupValue)}`);
+                    if (Array.isArray(groupValue)) {
+                      console.error(`      _group length: ${groupValue.length}`);
+                      if (groupValue.includes(game)) {
+                        console.error(`      ❌ CIRCULAR: _group array contains the game itself!`);
+                      }
+                    }
+                  } catch (e2) {
+                    console.error(`      Error inspecting _group: ${e2.message}`);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    console.log(`   ✅ Circular ref check complete. Last good position: cube ${lastGoodCube + 1}, row ${lastGoodRow}, game ${lastGoodGame}`);
+    
+    // Skip all cleanup attempts - go straight to creating clean copies
+    // This avoids any issues with circular references during cleanup
+    console.log('   🧹 Creating clean copies of all objects (bypassing cleanup)...');
+    
+    try {
+      const cleanCubes = [];
+      let gameCount = 0;
+      
+      for (let cubeIdx = 0; cubeIdx < packedCubes.length; cubeIdx++) {
+        const cube = packedCubes[cubeIdx];
+        const cleanCube = {
+          id: cube.id,
+          currentHeight: cube.currentHeight,
+          currentWidth: cube.currentWidth,
+          rows: [],
+          games: []
+        };
+        
+        // Copy rows with clean games
+        for (const row of cube.rows || []) {
+          const cleanRow = {
+            heightUsed: row.heightUsed,
+            widthUsed: row.widthUsed,
+            games: []
+          };
+          
+          for (const game of row.games || []) {
+            gameCount++;
+            try {
+              // Check if game has _group before accessing any properties
+              if (game && typeof game === 'object') {
+                const gameProps = Object.getOwnPropertyNames(game);
+                if (gameProps.includes('_group')) {
+                  console.error(`   ⚠️  Game "${game.name || 'unknown'}" (id: ${game.id || 'no-id'}) has _group property in row of cube ${cubeIdx + 1}`);
+                }
+              }
+              
+              // Create a completely new object with only the properties we want
+              // Use safe property access and create new objects for nested properties
+              const cleanGame = {
+                id: game.id,
+                name: game.name,
+                dimensions: game.dimensions ? { ...game.dimensions } : game.dimensions,
+                position: game.position ? { ...game.position } : game.position,
+                packedDims: game.packedDims ? { ...game.packedDims } : game.packedDims,
+                actualDims: game.actualDims ? { ...game.actualDims } : game.actualDims,
+                orientedDims: game.orientedDims ? { ...game.orientedDims } : game.orientedDims,
+                actualOrientedDims: game.actualOrientedDims ? { ...game.actualOrientedDims } : game.actualOrientedDims,
+                oversizedX: game.oversizedX,
+                oversizedY: game.oversizedY,
+                categories: game.categories ? [...(game.categories || [])] : [],
+                families: game.families ? [...(game.families || [])] : [],
+                bggRank: game.bggRank,
+                minPlayers: game.minPlayers,
+                maxPlayers: game.maxPlayers,
+                bestPlayerCount: game.bestPlayerCount,
+                minPlaytime: game.minPlaytime,
+                maxPlaytime: game.maxPlaytime,
+                age: game.age,
+                communityAge: game.communityAge,
+                weight: game.weight,
+                bggRating: game.bggRating,
+                baseGameId: game.baseGameId,
+                isExpansion: game.isExpansion,
+                familyIds: game.familyIds ? [...(game.familyIds || [])] : []
+              };
+              
+              // Explicitly verify _group and _groupId are NOT in cleanGame
+              // (they shouldn't be since we're creating from scratch)
+              if ('_group' in cleanGame) {
+                console.error(`   ⚠️  ERROR: _group appeared in cleanGame for "${game.name}"! This shouldn't happen!`);
+                delete cleanGame._group;
+              }
+              if ('_groupId' in cleanGame) {
+                delete cleanGame._groupId;
+              }
+              
+              cleanRow.games.push(cleanGame);
+            } catch (gameError) {
+              console.error(`   ❌ Error creating cleanGame for "${game?.name || 'unknown'}" in row:`, gameError.message);
+              console.error(`   Stack:`, gameError.stack);
+              // Skip this game if we can't create a clean copy
+            }
+          }
+          
+          cleanCube.rows.push(cleanRow);
+        }
+        
+        // Copy games directly on cube
+        for (const game of cube.games || []) {
+          try {
+            // Check for _group before creating cleanGame
+            if (game && typeof game === 'object') {
+              const gameProps = Object.getOwnPropertyNames(game);
+              if (gameProps.includes('_group')) {
+                console.error(`   ⚠️  Game "${game.name || 'unknown'}" (id: ${game.id || 'no-id'}) has _group property in cube.games of cube ${cubeIdx + 1}`);
+              }
+            }
+            
+            const cleanGame = {
+              id: game.id,
+              name: game.name,
+              dimensions: game.dimensions ? { ...game.dimensions } : game.dimensions,
+              position: game.position ? { ...game.position } : game.position,
+              packedDims: game.packedDims ? { ...game.packedDims } : game.packedDims,
+              actualDims: game.actualDims ? { ...game.actualDims } : game.actualDims,
+              orientedDims: game.orientedDims ? { ...game.orientedDims } : game.orientedDims,
+              actualOrientedDims: game.actualOrientedDims ? { ...game.actualOrientedDims } : game.actualOrientedDims,
+              oversizedX: game.oversizedX,
+              oversizedY: game.oversizedY,
+              categories: game.categories ? [...(game.categories || [])] : [],
+              families: game.families ? [...(game.families || [])] : [],
+              bggRank: game.bggRank,
+              minPlayers: game.minPlayers,
+              maxPlayers: game.maxPlayers,
+              bestPlayerCount: game.bestPlayerCount,
+              minPlaytime: game.minPlaytime,
+              maxPlaytime: game.maxPlaytime,
+              age: game.age,
+              communityAge: game.communityAge,
+              weight: game.weight,
+              bggRating: game.bggRating,
+              baseGameId: game.baseGameId,
+              isExpansion: game.isExpansion,
+              familyIds: game.familyIds ? [...(game.familyIds || [])] : []
+            };
+            
+            // Verify _group is NOT in cleanGame (it shouldn't be)
+            if ('_group' in cleanGame) {
+              console.error(`   ⚠️  ERROR: _group appeared in cleanGame for "${game.name}" in cube.games! This shouldn't happen!`);
+              delete cleanGame._group;
+            }
+            if ('_groupId' in cleanGame) {
+              delete cleanGame._groupId;
+            }
+            
+            cleanCube.games.push(cleanGame);
+          } catch (gameError) {
+            console.error(`   ❌ Error creating cleanGame for "${game?.name || 'unknown'}" in cube.games:`, gameError.message);
+            // Skip this game if we can't create a clean copy
+          }
+        }
+        
+        cleanCubes.push(cleanCube);
+      }
+      
+      console.log(`   ✅ Clean copies created for ${gameCount} games in ${cleanCubes.length} cubes`);
+      console.log('   📤 Attempting JSON serialization...');
+      
+      // Final check - make absolutely sure no _group properties exist
+      let finalCheckCount = 0;
+      for (const cube of cleanCubes) {
+        for (const row of cube.rows) {
+          for (const game of row.games) {
+            if ('_group' in game || '_groupId' in game) {
+              finalCheckCount++;
+              console.error(`   ❌ FINAL CHECK: Found _group in clean copy of "${game.name}"!`);
+              delete game._group;
+              delete game._groupId;
+            }
+          }
+        }
+        for (const game of cube.games) {
+          if ('_group' in game || '_groupId' in game) {
+            finalCheckCount++;
+            console.error(`   ❌ FINAL CHECK: Found _group in clean copy of "${game.name}"!`);
+            delete game._group;
+            delete game._groupId;
+          }
+        }
+      }
+      
+      if (finalCheckCount > 0) {
+        console.error(`   ⚠️  WARNING: Found ${finalCheckCount} _group properties in clean copies!`);
+      }
+      
+      res.json({ cubes: cleanCubes, totalGames: uniqueGames.length });
+      console.log('   ✅ JSON response sent successfully');
+      
+    } catch (jsonError) {
+      console.error('   ❌ JSON serialization error:', jsonError.message);
+      console.error('   Stack:', jsonError.stack);
+      res.status(500).json({ error: 'Failed to serialize response. Please try again.' });
+    }
     
     // Clean up progress store after a delay
     setTimeout(() => {
@@ -1515,6 +2637,27 @@ function processGameItem(item, versionInfo = null, versionId = null) {
   const families = item.link
     ?.filter(l => l.$.type === 'boardgamefamily')
     .map(l => l.$.value) || [];
+  
+  // Extract family IDs (for series grouping)
+  const familyIds = item.link
+    ?.filter(l => l.$.type === 'boardgamefamily')
+    .map(l => l.$.id) || [];
+  
+  // Extract expansion relationships (base game ID if this is an expansion)
+  const expansionLinks = item.link
+    ?.filter(l => l.$.type === 'boardgameexpansion') || [];
+  
+  let baseGameId = null;
+  if (expansionLinks.length > 0) {
+    // Take the first expansion link's ID as the base game
+    // (expansions typically link to one base game)
+    baseGameId = expansionLinks[0].$.id || null;
+  }
+  
+  // Determine if this is an expansion
+  const isExpansion = baseGameId !== null || 
+    item.$.type === 'boardgameexpansion' ||
+    categories.includes('Expansion for Base-game');
 
   // Extract stats
   const stats = item.statistics?.[0]?.ratings?.[0];
@@ -1618,6 +2761,10 @@ function processGameItem(item, versionInfo = null, versionId = null) {
     communityAge,
     weight,
     bggRating,
+    // Grouping fields
+    baseGameId,   // ID of base game if this is an expansion
+    isExpansion,  // True if this game is an expansion
+    familyIds,    // Array of family/series IDs for grouping
     // DISCARD: descriptions, designers, publishers, artists, yearpublished, 
     // mechanics, all raw XML data, version info, thumbnails, images, etc.
   };

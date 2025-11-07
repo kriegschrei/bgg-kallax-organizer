@@ -475,6 +475,24 @@ export function extractGameData(item) {
   const families = item.link
     ?.filter(l => l.$.type === 'boardgamefamily')
     .map(l => l.$.value) || [];
+  
+  // Extract family IDs (for series grouping)
+  const familyIds = item.link
+    ?.filter(l => l.$.type === 'boardgamefamily')
+    .map(l => l.$.id) || [];
+  
+  // Extract expansion relationships (base game ID if this is an expansion)
+  const expansionLinks = item.link
+    ?.filter(l => l.$.type === 'boardgameexpansion') || [];
+  
+  let baseGameId = null;
+  if (expansionLinks.length > 0) {
+    baseGameId = expansionLinks[0].$.id || null;
+  }
+  
+  const isExpansion = baseGameId !== null || 
+    item.$.type === 'boardgameexpansion' ||
+    categories.includes('Expansion for Base-game');
 
   // Extract stats
   const stats = item.statistics?.[0]?.ratings?.[0];
@@ -538,7 +556,11 @@ export function extractGameData(item) {
     age,
     communityAge,
     weight,
-    bggRating
+    bggRating,
+    // Grouping fields
+    baseGameId,
+    isExpansion,
+    familyIds
   };
 }
 

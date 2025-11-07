@@ -24,6 +24,8 @@ function App() {
   const [username, setUsername] = useState('');
   const [includePreordered, setIncludePreordered] = useState(false);
   const [includeExpansions, setIncludeExpansions] = useState(false);
+  const [groupExpansions, setGroupExpansions] = useState(false);
+  const [groupSeries, setGroupSeries] = useState(false);
   const [verticalStacking, setVerticalStacking] = useState(true);
   const [allowAlternateRotation, setAllowAlternateRotation] = useState(true);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
@@ -39,7 +41,7 @@ function App() {
   const handleOptimizeSpaceChange = (checked) => {
     setOptimizeSpace(checked);
     if (checked) {
-      // Disable and uncheck all priorities when optimize space is enabled
+      // Disable all manual sorting controls when optimize space is enabled
       setPriorities(priorities.map(p => ({ ...p, enabled: false })));
       setRespectSortOrder(false);
     }
@@ -70,6 +72,8 @@ function App() {
         optimizeSpace,
         respectSortOrder,
         ensureSupport,
+        groupExpansions && !optimizeSpace,
+        groupSeries && !optimizeSpace,
         (progress) => {
           // Update progress message from SSE updates
           if (progress && progress.message) {
@@ -189,10 +193,41 @@ function App() {
                   <input
                     type="checkbox"
                     checked={includeExpansions}
-                    onChange={(e) => setIncludeExpansions(e.target.checked)}
+                    onChange={(e) => {
+                      setIncludeExpansions(e.target.checked);
+                      if (!e.target.checked) {
+                        setGroupExpansions(false); // Disable grouping when expansions are disabled
+                      }
+                    }}
                     disabled={loading}
                   />
                   Include expansions
+                </label>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={groupExpansions}
+                    onChange={(e) => setGroupExpansions(e.target.checked)}
+                    disabled={loading || !includeExpansions || optimizeSpace}
+                  />
+                  Group expansions with base game
+                  <span className="tooltip-trigger" data-tooltip="Keep expansions with their base game in the same cube when possible">ℹ️</span>
+                </label>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={groupSeries}
+                    onChange={(e) => setGroupSeries(e.target.checked)}
+                    disabled={loading || optimizeSpace}
+                  />
+                  Group series
+                  <span className="tooltip-trigger" data-tooltip="Keep games from the same series/family together in the same cube when possible">ℹ️</span>
                 </label>
               </div>
 

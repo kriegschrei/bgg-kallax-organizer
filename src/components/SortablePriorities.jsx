@@ -3,7 +3,8 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -82,7 +83,17 @@ export default function SortablePriorities({ priorities, onChange, disabled = fa
   const [isExpanded, setIsExpanded] = React.useState(false);
   
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 5, // Activates after moving 5 pixels (prevents accidental drags)
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // Activates after a 250ms hold
+        tolerance: 5, // Allows 5 pixels of movement during the delay
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })

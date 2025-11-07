@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import SortablePriorities from './components/SortablePriorities';
 import Results from './components/Results';
+import MissingVersionsWarning from './components/MissingVersionsWarning';
 import { fetchPackedCubes } from './services/bggApi';
 import './App.css';
 
@@ -24,22 +25,27 @@ function App() {
   const [username, setUsername] = useState('');
   const [includePreordered, setIncludePreordered] = useState(false);
   const [includeExpansions, setIncludeExpansions] = useState(false);
+  const [groupExpansions, setGroupExpansions] = useState(false);
+  const [groupSeries, setGroupSeries] = useState(false);
   const [verticalStacking, setVerticalStacking] = useState(true);
   const [allowAlternateRotation, setAllowAlternateRotation] = useState(true);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
-  const [ensureSupport, setEnsureSupport] = useState(false);
+  const [fitOversized, setFitOversized] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
   const [cubes, setCubes] = useState(null);
+  const [oversizedGames, setOversizedGames] = useState([]);
+  const [missingVersionWarning, setMissingVersionWarning] = useState(null);
+  const [lastRequestConfig, setLastRequestConfig] = useState(null);
 
   const handleOptimizeSpaceChange = (checked) => {
     setOptimizeSpace(checked);
     if (checked) {
-      // Disable and uncheck all priorities when optimize space is enabled
+      // Disable all manual sorting controls when optimize space is enabled
       setPriorities(priorities.map(p => ({ ...p, enabled: false })));
       setRespectSortOrder(false);
     }
@@ -56,29 +62,60 @@ function App() {
     setLoading(true);
     setError(null);
     setCubes(null);
-    setProgress('Starting...');
+    setOversizedGames([]);
+    setProgress('Fetching your collection from BoardGameGeek...');
+    setMissingVersionWarning(null);
 
     try {
-      // Get fully processed and packed cubes from server with progress updates
-      const packedCubes = await fetchPackedCubes(
-        username.trim(), 
-        includePreordered, 
+      const trimmedUsername = username.trim();
+      const effectiveGroupExpansions = groupExpansions && !optimizeSpace;
+      const effectiveGroupSeries = groupSeries && !optimizeSpace;
+
+      const requestConfig = {
+        username: trimmedUsername,
+        includePreordered,
         includeExpansions,
         priorities,
         verticalStacking,
         allowAlternateRotation,
         optimizeSpace,
         respectSortOrder,
-        ensureSupport,
-        (progressData) => {
-          // Update progress message from SSE
-          if (progressData && progressData.message) {
-            setProgress(progressData.message);
+        fitOversized,
+        groupExpansions: effectiveGroupExpansions,
+        groupSeries: effectiveGroupSeries,
+      };
+
+      setLastRequestConfig(requestConfig);
+
+      // Get fully processed and packed cubes from server with progress updates
+      const response = await fetchPackedCubes(
+        trimmedUsername,
+        includePreordered,
+        includeExpansions,
+        priorities,
+        verticalStacking,
+        allowAlternateRotation,
+        optimizeSpace,
+        respectSortOrder,
+        fitOversized,
+        effectiveGroupExpansions,
+        effectiveGroupSeries,
+        (progress) => {
+          // Update progress message from SSE updates
+          if (progress && progress.message) {
+            setProgress(progress.message);
           }
         }
       );
       
-      if (!packedCubes || packedCubes.length === 0) {
+      if (response?.status === 'missing_versions') {
+        setLoading(false);
+        setProgress('');
+        setMissingVersionWarning({ ...response, username: trimmedUsername });
+        return;
+      }
+      
+      if (!response || !response.cubes || response.cubes.length === 0) {
         setError('No owned games found for this user');
         setLoading(false);
         return;
@@ -86,10 +123,68 @@ function App() {
 
       setProgress('Rendering results...');
 
-      setCubes(packedCubes);
+      setCubes(response.cubes);
+      setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
 
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
+      setLoading(false);
+      setProgress('');
+    }
+  };
+
+  const handleWarningCancel = () => {
+    setMissingVersionWarning(null);
+    setProgress('');
+    setError('Processing cancelled. Please select versions for the highlighted games on BoardGameGeek and try again.');
+  };
+
+  const handleWarningContinue = async () => {
+    if (!lastRequestConfig) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setProgress('Attempting fallback dimension lookup. This may take a little while...');
+    setMissingVersionWarning(null);
+    setOversizedGames([]);
+
+    try {
+      const response = await fetchPackedCubes(
+        lastRequestConfig.username,
+        lastRequestConfig.includePreordered,
+        lastRequestConfig.includeExpansions,
+        lastRequestConfig.priorities,
+        lastRequestConfig.verticalStacking,
+        lastRequestConfig.allowAlternateRotation,
+        lastRequestConfig.optimizeSpace,
+        lastRequestConfig.respectSortOrder,
+        lastRequestConfig.fitOversized,
+        lastRequestConfig.groupExpansions,
+        lastRequestConfig.groupSeries,
+        (progress) => {
+          if (progress && progress.message) {
+            setProgress(progress.message);
+          }
+        },
+        { skipVersionCheck: true }
+      );
+
+      if (!response || !response.cubes || response.cubes.length === 0) {
+        setError('No owned games found for this user');
+        setLoading(false);
+        return;
+      }
+
+      setProgress('Rendering results...');
+      setCubes(response.cubes);
+      setOversizedGames(response.oversizedGames || []);
+      setProgress('');
+      setLoading(false);
     } catch (err) {
       console.error('Error:', err);
       setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
@@ -189,7 +284,12 @@ function App() {
                   <input
                     type="checkbox"
                     checked={includeExpansions}
-                    onChange={(e) => setIncludeExpansions(e.target.checked)}
+                    onChange={(e) => {
+                      setIncludeExpansions(e.target.checked);
+                      if (!e.target.checked) {
+                        setGroupExpansions(false); // Disable grouping when expansions are disabled
+                      }
+                    }}
                     disabled={loading}
                   />
                   Include expansions
@@ -200,12 +300,39 @@ function App() {
                 <label>
                   <input
                     type="checkbox"
-                    checked={ensureSupport}
-                    onChange={(e) => setEnsureSupport(e.target.checked)}
+                    checked={groupExpansions}
+                    onChange={(e) => setGroupExpansions(e.target.checked)}
+                    disabled={loading || !includeExpansions || optimizeSpace}
+                  />
+                  Group expansions with base game
+                  <span className="tooltip-trigger" data-tooltip="Keep expansions with their base game in the same cube when possible">ℹ️</span>
+                </label>
+              </div>
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={groupSeries}
+                    onChange={(e) => setGroupSeries(e.target.checked)}
+                    disabled={loading || optimizeSpace}
+                  />
+                  Group series
+                  <span className="tooltip-trigger" data-tooltip="Keep games from the same series/family together in the same cube when possible">ℹ️</span>
+                </label>
+              </div>
+
+
+              <div className="checkbox-group">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={fitOversized}
+                    onChange={(e) => setFitOversized(e.target.checked)}
                     disabled={loading}
                   />
-                  Support all games
-                  <span className="tooltip-trigger" data-tooltip="Prevents floating games, may take longer to organize">ℹ️</span>
+                  Fit oversized games
+                  <span className="tooltip-trigger" data-tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches.">ℹ️</span>
                 </label>
               </div>
 
@@ -280,7 +407,23 @@ function App() {
         </div>
       )}
 
-      {cubes && <Results cubes={cubes} verticalStacking={verticalStacking} />}
+      {missingVersionWarning && (
+        <MissingVersionsWarning
+          warning={missingVersionWarning}
+          onContinue={handleWarningContinue}
+          onCancel={handleWarningCancel}
+          isProcessing={loading}
+        />
+      )}
+
+      {cubes && (
+        <Results
+          cubes={cubes}
+          verticalStacking={verticalStacking}
+          oversizedGames={oversizedGames}
+          fitOversized={fitOversized}
+        />
+      )}
 
       <footer className="disclaimer-footer">
         <div className="footer-content">

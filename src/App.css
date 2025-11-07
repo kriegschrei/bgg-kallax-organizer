@@ -214,7 +214,7 @@ header h1 {
   font-weight: 500;
 }
 
-.toggle-button:hover:not(:disabled) {
+.toggle-button:hover:not(:disabled):not(.active) {
   background: #d5dbdb;
   border-color: #95a5a6;
 }
@@ -223,6 +223,11 @@ header h1 {
   background: #3498db;
   color: white;
   border-color: #2980b9;
+}
+
+.toggle-button.active:hover:not(:disabled) {
+  background: #2980b9;
+  border-color: #21618c;
 }
 
 .toggle-button:disabled {

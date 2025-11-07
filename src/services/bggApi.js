@@ -3,9 +3,9 @@ import axios from 'axios';
 // Use backend proxy instead of calling BGG directly
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
-// Create axios instance with extended timeout for long-running requests
+// Create axios instance with extended timeout for long-running requests (2 minutes)
 const apiClient = axios.create({
-  timeout: 120000, // 2 minutes (120 seconds)
+  timeout: 120000, // 2 minutes
   headers: {
     'Connection': 'keep-alive',
   }
@@ -69,22 +69,25 @@ export const fetchPackedCubes = async (
   allowAlternateRotation = true, 
   optimizeSpace = false, 
   respectSortOrder = false, 
-  ensureSupport = false,
-  onProgress = null // Callback for progress updates: (progress) => void
+  fitOversized = false,
+  groupExpansions = false,
+  groupSeries = false,
+  onProgress = null, // Optional callback for progress updates
+  extraParams = {}
 ) => {
-  // Generate request ID for progress tracking
-  const requestId = `${username}-${Date.now()}`;
-  
-  // Set up SSE connection for progress updates if callback provided
+  const requestId = extraParams.requestId || `${username}-${Date.now()}`;
   let eventSource = null;
-  if (onProgress) {
-    try {
-      // Pass request ID as query parameter so SSE endpoint can match it
-      eventSource = new EventSource(`${API_BASE}/games/${username}/progress?requestId=${encodeURIComponent(requestId)}`);
+  
+  try {
+    console.log('📡 Frontend: Fetching packed cubes from server');
+    
+    // Set up SSE connection for progress updates if callback provided
+    if (onProgress) {
+      eventSource = new EventSource(`${API_BASE}/games/${username}/progress?requestId=${requestId}`);
       
       eventSource.onmessage = (event) => {
         try {
-          // Skip keep-alive pings (lines starting with :)
+          // Skip keep-alive pings (they start with ':')
           if (event.data.startsWith(':')) {
             return;
           }
@@ -102,14 +105,7 @@ export const fetchPackedCubes = async (
         console.warn('SSE connection error:', error);
         // Don't close - let it reconnect automatically
       };
-    } catch (error) {
-      console.warn('Failed to establish SSE connection:', error);
-      // Continue without progress updates
     }
-  }
-  
-  try {
-    console.log('📡 Frontend: Fetching packed cubes from server');
     
     const params = new URLSearchParams({
       includePreordered: includePreordered.toString(),
@@ -119,24 +115,33 @@ export const fetchPackedCubes = async (
       allowAlternateRotation: allowAlternateRotation.toString(),
       optimizeSpace: optimizeSpace.toString(),
       respectSortOrder: respectSortOrder.toString(),
-      ensureSupport: ensureSupport.toString(),
+      fitOversized: fitOversized.toString(),
+      groupExpansions: groupExpansions.toString(),
+      groupSeries: groupSeries.toString(),
+      requestId: requestId, // Pass requestId to match with SSE
     });
-    
-    // Add request ID as query parameter and header for progress tracking
-    params.append('requestId', requestId);
-    const response = await apiClient.get(`${API_BASE}/games/${username}?${params.toString()}`, {
-      headers: {
-        'X-Request-ID': requestId
+    Object.entries(extraParams).forEach(([key, value]) => {
+      if (key === 'requestId') {
+        return;
+      }
+      if (value !== undefined && value !== null) {
+        params.set(key, value.toString());
       }
     });
     
-    // Close SSE connection when done
+    const response = await apiClient.get(`${API_BASE}/games/${username}?${params.toString()}`);
+    
+    // Close SSE connection
     if (eventSource) {
       eventSource.close();
     }
     
-    console.log('✅ Frontend: Received', response.data.totalGames, 'games in', response.data.cubes.length, 'cubes');
-    return response.data.cubes;
+    if (response.data?.status === 'missing_versions') {
+      console.log('⚠️ Frontend: Missing versions detected for', response.data.games?.length || 0, 'games');
+    } else {
+      console.log('✅ Frontend: Received', response.data.totalGames, 'games in', response.data.cubes?.length || 0, 'cubes');
+    }
+    return response.data;
   } catch (error) {
     // Close SSE connection on error
     if (eventSource) {

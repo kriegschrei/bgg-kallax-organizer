@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { FaUndoAlt } from 'react-icons/fa';
+import { FaUndoAlt, FaExclamationTriangle, FaBug } from 'react-icons/fa';
 import SortablePriorities from './components/SortablePriorities';
 import ToggleSwitch from './components/ToggleSwitch';
 import Results from './components/Results';
@@ -91,6 +91,7 @@ function App() {
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
   const [fitOversized, setFitOversized] = useState(false);
+  const [bypassVersionWarning, setBypassVersionWarning] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
   const [excludedGamesMap, setExcludedGamesMap] = useState({});
   const [orientationOverridesMap, setOrientationOverridesMap] = useState({});
@@ -145,6 +146,7 @@ function App() {
             respectSortOrder: storedRespectSortOrder,
             fitOversized: storedFitOversized,
             filtersCollapsed: storedFiltersCollapsed,
+            bypassVersionWarning: storedBypassVersionWarning,
             priorities: storedPriorities,
           } = storedSettings;
 
@@ -178,6 +180,9 @@ function App() {
           if (typeof storedFitOversized === 'boolean') {
             setFitOversized(storedFitOversized);
           }
+          if (typeof storedBypassVersionWarning === 'boolean') {
+            setBypassVersionWarning(storedBypassVersionWarning);
+          }
           if (typeof storedFiltersCollapsed === 'boolean') {
             setFiltersCollapsed(storedFiltersCollapsed);
           }
@@ -202,6 +207,45 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const widgetId = 'ko-fi-overlay-widget';
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (document.getElementById(widgetId)) {
+      window.kofiWidgetOverlay?.draw?.('kriegschrei', {
+        type: 'floating-chat',
+        'floating-chat.donateButton.text': 'Support me',
+        'floating-chat.donateButton.background-color': '#00b9fe',
+        'floating-chat.donateButton.text-color': '#fff',
+      });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = widgetId;
+    script.src = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js';
+    script.async = true;
+    script.onload = () => {
+      window.kofiWidgetOverlay?.draw?.('kriegschrei', {
+        type: 'floating-chat',
+        'floating-chat.donateButton.text': 'Support me',
+        'floating-chat.donateButton.background-color': '#00b9fe',
+        'floating-chat.donateButton.text-color': '#fff',
+      });
+    };
+
+    document.body.appendChild(script);
+
+    return () => {
+      const existingScript = document.getElementById(widgetId);
+      if (existingScript) {
+        existingScript.remove();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!settingsHydrated) {
       return;
     }
@@ -219,6 +263,7 @@ function App() {
       fitOversized,
       filtersCollapsed,
       priorities,
+    bypassVersionWarning,
     };
 
     saveUserSettings(settingsToPersist).catch((persistError) => {
@@ -238,6 +283,7 @@ function App() {
     fitOversized,
     filtersCollapsed,
     priorities,
+    bypassVersionWarning,
   ]);
 
   useEffect(() => {
@@ -470,6 +516,7 @@ function App() {
     setOptimizeSpace(false);
     setRespectSortOrder(false);
     setFitOversized(false);
+    setBypassVersionWarning(false);
     setFiltersCollapsed(false);
     setPriorities(DEFAULT_PRIORITIES.map((priority) => ({ ...priority })));
   setCubes(null);
@@ -511,6 +558,7 @@ function App() {
     pushLabel(respectSortOrder, 'Respect priority order');
     pushLabel(optimizeSpace, 'Optimize for space');
     pushLabel(fitOversized, 'Fit oversized games');
+    pushLabel(bypassVersionWarning, 'Bypass version warning');
     pushLabel(!verticalStacking, 'Horizontal stacking');
     pushLabel(!allowAlternateRotation, 'Lock rotation');
 
@@ -547,6 +595,7 @@ function App() {
   }, [
     allowAlternateRotation,
     fitOversized,
+    bypassVersionWarning,
     groupExpansions,
     groupSeries,
     includeExpansions,
@@ -604,6 +653,8 @@ function App() {
         fitOversized,
         groupExpansions: effectiveGroupExpansions,
         groupSeries: effectiveGroupSeries,
+        bypassVersionWarning,
+        skipVersionCheck: bypassVersionWarning,
         overrides: overridesPayload,
       };
 
@@ -627,9 +678,12 @@ function App() {
           if (progress && progress.message) {
             setProgress(progress.message);
           }
+        },
+        {
+          overrides: overridesPayload,
+          skipVersionCheck: bypassVersionWarning,
+          bypassVersionWarning,
         }
-      ,
-        { overrides: overridesPayload }
       );
       
       if (response?.status === 'missing_versions') {
@@ -691,6 +745,8 @@ function App() {
     setFiltersCollapsed(true);
 
     try {
+      const effectiveBypassVersionWarning =
+        lastRequestConfig?.bypassVersionWarning ?? bypassVersionWarning;
       const overridesPayload = lastRequestConfig.overrides
         ? {
             excludedGames: (lastRequestConfig.overrides.excludedGames || []).map((item) => ({
@@ -726,7 +782,11 @@ function App() {
             setProgress(progress.message);
           }
         },
-        { skipVersionCheck: true, overrides: overridesPayload }
+        {
+          skipVersionCheck: true,
+          overrides: overridesPayload,
+          bypassVersionWarning: effectiveBypassVersionWarning,
+        }
       );
 
       if (!response || !response.cubes || response.cubes.length === 0) {
@@ -787,13 +847,11 @@ function App() {
             </a>
           </div>
           <div className="banner-item">
-            <a href="https://ko-fi.com/kriegschrei" target="_blank" rel="noopener noreferrer" className="banner-link">
-              ☕ Support on Ko-Fi
-            </a>
-          </div>
-          <div className="banner-item">
             <a href="https://github.com/kriegschrei/bgg-kallax-organizer/issues" target="_blank" rel="noopener noreferrer" className="banner-link">
-              🐛 Report Issues
+              <span className="banner-link-content">
+                <FaBug aria-hidden="true" className="banner-link-icon" />
+                Report Issues
+              </span>
             </a>
           </div>
         </div>
@@ -912,6 +970,17 @@ function App() {
                     onChange={setFitOversized}
                     disabled={loading}
                     tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
+                  />
+
+                  <ToggleSwitch
+                    id="bypassVersionWarning"
+                    label="Bypass version warning"
+                    checked={bypassVersionWarning}
+                    onChange={setBypassVersionWarning}
+                    disabled={loading}
+                    tooltip="You will not be warned about missing versions. This may result in incorrect data and longer processing times."
+                    tooltipIcon={FaExclamationTriangle}
+                    tooltipIconClassName="warning-icon"
                   />
 
                   <ToggleSwitch

@@ -9,6 +9,8 @@ function ToggleSwitch({
   onChange,
   disabled = false,
   tooltip,
+  tooltipIcon: TooltipIcon = FaInfoCircle,
+  tooltipIconClassName = '',
 }) {
   const handleChange = (event) => {
     if (!disabled && onChange) {
@@ -24,7 +26,10 @@ function ToggleSwitch({
         </label>
         {tooltip && (
           <span className="tooltip-trigger" data-tooltip={tooltip}>
-            <FaInfoCircle aria-hidden="true" className="button-icon" />
+            <TooltipIcon
+              aria-hidden="true"
+              className={`button-icon ${tooltipIconClassName}`.trim()}
+            />
             <span className="sr-only">More info</span>
           </span>
         )}

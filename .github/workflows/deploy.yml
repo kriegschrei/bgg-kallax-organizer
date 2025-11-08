@@ -39,8 +39,7 @@ jobs:
       - name: Build frontend
         env:
           VITE_API_URL: ${{ secrets.VITE_API_URL }}
-        run: echo "::notice::len=${#VITE_API_URL}"
-        run: npm run build
+        run: echo "::notice::len=${#VITE_API_URL}"; npm run build
 
       - name: Deploy frontend to S3
         run: aws s3 sync ./dist s3://${{ secrets.S3_BUCKET }} --delete

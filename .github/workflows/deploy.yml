@@ -40,16 +40,12 @@ jobs:
         run: npm run build
 
       - name: Deploy frontend to S3
-        uses: aws-actions/s3-sync@v1
-        with:
-          source: ./dist
-          destination: ${{ secrets.S3_BUCKET }}
+        run: aws s3 sync ./dist s3://${{ secrets.S3_BUCKET }} --delete
 
       - name: Invalidate CloudFront cache
-        uses: aws-actions/cloudfront-invalidate-cache@v1
-        with:
-          distribution-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-          paths: "/*"
+        run: aws cloudfront create-invalidation \
+          --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+          --paths "/*"
 
       - name: Purge Cloudflare cache
         run: |

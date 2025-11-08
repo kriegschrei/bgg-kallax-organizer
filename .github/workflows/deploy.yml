@@ -37,6 +37,8 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Build frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
         run: npm run build
 
       - name: Deploy frontend to S3

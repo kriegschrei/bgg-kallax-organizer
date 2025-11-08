@@ -66,6 +66,6 @@ jobs:
             cd server
             npm ci
             cd ..
-            pm2 reload all
+            pm2 reload all --wait-ready
             curl --fail http://localhost:3001/api/health
 

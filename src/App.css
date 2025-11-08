@@ -20,7 +20,7 @@ header {
   padding: 3rem 2rem 1rem;
   background: 
     linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.85) 100%),
-    url('/logo.jpg') center/cover;
+    url('/background.jpg') center/cover;
   color: white;
   border-radius: 8px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -39,7 +39,6 @@ header {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
-  padding: 1rem;
   background: rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(10px);
   border-radius: 8px;
@@ -81,20 +80,11 @@ header {
   font-size: 0.9rem;
 }
 
-header h1 {
-  font-family: var(--font-display);
-  font-size: 3rem;
-  margin-bottom: 0.75rem;
-  color: white;
-  text-shadow: 
-    -2px -2px 0 #000,
-    2px -2px 0 #000,
-    -2px 2px 0 #000,
-    2px 2px 0 #000,
-    0 0 10px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(0, 0, 0, 0.3);
-  font-weight: 700;
-  letter-spacing: 1px;
+.app-logo {
+  height: 100px;
+  width: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .subtitle {
@@ -236,9 +226,79 @@ header h1 {
   cursor: not-allowed;
 }
 
-.form-left button {
+.form-left > button {
   margin-top: 1rem;
   width: 100%;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.form-actions button {
+  width: auto;
+  margin-top: 0;
+}
+
+.reset-settings-button {
+  background: transparent;
+  border: 1px solid #95a5a6;
+  color: #2c3e50;
+  padding: 0.65rem 1rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.reset-settings-button:hover:not(:disabled) {
+  background: rgba(149, 165, 166, 0.15);
+  border-color: #7f8c8d;
+  color: #1f2f3a;
+}
+
+.reset-settings-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-right: 0.4rem;
+}
+
+.icon-end {
+  margin-left: 0.4rem;
+  margin-right: 0;
+}
+
+.button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  white-space: nowrap;
 }
 
 .search-panel.card {

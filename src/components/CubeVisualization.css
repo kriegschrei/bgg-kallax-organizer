@@ -61,6 +61,8 @@
   padding: 0.75rem;
   margin: 0.5rem 0;
   border-radius: 4px;
+  position: relative;
+  transition: opacity 0.2s ease, box-shadow 0.2s ease;
 }
 
 .list-view li strong {
@@ -69,13 +71,87 @@
   margin-bottom: 0.25rem;
 }
 
+.list-view li.is-excluded {
+  opacity: 0.55;
+}
+
+.list-view li.is-excluded:hover {
+  opacity: 0.75;
+}
+
+.list-view li.has-dimension-override {
+  box-shadow: inset 0 0 0 1px rgba(41, 128, 185, 0.25);
+}
+
+.game-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.game-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.game-action {
+  position: relative;
+}
+
+.game-action .button-icon {
+  font-size: 1rem;
+}
+
+.game-action {
+  background: rgba(44, 62, 80, 0.03);
+  border: 1px solid rgba(44, 62, 80, 0.2);
+  border-radius: 4px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  color: #2c3e50;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.game-action:hover:not(:disabled) {
+  background: rgba(41, 128, 185, 0.1);
+  color: #2980b9;
+  border-color: rgba(41, 128, 185, 0.4);
+}
+
+.game-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.game-action.orientation.active,
+.game-action.dimension.active {
+  background: rgba(41, 128, 185, 0.12);
+  border-color: rgba(41, 128, 185, 0.5);
+  color: #2980b9;
+}
+
+.game-action svg {
+  pointer-events: none;
+}
+
+.game-action.delete {
+  border-color: rgba(231, 76, 60, 0.35);
+}
+
+.game-action.delete:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.12);
+  color: #c0392b;
+}
+
 .game-details {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   font-size: 0.85rem;
   color: #7f8c8d;
-  margin-top: 0.25rem;
+  margin-top: 0.35rem;
 }
 
 .dimension-info {
@@ -103,5 +179,132 @@
   padding: 0.2rem 0.5rem;
   border-radius: 3px;
   color: #e67e22;
+}
+
+.game-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+.override-pill {
+  background: rgba(41, 128, 185, 0.12);
+  color: #1f618d;
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.game-dimensions {
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+  color: #2c3e50;
+}
+
+.dimension-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+}
+
+.dimension-label {
+  font-weight: 600;
+  color: #34495e;
+}
+
+.dimension-clear {
+  background: transparent;
+  border: none;
+  color: #c0392b;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0.15rem;
+  display: inline-flex;
+  align-items: center;
+}
+
+.dimension-clear:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.dimension-edit-form {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(44, 62, 80, 0.1);
+}
+
+.dimension-edit-grid {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.dimension-edit-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: #2c3e50;
+}
+
+.dimension-edit-grid input {
+  margin-top: 0.25rem;
+  padding: 0.35rem;
+  border-radius: 4px;
+  border: 1px solid rgba(44, 62, 80, 0.25);
+  font-size: 0.9rem;
+}
+
+.dimension-edit-actions {
+  margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dimension-edit-actions .primary,
+.dimension-edit-actions .secondary {
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: filter 0.2s ease;
+}
+
+.dimension-edit-actions .primary {
+  background: #2980b9;
+  color: white;
+}
+
+.dimension-edit-actions .secondary {
+  background: rgba(44, 62, 80, 0.08);
+  color: #2c3e50;
+}
+
+.dimension-edit-actions button:hover {
+  filter: brightness(0.95);
+}
+
+.dimension-edit-error {
+  margin-top: 0.5rem;
+  color: #c0392b;
+  font-size: 0.8rem;
+}
+
+.warning-icon {
+  color: #e67e22;
+}
+
+.oversized-icon {
+  color: #c0392b;
+}
+
+.game-action .sr-only,
+.dimension-clear .sr-only {
+  position: absolute;
 }
 

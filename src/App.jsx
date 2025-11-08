@@ -1,9 +1,27 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { FaUndoAlt } from 'react-icons/fa';
 import SortablePriorities from './components/SortablePriorities';
 import ToggleSwitch from './components/ToggleSwitch';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
 import { fetchPackedCubes } from './services/bggApi';
+import {
+  getExcludedGames,
+  saveExcludedGame,
+  removeExcludedGame,
+  getOrientationOverrides,
+  saveOrientationOverride,
+  removeOrientationOverride,
+  getDimensionOverrides,
+  saveDimensionOverride,
+  removeDimensionOverride,
+  getUserSettings,
+  saveUserSettings,
+  clearUserSettings,
+  getLastResult,
+  saveLastResult,
+  clearLastResult,
+} from './services/storage/indexedDb';
 import './App.css';
 
 const DEFAULT_PRIORITIES = [
@@ -47,6 +65,21 @@ const PRIORITY_LABELS = {
   bggRating: 'BGG Rating',
 };
 
+const arrayToMap = (items = []) =>
+  Array.isArray(items)
+    ? items.reduce((acc, item) => {
+        if (item?.id) {
+          acc[item.id] = { ...item };
+        }
+        return acc;
+      }, {})
+    : {};
+
+const parseDimensionValue = (value) => {
+  const numeric = typeof value === 'string' ? parseFloat(value) : value;
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
 function App() {
   const [username, setUsername] = useState('');
   const [includePreordered, setIncludePreordered] = useState(false);
@@ -59,6 +92,9 @@ function App() {
   const [respectSortOrder, setRespectSortOrder] = useState(false);
   const [fitOversized, setFitOversized] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
+  const [excludedGamesMap, setExcludedGamesMap] = useState({});
+  const [orientationOverridesMap, setOrientationOverridesMap] = useState({});
+  const [dimensionOverridesMap, setDimensionOverridesMap] = useState({});
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -68,6 +104,388 @@ function App() {
   const [missingVersionWarning, setMissingVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const [lastResultHydrated, setLastResultHydrated] = useState(false);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function hydrateFromStorage() {
+      try {
+        const [
+          storedExcluded,
+          storedOrientation,
+          storedDimensions,
+          storedSettings,
+        ] = await Promise.all([
+          getExcludedGames(),
+          getOrientationOverrides(),
+          getDimensionOverrides(),
+          getUserSettings(),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setExcludedGamesMap(arrayToMap(storedExcluded));
+        setOrientationOverridesMap(arrayToMap(storedOrientation));
+        setDimensionOverridesMap(arrayToMap(storedDimensions));
+
+        if (storedSettings && typeof storedSettings === 'object') {
+          const {
+            username: storedUsername,
+            includePreordered: storedIncludePreordered,
+            includeExpansions: storedIncludeExpansions,
+            groupExpansions: storedGroupExpansions,
+            groupSeries: storedGroupSeries,
+            verticalStacking: storedVerticalStacking,
+            allowAlternateRotation: storedAllowAlternateRotation,
+            optimizeSpace: storedOptimizeSpace,
+            respectSortOrder: storedRespectSortOrder,
+            fitOversized: storedFitOversized,
+            filtersCollapsed: storedFiltersCollapsed,
+            priorities: storedPriorities,
+          } = storedSettings;
+
+          if (typeof storedUsername === 'string') {
+            setUsername(storedUsername);
+          }
+          if (typeof storedIncludePreordered === 'boolean') {
+            setIncludePreordered(storedIncludePreordered);
+          }
+          if (typeof storedIncludeExpansions === 'boolean') {
+            setIncludeExpansions(storedIncludeExpansions);
+          }
+          if (typeof storedGroupExpansions === 'boolean') {
+            setGroupExpansions(storedGroupExpansions);
+          }
+          if (typeof storedGroupSeries === 'boolean') {
+            setGroupSeries(storedGroupSeries);
+          }
+          if (typeof storedVerticalStacking === 'boolean') {
+            setVerticalStacking(storedVerticalStacking);
+          }
+          if (typeof storedAllowAlternateRotation === 'boolean') {
+            setAllowAlternateRotation(storedAllowAlternateRotation);
+          }
+          if (typeof storedOptimizeSpace === 'boolean') {
+            setOptimizeSpace(storedOptimizeSpace);
+          }
+          if (typeof storedRespectSortOrder === 'boolean') {
+            setRespectSortOrder(storedRespectSortOrder);
+          }
+          if (typeof storedFitOversized === 'boolean') {
+            setFitOversized(storedFitOversized);
+          }
+          if (typeof storedFiltersCollapsed === 'boolean') {
+            setFiltersCollapsed(storedFiltersCollapsed);
+          }
+          if (Array.isArray(storedPriorities) && storedPriorities.length > 0) {
+            setPriorities(storedPriorities);
+          }
+        }
+      } catch (storageError) {
+        console.error('Unable to load stored preferences', storageError);
+      } finally {
+        if (!isCancelled) {
+          setSettingsHydrated(true);
+        }
+      }
+    }
+
+    hydrateFromStorage();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!settingsHydrated) {
+      return;
+    }
+
+    const settingsToPersist = {
+      username,
+      includePreordered,
+      includeExpansions,
+      groupExpansions,
+      groupSeries,
+      verticalStacking,
+      allowAlternateRotation,
+      optimizeSpace,
+      respectSortOrder,
+      fitOversized,
+      filtersCollapsed,
+      priorities,
+    };
+
+    saveUserSettings(settingsToPersist).catch((persistError) => {
+      console.error('Unable to persist user settings', persistError);
+    });
+  }, [
+    settingsHydrated,
+    username,
+    includePreordered,
+    includeExpansions,
+    groupExpansions,
+    groupSeries,
+    verticalStacking,
+    allowAlternateRotation,
+    optimizeSpace,
+    respectSortOrder,
+    fitOversized,
+    filtersCollapsed,
+    priorities,
+  ]);
+
+  useEffect(() => {
+    if (!settingsHydrated || lastResultHydrated || cubes !== null) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    (async () => {
+      try {
+        const storedResult = await getLastResult();
+        if (
+          isCancelled ||
+          !storedResult ||
+          !storedResult.response ||
+          !Array.isArray(storedResult.response.cubes) ||
+          storedResult.response.cubes.length === 0
+        ) {
+          return;
+        }
+
+        setCubes(storedResult.response.cubes);
+        setOversizedGames(storedResult.response.oversizedGames || []);
+
+        if (typeof storedResult.response.fitOversized === 'boolean') {
+          setFitOversized(storedResult.response.fitOversized);
+        }
+        if (typeof storedResult.response.verticalStacking === 'boolean') {
+          setVerticalStacking(storedResult.response.verticalStacking);
+        }
+        if (storedResult.requestConfig) {
+          setLastRequestConfig(storedResult.requestConfig);
+        }
+
+        setError(null);
+        setProgress('');
+      } catch (resultError) {
+        console.error('Unable to restore last result', resultError);
+      } finally {
+        if (!isCancelled) {
+          setLastResultHydrated(true);
+        }
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [settingsHydrated, lastResultHydrated, cubes]);
+
+  const excludedGamesList = useMemo(
+    () => Object.values(excludedGamesMap),
+    [excludedGamesMap]
+  );
+  const orientationOverridesList = useMemo(
+    () => Object.values(orientationOverridesMap),
+    [orientationOverridesMap]
+  );
+  const dimensionOverridesList = useMemo(
+    () => Object.values(dimensionOverridesMap),
+    [dimensionOverridesMap]
+  );
+
+  const handleExcludeGame = useCallback(async (game) => {
+    if (!game?.id) {
+      return;
+    }
+
+    const entry = {
+      id: game.id,
+      name: game.name || game.id,
+    };
+
+    setExcludedGamesMap((prev) => {
+      if (prev[entry.id]) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [entry.id]: entry,
+      };
+    });
+
+    try {
+      await saveExcludedGame(entry);
+    } catch (storageError) {
+      console.error('Unable to persist excluded game', storageError);
+    }
+  }, []);
+
+  const handleReincludeGame = useCallback(async (gameId) => {
+    if (!gameId) {
+      return;
+    }
+
+    setExcludedGamesMap((prev) => {
+      if (!prev[gameId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[gameId];
+      return next;
+    });
+
+    try {
+      await removeExcludedGame(gameId);
+    } catch (storageError) {
+      console.error('Unable to remove excluded game', storageError);
+    }
+  }, []);
+
+  const handleSetOrientationOverride = useCallback(async (game, orientation) => {
+    if (!game?.id || !orientation) {
+      return;
+    }
+
+    const normalizedOrientation =
+      orientation === 'vertical' || orientation === 'horizontal'
+        ? orientation
+        : null;
+
+    if (!normalizedOrientation) {
+      return;
+    }
+
+    const entry = {
+      id: game.id,
+      name: game.name || game.id,
+      orientation: normalizedOrientation,
+    };
+
+    setOrientationOverridesMap((prev) => ({
+      ...prev,
+      [entry.id]: entry,
+    }));
+
+    try {
+      await saveOrientationOverride(entry);
+    } catch (storageError) {
+      console.error('Unable to persist orientation override', storageError);
+    }
+  }, []);
+
+  const handleClearOrientationOverride = useCallback(async (gameId) => {
+    if (!gameId) {
+      return;
+    }
+
+    setOrientationOverridesMap((prev) => {
+      if (!prev[gameId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[gameId];
+      return next;
+    });
+
+    try {
+      await removeOrientationOverride(gameId);
+    } catch (storageError) {
+      console.error('Unable to remove orientation override', storageError);
+    }
+  }, []);
+
+  const handleSaveDimensionOverride = useCallback(async (game, rawDimensions) => {
+    if (!game?.id || !rawDimensions) {
+      return false;
+    }
+
+    const length = parseDimensionValue(rawDimensions.length);
+    const width = parseDimensionValue(rawDimensions.width);
+    const depth = parseDimensionValue(rawDimensions.depth);
+
+    if (!length || !width || !depth) {
+      return false;
+    }
+
+    const entry = {
+      id: game.id,
+      name: game.name || game.id,
+      length,
+      width,
+      depth,
+    };
+
+    setDimensionOverridesMap((prev) => ({
+      ...prev,
+      [entry.id]: entry,
+    }));
+
+    try {
+      await saveDimensionOverride(entry);
+      return true;
+    } catch (storageError) {
+      console.error('Unable to persist dimension override', storageError);
+      return false;
+    }
+  }, []);
+
+  const handleRemoveDimensionOverride = useCallback(async (gameId) => {
+    if (!gameId) {
+      return;
+    }
+
+    setDimensionOverridesMap((prev) => {
+      if (!prev[gameId]) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[gameId];
+      return next;
+    });
+
+    try {
+      await removeDimensionOverride(gameId);
+    } catch (storageError) {
+      console.error('Unable to remove dimension override', storageError);
+    }
+  }, []);
+
+  const handleResetSettings = useCallback(async () => {
+    setUsername('');
+    setIncludePreordered(false);
+    setIncludeExpansions(false);
+    setGroupExpansions(false);
+    setGroupSeries(false);
+    setVerticalStacking(true);
+    setAllowAlternateRotation(true);
+    setOptimizeSpace(false);
+    setRespectSortOrder(false);
+    setFitOversized(false);
+    setFiltersCollapsed(false);
+    setPriorities(DEFAULT_PRIORITIES.map((priority) => ({ ...priority })));
+  setCubes(null);
+  setOversizedGames([]);
+  setMissingVersionWarning(null);
+  setLastRequestConfig(null);
+  setError(null);
+  setProgress('');
+
+    try {
+      await clearUserSettings();
+    await clearLastResult();
+    } catch (storageError) {
+      console.error('Unable to clear stored user settings', storageError);
+    }
+  }, []);
 
   const handleOptimizeSpaceChange = (checked) => {
     setOptimizeSpace(checked);
@@ -168,6 +586,11 @@ function App() {
       const trimmedUsername = username.trim();
       const effectiveGroupExpansions = groupExpansions && !optimizeSpace;
       const effectiveGroupSeries = groupSeries && !optimizeSpace;
+      const overridesPayload = {
+        excludedGames: excludedGamesList.map((game) => ({ ...game })),
+        orientationOverrides: orientationOverridesList.map((entry) => ({ ...entry })),
+        dimensionOverrides: dimensionOverridesList.map((entry) => ({ ...entry })),
+      };
 
       const requestConfig = {
         username: trimmedUsername,
@@ -181,6 +604,7 @@ function App() {
         fitOversized,
         groupExpansions: effectiveGroupExpansions,
         groupSeries: effectiveGroupSeries,
+        overrides: overridesPayload,
       };
 
       setLastRequestConfig(requestConfig);
@@ -204,6 +628,8 @@ function App() {
             setProgress(progress.message);
           }
         }
+      ,
+        { overrides: overridesPayload }
       );
       
       if (response?.status === 'missing_versions') {
@@ -225,6 +651,18 @@ function App() {
       setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
+
+      saveLastResult({
+        requestConfig,
+        response: {
+          cubes: response.cubes,
+          oversizedGames: response.oversizedGames || [],
+          fitOversized,
+          verticalStacking,
+        },
+      }).catch((storageError) => {
+        console.error('Unable to persist last result', storageError);
+      });
 
     } catch (err) {
       console.error('Error:', err);
@@ -253,6 +691,24 @@ function App() {
     setFiltersCollapsed(true);
 
     try {
+      const overridesPayload = lastRequestConfig.overrides
+        ? {
+            excludedGames: (lastRequestConfig.overrides.excludedGames || []).map((item) => ({
+              ...item,
+            })),
+            orientationOverrides: (lastRequestConfig.overrides.orientationOverrides || []).map(
+              (item) => ({ ...item })
+            ),
+            dimensionOverrides: (lastRequestConfig.overrides.dimensionOverrides || []).map(
+              (item) => ({ ...item })
+            ),
+          }
+        : {
+            excludedGames: excludedGamesList.map((item) => ({ ...item })),
+            orientationOverrides: orientationOverridesList.map((item) => ({ ...item })),
+            dimensionOverrides: dimensionOverridesList.map((item) => ({ ...item })),
+          };
+
       const response = await fetchPackedCubes(
         lastRequestConfig.username,
         lastRequestConfig.includePreordered,
@@ -270,7 +726,7 @@ function App() {
             setProgress(progress.message);
           }
         },
-        { skipVersionCheck: true }
+        { skipVersionCheck: true, overrides: overridesPayload }
       );
 
       if (!response || !response.cubes || response.cubes.length === 0) {
@@ -284,6 +740,18 @@ function App() {
       setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
+
+      saveLastResult({
+        requestConfig: lastRequestConfig,
+        response: {
+          cubes: response.cubes,
+          oversizedGames: response.oversizedGames || [],
+          fitOversized: lastRequestConfig.fitOversized,
+          verticalStacking: lastRequestConfig.verticalStacking,
+        },
+      }).catch((storageError) => {
+        console.error('Unable to persist last result', storageError);
+      });
     } catch (err) {
       console.error('Error:', err);
       setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
@@ -296,7 +764,7 @@ function App() {
     <div className="app">
       <header>
         <div className="header-content">
-          <h1>BGCube</h1>
+          <img src="/bgcube_logo.png" alt="BGCUBE.app" className="app-logo" />
           <p className="subtitle">
             Organize your <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="subtitle-link">BoardGameGeek</a> collection into <a href="https://www.ikea.com/us/en/cat/kallax-shelving-units-58285/" target="_blank" rel="noopener noreferrer" className="subtitle-link">IKEA Kallax shelving units</a>
           </p>
@@ -487,9 +955,21 @@ function App() {
                   </div>
                 </div>
 
-                <button type="submit" disabled={loading}>
-                  {loading ? 'Processing...' : 'Organize Collection'}
-                </button>
+                <div className="form-actions">
+                  <button type="submit" disabled={loading}>
+                    {loading ? 'Processing...' : 'Organize Collection'}
+                  </button>
+                  <button
+                    type="button"
+                    className="reset-settings-button"
+                    onClick={handleResetSettings}
+                    disabled={loading}
+                    title="Restore all search options to their default values"
+                  >
+                    <FaUndoAlt aria-hidden="true" className="button-icon" />
+                    <span>Reset settings</span>
+                  </button>
+                </div>
               </div>
 
               <div className="form-right">
@@ -526,6 +1006,17 @@ function App() {
           verticalStacking={verticalStacking}
           oversizedGames={oversizedGames}
           fitOversized={fitOversized}
+          excludedGames={excludedGamesList}
+          onExcludeGame={handleExcludeGame}
+          onRestoreExcludedGame={handleReincludeGame}
+          orientationOverrides={orientationOverridesList}
+          onSetOrientationOverride={handleSetOrientationOverride}
+          onClearOrientationOverride={handleClearOrientationOverride}
+          dimensionOverrides={dimensionOverridesList}
+          onSaveDimensionOverride={handleSaveDimensionOverride}
+          onRemoveDimensionOverride={handleRemoveDimensionOverride}
+          overridesReady={settingsHydrated}
+          isLoading={loading}
         />
       )}
 

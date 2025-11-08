@@ -40,13 +40,13 @@ jobs:
         run: npm run build
 
       - name: Deploy frontend to S3
-        uses: aws-actions/s3-sync@v2
+        uses: aws-actions/s3-sync@v1
         with:
           source: ./dist
           destination: ${{ secrets.S3_BUCKET }}
 
       - name: Invalidate CloudFront cache
-        uses: aws-actions/cloudfront-invalidate-cache@v2
+        uses: aws-actions/cloudfront-invalidate-cache@v1
         with:
           distribution-id: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
           paths: "/*"

@@ -236,13 +236,6 @@ function App() {
     };
 
     document.body.appendChild(script);
-
-    return () => {
-      const existingScript = document.getElementById(widgetId);
-      if (existingScript) {
-        existingScript.remove();
-      }
-    };
   }, []);
 
   useEffect(() => {
@@ -829,32 +822,6 @@ function App() {
             Organize your <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="subtitle-link">BoardGameGeek</a> collection into <a href="https://www.ikea.com/us/en/cat/kallax-shelving-units-58285/" target="_blank" rel="noopener noreferrer" className="subtitle-link">IKEA Kallax shelving units</a>
           </p>
         </div>
-        <div className="header-banner">
-          <div className="banner-item">
-            <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="banner-link">
-              <img 
-                src="/powered_by_bgg.png" 
-                alt="Powered by BoardGameGeek" 
-                className="banner-logo"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'block';
-                }}
-              />
-              <span className="banner-fallback" style={{ display: 'none' }}>
-                Powered by BoardGameGeek
-              </span>
-            </a>
-          </div>
-          <div className="banner-item">
-            <a href="https://github.com/kriegschrei/bgg-kallax-organizer/issues" target="_blank" rel="noopener noreferrer" className="banner-link">
-              <span className="banner-link-content">
-                <FaBug aria-hidden="true" className="banner-link-icon" />
-                Report Issues
-              </span>
-            </a>
-          </div>
-        </div>
       </header>
 
       {error && (
@@ -1090,6 +1057,32 @@ function App() {
       )}
 
       <footer className="disclaimer-footer">
+        <div className="footer-banner">
+          <div className="banner-item">
+            <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="banner-link">
+              <img 
+                src="/powered_by_bgg.png" 
+                alt="Powered by BoardGameGeek" 
+                className="banner-logo"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'block';
+                }}
+              />
+              <span className="banner-fallback" style={{ display: 'none' }}>
+                Powered by BoardGameGeek
+              </span>
+            </a>
+          </div>
+          <div className="banner-item">
+            <a href="https://github.com/kriegschrei/bgg-kallax-organizer/issues" target="_blank" rel="noopener noreferrer" className="banner-link">
+              <span className="banner-link-content banner-link-content--inverted">
+                <FaBug aria-hidden="true" className="banner-link-icon banner-link-icon--inverted" />
+                <span className="banner-link-text">Report Issues</span>
+              </span>
+            </a>
+          </div>
+        </div>
         <div className="footer-content">
           <div className="footer-section">
             <h4>About</h4>

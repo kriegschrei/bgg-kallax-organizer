@@ -93,3 +93,7 @@
   cursor: not-allowed;
 }
 
+.toggle-control .warning-icon {
+  color: #dc2626;
+}
+

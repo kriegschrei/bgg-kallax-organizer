@@ -302,7 +302,7 @@ export default function Results({
                 <span className="warning-arrow">{excludedExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaTrashAlt className="inline-icon" aria-hidden="true" />
-                  Games manually excluded ({sortedExcludedGames.length})
+                  Manual exclusions ({sortedExcludedGames.length})
                 </strong>
               </button>
               {excludedExpanded && (

@@ -211,18 +211,7 @@ export default function CubeVisualization({
                 rectX = game.position.x * SCALE;
                 rectY = canvasHeight - (game.position.y + clampedDims.y) * SCALE;
                 
-                // Debug first game
-                if (index === 0) {
-                  console.log('First game positioning:', {
-                    name: game.name,
-                    position: game.position,
-                    clampedDims,
-                    actualDims,
-                    rectX,
-                    rectY,
-                    canvasHeight
-                  });
-                }
+                
               } else {
                 // Fallback to row-based positioning
                 const rowIndex = cube.rows?.findIndex(r => r.games.includes(game)) ?? -1;

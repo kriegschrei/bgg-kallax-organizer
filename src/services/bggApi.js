@@ -20,7 +20,7 @@ const parseXML = (xmlString) => {
 // Helper to convert XML node to object
 const xmlToObject = (node) => {
   const obj = {};
-  
+   
   // Get attributes
   if (node.attributes) {
     for (let i = 0; i < node.attributes.length; i++) {
@@ -75,7 +75,25 @@ export const fetchPackedCubes = async (
   onProgress = null, // Optional callback for progress updates
   extraParams = {}
 ) => {
-  const requestId = extraParams.requestId || `${username}-${Date.now()}`;
+  const {
+    requestId: providedRequestId,
+    overrides: providedOverrides,
+    skipVersionCheck = false,
+    ...additionalParams
+  } = extraParams || {};
+
+  const requestId = providedRequestId || `${username}-${Date.now()}`;
+  const overridesPayload = {
+    excludedGames: Array.isArray(providedOverrides?.excludedGames)
+      ? providedOverrides.excludedGames
+      : [],
+    orientationOverrides: Array.isArray(providedOverrides?.orientationOverrides)
+      ? providedOverrides.orientationOverrides
+      : [],
+    dimensionOverrides: Array.isArray(providedOverrides?.dimensionOverrides)
+      ? providedOverrides.dimensionOverrides
+      : [],
+  };
   let eventSource = null;
   
   try {
@@ -107,29 +125,24 @@ export const fetchPackedCubes = async (
       };
     }
     
-    const params = new URLSearchParams({
-      includePreordered: includePreordered.toString(),
-      includeExpansions: includeExpansions.toString(),
-      priorities: JSON.stringify(priorities),
-      verticalStacking: verticalStacking.toString(),
-      allowAlternateRotation: allowAlternateRotation.toString(),
-      optimizeSpace: optimizeSpace.toString(),
-      respectSortOrder: respectSortOrder.toString(),
-      fitOversized: fitOversized.toString(),
-      groupExpansions: groupExpansions.toString(),
-      groupSeries: groupSeries.toString(),
-      requestId: requestId, // Pass requestId to match with SSE
-    });
-    Object.entries(extraParams).forEach(([key, value]) => {
-      if (key === 'requestId') {
-        return;
-      }
-      if (value !== undefined && value !== null) {
-        params.set(key, value.toString());
-      }
-    });
+    const payload = {
+      includePreordered,
+      includeExpansions,
+      priorities,
+      verticalStacking,
+      allowAlternateRotation,
+      optimizeSpace,
+      respectSortOrder,
+      fitOversized,
+      groupExpansions,
+      groupSeries,
+      requestId,
+      skipVersionCheck,
+      overrides: overridesPayload,
+      ...additionalParams,
+    };
     
-    const response = await apiClient.get(`${API_BASE}/games/${username}?${params.toString()}`);
+    const response = await apiClient.post(`${API_BASE}/games/${username}`, payload);
     
     // Close SSE connection
     if (eventSource) {

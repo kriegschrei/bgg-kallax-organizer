@@ -131,6 +131,25 @@ function normalizeUsername(username) {
   return username ? username.toLowerCase() : username;
 }
 
+function parseBoolean(value, defaultValue = false) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') {
+      return true;
+    }
+    if (normalized === 'false') {
+      return false;
+    }
+  }
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+  return defaultValue;
+}
+
 // SSE endpoint for progress updates
 app.get('/api/games/:username/progress', (req, res) => {
   const username = normalizeUsername(req.params.username);
@@ -567,7 +586,15 @@ function checkAndImproveStability(cube, placedGame) {
 }
 
 // Aggressive reorganization: try to rearrange all games in cube to fit a new game
-function tryAggressiveReorganization(cube, newGame, width, height, priorities, optimizeSpace) {
+function tryAggressiveReorganization(
+  cube,
+  newGame,
+  width,
+  height,
+  priorities,
+  optimizeSpace,
+  orientationLabel = null
+) {
   console.log(`   🔄 Attempting aggressive reorganization for "${newGame.name}"`);
   
   // Check if there's theoretically enough space
@@ -589,14 +616,22 @@ function tryAggressiveReorganization(cube, newGame, width, height, priorities, o
   }));
   
   // Create a list of all games to pack (existing + new)
-  const allGames = [...cube.games.map(g => ({
-    ...g,
-    isOriginal: true
-  })), {
-    ...newGame,
-    packedDims: { x: width, y: height },
-    isNew: true
-  }];
+  const allGames = [
+    ...cube.games.map(g => ({
+      ...g,
+      isOriginal: true,
+      manualOrientation:
+        g.forcedOrientation ||
+        g.appliedOrientation ||
+        null,
+    })),
+    {
+      ...newGame,
+      packedDims: { x: width, y: height },
+      isNew: true,
+      manualOrientation: orientationLabel,
+    },
+  ];
   
   // Sort games by:
   // 1. If optimizeSpace: largest area first (for better packing)
@@ -640,6 +675,10 @@ function tryAggressiveReorganization(cube, newGame, width, height, priorities, o
       gameToPlace.position = position;
       gameToPlace.packedDims = { x: gWidth, y: gHeight, z: depthDimension };
       gameToPlace.actualDims = gameToPlace.actualDims || { x: gWidth, y: gHeight, z: depthDimension };
+      const orientationForGame =
+        gameToPlace.manualOrientation ||
+        (gWidth >= gHeight ? 'horizontal' : 'vertical');
+      gameToPlace.appliedOrientation = orientationForGame;
       cube.games.push(gameToPlace);
     } else {
       failedToPlace = gameToPlace;
@@ -667,7 +706,7 @@ function tryAggressiveReorganization(cube, newGame, width, height, priorities, o
 }
 
 // Try to place a game in a cube with given dimensions
-function tryPlaceGame(cube, game, width, height) {
+function tryPlaceGame(cube, game, width, height, orientationLabel = null) {
   const actualWidth = width;
   const actualHeight = height;
   const packedWidth = Math.min(width, CUBE_SIZE);
@@ -694,6 +733,11 @@ function tryPlaceGame(cube, game, width, height) {
     game.actualDims = { x: actualWidth, y: actualHeight, z: depthDimension };
     game.oversizedX = actualWidth > OVERSIZED_THRESHOLD;
     game.oversizedY = actualHeight > OVERSIZED_THRESHOLD;
+    if (orientationLabel) {
+      game.appliedOrientation = orientationLabel;
+    } else if (!game.appliedOrientation) {
+      game.appliedOrientation = packedWidth >= packedHeight ? 'horizontal' : 'vertical';
+    }
     cube.games.push(game);
     
     // Check and improve stability after placement
@@ -1053,7 +1097,13 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       game.dims2D = null;
       continue;
     }
-    game.dims2D = calculate2DDimensions(game.dimensions, primaryOrder);
+    const forcedOrientation =
+      game.forcedOrientation === 'horizontal' || game.forcedOrientation === 'vertical'
+        ? game.forcedOrientation
+        : null;
+    const orientationToUse = forcedOrientation || primaryOrder;
+    game.dims2D = calculate2DDimensions(game.dimensions, orientationToUse);
+    game.primaryOrientation = orientationToUse;
     game.exceedsMaxDimension = game.dims2D.x > OVERSIZED_THRESHOLD || game.dims2D.y > OVERSIZED_THRESHOLD;
 
     if (game.exceedsMaxDimension && !fitOversized) {
@@ -1296,15 +1346,25 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     for (const game of sortedGroup) {
       if (placed.has(game.id)) continue;
       
+      const forcedOrientation =
+        game.forcedOrientation === 'horizontal' || game.forcedOrientation === 'vertical'
+          ? game.forcedOrientation
+          : null;
       const orientations = [];
-      orientations.push({ x: game.dims2D.x, y: game.dims2D.y });
-      if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
-        orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
+      if (forcedOrientation) {
+        orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: forcedOrientation });
+      } else {
+        const primary = game.primaryOrientation || primaryOrder;
+        orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
+        if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+          const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
+          orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
+        }
       }
       
       let gamePlaced = false;
       for (const orientation of orientations) {
-        if (tryPlaceGame(tempCube, game, orientation.x, orientation.y)) {
+        if (tryPlaceGame(tempCube, game, orientation.x, orientation.y, orientation.label)) {
           groupPlaced.push(game);
           gamePlaced = true;
           break;
@@ -1425,15 +1485,20 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
   for (const game of standaloneGames) {
     if (placed.has(game.id)) continue;
     
+    const forcedOrientation =
+      game.forcedOrientation === 'horizontal' || game.forcedOrientation === 'vertical'
+        ? game.forcedOrientation
+        : null;
     const orientations = [];
-    
-    // Primary orientation (respects user's stacking preference)
-    orientations.push({ x: game.dims2D.x, y: game.dims2D.y });
-    
-    // Alternate orientation (if rotation allowed and dimensions different)
-    // Always try as fallback, never prioritize over user's preference
-    if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
-      orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
+    if (forcedOrientation) {
+      orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: forcedOrientation });
+    } else {
+      const primary = game.primaryOrientation || primaryOrder;
+      orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
+      if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+        const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
+        orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
+      }
     }
     
     let wasPlaced = false;
@@ -1466,7 +1531,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     // Try to place in existing cubes
     for (const cube of cubesToCheck) {
       for (const orientation of orientations) {
-        if (tryPlaceGame(cube, game, orientation.x, orientation.y)) {
+        if (tryPlaceGame(cube, game, orientation.x, orientation.y, orientation.label)) {
           placed.add(game.id);
           wasPlaced = true;
           break;
@@ -1477,7 +1542,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       // If normal placement failed, try aggressive reorganization
       if (!wasPlaced) {
         for (const orientation of orientations) {
-          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, priorities, optimizeSpace)) {
+          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, priorities, optimizeSpace, orientation.label)) {
             placed.add(game.id);
             wasPlaced = true;
             break;
@@ -1492,7 +1557,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       const newCube = { games: [], rows: [] };
       
       for (const orientation of orientations) {
-        if (tryPlaceGame(newCube, game, orientation.x, orientation.y)) {
+        if (tryPlaceGame(newCube, game, orientation.x, orientation.y, orientation.label)) {
           placed.add(game.id);
           cubes.push(newCube);
           console.log(`   Created cube ${cubes.length} for "${game.name}"`);
@@ -1506,14 +1571,20 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
   for (const game of unplacedGroupGames) {
     if (placed.has(game.id)) continue;
     
+    const forcedOrientation =
+      game.forcedOrientation === 'horizontal' || game.forcedOrientation === 'vertical'
+        ? game.forcedOrientation
+        : null;
     const orientations = [];
-    
-    // Primary orientation (respects user's stacking preference)
-    orientations.push({ x: game.dims2D.x, y: game.dims2D.y });
-    
-    // Alternate orientation (if rotation allowed and dimensions different)
-    if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
-      orientations.push({ x: game.dims2D.y, y: game.dims2D.x });
+    if (forcedOrientation) {
+      orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: forcedOrientation });
+    } else {
+      const primary = game.primaryOrientation || primaryOrder;
+      orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
+      if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+        const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
+        orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
+      }
     }
     
     let wasPlaced = false;
@@ -1545,7 +1616,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     // Try to place in existing cubes
     for (const cube of cubesToCheck) {
       for (const orientation of orientations) {
-        if (tryPlaceGame(cube, game, orientation.x, orientation.y)) {
+        if (tryPlaceGame(cube, game, orientation.x, orientation.y, orientation.label)) {
           placed.add(game.id);
           wasPlaced = true;
           break;
@@ -1556,7 +1627,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       // If normal placement failed, try aggressive reorganization
       if (!wasPlaced) {
         for (const orientation of orientations) {
-          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, priorities, optimizeSpace)) {
+          if (tryAggressiveReorganization(cube, game, orientation.x, orientation.y, priorities, optimizeSpace, orientation.label)) {
             placed.add(game.id);
             wasPlaced = true;
             break;
@@ -1571,7 +1642,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       const newCube = { games: [], rows: [] };
       
       for (const orientation of orientations) {
-        if (tryPlaceGame(newCube, game, orientation.x, orientation.y)) {
+        if (tryPlaceGame(newCube, game, orientation.x, orientation.y, orientation.label)) {
           placed.add(game.id);
           cubes.push(newCube);
           console.log(`   Created cube ${cubes.length} for "${game.name}"`);
@@ -1706,14 +1777,82 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
 }
 
 // New endpoint that returns processed JSON with packed cubes
-app.get('/api/games/:username', async (req, res) => {
+app.post('/api/games/:username', async (req, res) => {
   // Normalize username to lowercase for case-insensitive caching
   const username = normalizeUsername(req.params.username);
-  const requestId = req.query.requestId || `${username}-${Date.now()}`;
+  const bodyOptions = req.body || {};
+  const queryOptions = req.query || {};
+  const requestId =
+    bodyOptions.requestId ||
+    queryOptions.requestId ||
+    `${username}-${Date.now()}`;
   
   try {
-    const { includePreordered, includeExpansions, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, fitOversized, groupExpansions, groupSeries, skipVersionCheck } = req.query;
-    const shouldSkipVersionCheck = skipVersionCheck === 'true';
+    const includePreorderedFlag = parseBoolean(
+      bodyOptions.includePreordered ?? queryOptions.includePreordered,
+      false
+    );
+    const includeExpansionsFlag = parseBoolean(
+      bodyOptions.includeExpansions ?? queryOptions.includeExpansions,
+      false
+    );
+    const verticalStackingFlag = parseBoolean(
+      bodyOptions.verticalStacking ?? queryOptions.verticalStacking,
+      true
+    );
+    const allowAlternateRotationFlag = parseBoolean(
+      bodyOptions.allowAlternateRotation ?? queryOptions.allowAlternateRotation,
+      true
+    );
+    const optimizeSpaceFlag = parseBoolean(
+      bodyOptions.optimizeSpace ?? queryOptions.optimizeSpace,
+      false
+    );
+    const respectSortOrderFlag = parseBoolean(
+      bodyOptions.respectSortOrder ?? queryOptions.respectSortOrder,
+      false
+    );
+    const fitOversizedFlag = parseBoolean(
+      bodyOptions.fitOversized ?? queryOptions.fitOversized,
+      false
+    );
+    const groupExpansionsFlag = parseBoolean(
+      bodyOptions.groupExpansions ?? queryOptions.groupExpansions,
+      false
+    );
+    const groupSeriesFlag = parseBoolean(
+      bodyOptions.groupSeries ?? queryOptions.groupSeries,
+      false
+    );
+    const shouldSkipVersionCheck = parseBoolean(
+      bodyOptions.skipVersionCheck ?? queryOptions.skipVersionCheck,
+      false
+    );
+
+    let prioritiesPayload =
+      bodyOptions.priorities ?? queryOptions.priorities ?? [];
+    if (typeof prioritiesPayload === 'string') {
+      try {
+        prioritiesPayload = JSON.parse(prioritiesPayload);
+      } catch (error) {
+        prioritiesPayload = [];
+      }
+    }
+    if (!Array.isArray(prioritiesPayload)) {
+      prioritiesPayload = [];
+    }
+
+    let overridesPayload = bodyOptions.overrides;
+    if (!overridesPayload && typeof queryOptions.overrides === 'string') {
+      try {
+        overridesPayload = JSON.parse(queryOptions.overrides);
+      } catch (error) {
+        overridesPayload = {};
+      }
+    }
+    if (!overridesPayload || typeof overridesPayload !== 'object') {
+      overridesPayload = {};
+    }
     
     if (!BGG_TOKEN) {
       console.error('❌ BGG API token not configured');
@@ -1724,7 +1863,15 @@ app.get('/api/games/:username', async (req, res) => {
     }
 
     console.log('🎮 Processing games for user:', username);
-    console.log('   Options:', { includePreordered, includeExpansions, allowAlternateRotation, optimizeSpace, fitOversized, groupExpansions, groupSeries });
+    console.log('   Options:', {
+      includePreordered: includePreorderedFlag,
+      includeExpansions: includeExpansionsFlag,
+      allowAlternateRotation: allowAlternateRotationFlag,
+      optimizeSpace: optimizeSpaceFlag,
+      fitOversized: fitOversizedFlag,
+      groupExpansions: groupExpansionsFlag,
+      groupSeries: groupSeriesFlag,
+    });
     
     sendProgress(requestId, 'Starting to process your collection...', { step: 'init' });
 
@@ -1736,12 +1883,12 @@ app.get('/api/games/:username', async (req, res) => {
       version: 1, // Include version info for each item
     });
     
-    if (includePreordered === 'true') {
+    if (includePreorderedFlag) {
       collectionParams.append('preordered', 1);
     }
 
     const collectionUrl = `${BGG_API_BASE}/collection?${collectionParams.toString()}`;
-    const collectionKey = `user:${username}:${includePreordered === 'true'}:${includeExpansions === 'true'}`;
+    const collectionKey = `user:${username}:${includePreorderedFlag}:${includeExpansionsFlag}`;
     
     let collection;
     let collectionResponse;
@@ -1821,7 +1968,7 @@ app.get('/api/games/:username', async (req, res) => {
     const missingVersionGames = new Map();
 
     // Filter expansions if needed (check both subtype and categories)
-    if (includeExpansions !== 'true') {
+    if (!includeExpansionsFlag) {
       const beforeFilter = items.length;
       items = items.filter(item => {
         const subtype = item.$.subtype;
@@ -2434,7 +2581,7 @@ app.get('/api/games/:username', async (req, res) => {
     }
     
     // Filter out expansions based on full game data (if not including expansions)
-    if (includeExpansions !== 'true') {
+    if (!includeExpansionsFlag) {
       const beforeExpansionFilter = allGames.length;
       allGames = allGames.filter(game => {
         // Check if any category or family indicates this is an expansion
@@ -2477,6 +2624,118 @@ app.get('/api/games/:username', async (req, res) => {
     
     console.log(`   ℹ️  Total items to pack: ${uniqueGames.length} (includes multiple versions of same games)`);
     
+    const excludedIdsSet = new Set(
+      Array.isArray(overridesPayload.excludedGames)
+        ? overridesPayload.excludedGames
+            .map((item) =>
+              typeof item === 'string' ? item : item?.id
+            )
+            .filter(Boolean)
+        : []
+    );
+
+    const orientationOverrideMap = new Map(
+      Array.isArray(overridesPayload.orientationOverrides)
+        ? overridesPayload.orientationOverrides
+            .filter(
+              (item) =>
+                item?.id &&
+                (item.orientation === 'vertical' ||
+                  item.orientation === 'horizontal')
+            )
+            .map((item) => [item.id, item.orientation])
+        : []
+    );
+
+    const dimensionOverrideMap = new Map(
+      Array.isArray(overridesPayload.dimensionOverrides)
+        ? overridesPayload.dimensionOverrides
+            .filter((item) => {
+              if (!item?.id) {
+                return false;
+              }
+              const length = Number(item.length);
+              const width = Number(item.width);
+              const depth = Number(item.depth);
+              return (
+                Number.isFinite(length) &&
+                Number.isFinite(width) &&
+                Number.isFinite(depth) &&
+                length > 0 &&
+                width > 0 &&
+                depth > 0
+              );
+            })
+            .map((item) => [
+              item.id,
+              {
+                length: Number(item.length),
+                width: Number(item.width),
+                depth: Number(item.depth),
+              },
+            ])
+        : []
+    );
+
+    if (excludedIdsSet.size > 0) {
+      console.log(
+        `   🚫 Excluding ${excludedIdsSet.size} game(s) from packing due to user override`
+      );
+    }
+    if (orientationOverrideMap.size > 0) {
+      console.log(
+        `   ↕️  Applying forced orientation to ${orientationOverrideMap.size} game(s)`
+      );
+    }
+    if (dimensionOverrideMap.size > 0) {
+      console.log(
+        `   📏 Applying manual dimensions to ${dimensionOverrideMap.size} game(s)`
+      );
+    }
+
+    const preparedGames = uniqueGames
+      .filter((game) => !excludedIdsSet.has(game.id))
+      .map((game) => {
+        const originalDimensions = {
+          length: game.dimensions?.length ?? 0,
+          width: game.dimensions?.width ?? 0,
+          depth: game.dimensions?.depth ?? 0,
+          missingDimensions: game.dimensions?.missingDimensions ?? false,
+        };
+
+        const overrideDims = dimensionOverrideMap.get(game.id);
+        if (overrideDims) {
+          game.bggDimensions = { ...originalDimensions };
+          game.userDimensions = { ...overrideDims };
+          game.dimensions = {
+            length: overrideDims.length,
+            width: overrideDims.width,
+            depth: overrideDims.depth,
+            missingDimensions: originalDimensions.missingDimensions,
+          };
+        } else {
+          game.bggDimensions = { ...originalDimensions };
+          game.userDimensions = null;
+        }
+
+        const forcedOrientation = orientationOverrideMap.get(game.id);
+        if (forcedOrientation) {
+          game.forcedOrientation = forcedOrientation;
+        } else {
+          delete game.forcedOrientation;
+        }
+
+        return game;
+      });
+
+    if (preparedGames.length < uniqueGames.length) {
+      console.log(
+        `   → ${uniqueGames.length - preparedGames.length} game(s) removed via manual exclusions`
+      );
+    }
+
+    const gamesToPack = preparedGames;
+    
     // Free up the version map and collection items - we don't need them anymore
     versionMap.clear();
     items.length = 0;
@@ -2489,22 +2748,23 @@ app.get('/api/games/:username', async (req, res) => {
     }
     
     // Step 3: Pack games into cubes
-    sendProgress(requestId, `Packing ${uniqueGames.length} games into cubes...`, { step: 'packing', gameCount: uniqueGames.length });
-    const parsedPriorities = priorities ? JSON.parse(priorities) : [];
-    const isVertical = verticalStacking === 'true';
-    const allowAltRotation = allowAlternateRotation === 'true';
-    const shouldOptimizeSpace = optimizeSpace === 'true';
-    const strictSortOrder = respectSortOrder === 'true';
-    const shouldFitOversized = fitOversized === 'true';
-    const shouldGroupExpansions = !shouldOptimizeSpace && groupExpansions === 'true' && includeExpansions === 'true';
-    const shouldGroupSeries = !shouldOptimizeSpace && groupSeries === 'true';
+    sendProgress(requestId, `Packing ${gamesToPack.length} games into cubes...`, { step: 'packing', gameCount: gamesToPack.length });
+    const parsedPriorities = prioritiesPayload;
+    const isVertical = verticalStackingFlag;
+    const allowAltRotation = allowAlternateRotationFlag;
+    const shouldOptimizeSpace = optimizeSpaceFlag;
+    const strictSortOrder = respectSortOrderFlag;
+    const shouldFitOversized = fitOversizedFlag;
+    const shouldGroupExpansions =
+      !shouldOptimizeSpace && groupExpansionsFlag && includeExpansionsFlag;
+    const shouldGroupSeries = !shouldOptimizeSpace && groupSeriesFlag;
 
-    if (shouldOptimizeSpace && (groupExpansions === 'true' || groupSeries === 'true')) {
+    if (shouldOptimizeSpace && (groupExpansionsFlag || groupSeriesFlag)) {
       console.log('   ℹ️  Optimize for space enabled – grouping options disabled for this run');
     }
     
     const { cubes: packedCubes, oversizedExcludedGames } = packGamesIntoCubes(
-      uniqueGames,
+      gamesToPack,
       parsedPriorities,
       isVertical,
       allowAltRotation,
@@ -2515,7 +2775,7 @@ app.get('/api/games/:username', async (req, res) => {
       shouldGroupSeries
     );
     
-    sendProgress(requestId, `Complete! Packed into ${packedCubes.length} cubes`, { step: 'complete', cubes: packedCubes.length, games: uniqueGames.length });
+    sendProgress(requestId, `Complete! Packed into ${packedCubes.length} cubes`, { step: 'complete', cubes: packedCubes.length, games: gamesToPack.length });
     
     // CRITICAL: Check for circular refs BEFORE attempting serialization
     console.log('   🔍 Deep circular reference check before serialization...');
@@ -2706,6 +2966,14 @@ app.get('/api/games/:username', async (req, res) => {
               versionsUrl: game.versionsUrl || null,
               selectedVersionId: game.selectedVersionId || null
               };
+          cleanGame.bggDimensions = game.bggDimensions ? { ...game.bggDimensions } : null;
+          cleanGame.userDimensions = game.userDimensions ? { ...game.userDimensions } : null;
+          cleanGame.forcedOrientation = game.forcedOrientation || null;
+          cleanGame.appliedOrientation = game.appliedOrientation || null;
+              cleanGame.bggDimensions = game.bggDimensions ? { ...game.bggDimensions } : null;
+              cleanGame.userDimensions = game.userDimensions ? { ...game.userDimensions } : null;
+              cleanGame.forcedOrientation = game.forcedOrientation || null;
+              cleanGame.appliedOrientation = game.appliedOrientation || null;
               
               // Explicitly verify _group and _groupId are NOT in cleanGame
               // (they shouldn't be since we're creating from scratch)
@@ -2885,7 +3153,7 @@ app.get('/api/games/:username', async (req, res) => {
         ...((oversizedExcludedGames && Array.isArray(oversizedExcludedGames)) ? oversizedExcludedGames : []),
       ];
       
-      res.json({ cubes: cleanCubes, totalGames: uniqueGames.length, dimensionSummary, oversizedGames });
+      res.json({ cubes: cleanCubes, totalGames: gamesToPack.length, dimensionSummary, oversizedGames });
       console.log('   ✅ JSON response sent successfully');
       
     } catch (jsonError) {

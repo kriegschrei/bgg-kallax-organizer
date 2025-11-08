@@ -206,12 +206,179 @@
   text-decoration: underline;
 }
 
+.results-overrides {
+  margin: 1.5rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.results-overrides .warning-box {
+  flex: 1 1 280px;
+  max-width: 100%;
+}
+
+.warning-box.manual-box {
+  background: #eef2f7;
+  border: 1px solid #cbd5e1;
+  border-left: 4px solid #3b82f6;
+  color: #1e3a8a;
+}
+
+.warning-box.manual-box .warning-header,
+.warning-box.manual-box .warning-header strong,
+.warning-box.manual-box .warning-description,
+.warning-box.manual-box .warning-arrow {
+  color: inherit;
+}
+
+.warning-box.manual-box .warning-header:hover {
+  background-color: rgba(59, 130, 246, 0.12);
+}
+
+.override-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+}
+
+.override-entry-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.override-entry-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.override-entry-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.orientation-pill {
+  min-width: 84px;
+  text-align: center;
+}
+
+.override-action-button {
+  border: none;
+  background: rgba(30, 58, 138, 0.12);
+  color: #1e3a8a;
+  border-radius: 4px;
+  padding: 0.35rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.override-action-button:hover:not(:disabled) {
+  background: rgba(30, 58, 138, 0.22);
+}
+
+.override-action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.override-action-button .button-icon {
+  font-size: 0.95rem;
+}
+
+.override-dimension-form {
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(30, 58, 138, 0.12);
+  display: grid;
+  gap: 0.75rem;
+}
+
+.override-dimension-grid {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+}
+
+.override-dimension-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  color: #1e3a8a;
+}
+
+.override-dimension-grid input {
+  margin-top: 0.25rem;
+  padding: 0.35rem;
+  border-radius: 4px;
+  border: 1px solid rgba(30, 58, 138, 0.3);
+  font-size: 0.85rem;
+}
+
+.override-dimension-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.override-dimension-primary,
+.override-dimension-secondary {
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: filter 0.2s ease;
+}
+
+.override-dimension-primary {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.override-dimension-secondary {
+  background: rgba(30, 58, 138, 0.12);
+  color: #1e3a8a;
+}
+
+.override-dimension-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.override-dimension-actions button:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.override-dimension-error {
+  color: #c0392b;
+  font-size: 0.8rem;
+}
+
+.warning-header strong {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 @media (max-width: 768px) {
   .cubes-container {
     grid-template-columns: 1fr;
   }
   
   .results-warnings {
+    flex-direction: column;
+  }
+
+  .results-overrides {
     flex-direction: column;
   }
 }

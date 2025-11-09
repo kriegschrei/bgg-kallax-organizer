@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaInfoCircle } from 'react-icons/fa';
+import TooltipTrigger from './TooltipTrigger';
 import './ToggleSwitch.css';
 
 function ToggleSwitch({
@@ -25,13 +26,11 @@ function ToggleSwitch({
           {label}
         </label>
         {tooltip && (
-          <span className="tooltip-trigger" data-tooltip={tooltip}>
-            <TooltipIcon
-              aria-hidden="true"
-              className={`button-icon ${tooltipIconClassName}`.trim()}
-            />
-            <span className="sr-only">More info</span>
-          </span>
+          <TooltipTrigger
+            tooltip={tooltip}
+            icon={TooltipIcon}
+            iconClassName={tooltipIconClassName}
+          />
         )}
       </div>
       <label className="toggle-switch" htmlFor={id}>

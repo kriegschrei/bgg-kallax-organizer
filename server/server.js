@@ -316,6 +316,10 @@ const KALLAX_WIDTH = 12.8;
 const KALLAX_HEIGHT = 12.8;
 const KALLAX_DEPTH = 15;
 
+// Display dimensions for stats (retain 13" faces for UI messaging)
+const DISPLAY_KALLAX_WIDTH = 13;
+const DISPLAY_KALLAX_HEIGHT = 13;
+
 // ============================================================================
 // PACKING ALGORITHM - Complete Rewrite
 // ============================================================================
@@ -323,6 +327,50 @@ const KALLAX_DEPTH = 15;
 const GRID_PRECISION = 0.1; // 0.1 inch precision
 const CUBE_SIZE = 12.8; // Kallax cube is 12.8" x 12.8"
 const OVERSIZED_THRESHOLD = 13;
+
+function calculateStatsSummary(cubes, verticalStacking) {
+  const safeTotals = {
+    totalGames: 0,
+    totalCubes: 0,
+    avgGamesPerCube: '0.0',
+    avgUtilization: '0.0',
+  };
+
+  if (!Array.isArray(cubes) || cubes.length === 0) {
+    return safeTotals;
+  }
+
+  const totalGames = cubes.reduce(
+    (sum, cube) => sum + (Array.isArray(cube.games) ? cube.games.length : 0),
+    0
+  );
+  const avgGamesPerCube = totalGames / cubes.length || 0;
+
+  const utilizations = cubes.map((cube) => {
+    const numerator = verticalStacking
+      ? cube.currentHeight ?? 0
+      : cube.currentWidth ?? 0;
+    const denominator = verticalStacking ? DISPLAY_KALLAX_HEIGHT : DISPLAY_KALLAX_WIDTH;
+
+    if (!denominator) {
+      return 0;
+    }
+
+    return Math.min((numerator / denominator) * 100, 100);
+  });
+
+  const avgUtilization =
+    utilizations.length > 0
+      ? utilizations.reduce((sum, value) => sum + value, 0) / utilizations.length
+      : 0;
+
+  return {
+    totalGames,
+    totalCubes: cubes.length,
+    avgGamesPerCube: avgGamesPerCube.toFixed(1),
+    avgUtilization: avgUtilization.toFixed(1),
+  };
+}
 
 // Compare games based on priorities for sorting
 function compareGames(game1, game2, priorities) {
@@ -3256,6 +3304,8 @@ app.post('/api/games/:username', async (req, res) => {
       console.log(`   ✅ Clean copies created for ${gameCount} games in ${cleanCubes.length} cubes`);
       console.log('   📤 Attempting JSON serialization...');
 
+      const stats = calculateStatsSummary(cleanCubes, isVertical);
+
       const dimensionSummary = {
         guessedVersionCount: 0,
         selectedVersionFallbackCount: 0,
@@ -3345,8 +3395,14 @@ app.post('/api/games/:username', async (req, res) => {
         ...oversizedStuffedGames,
         ...((oversizedExcludedGames && Array.isArray(oversizedExcludedGames)) ? oversizedExcludedGames : []),
       ];
-      
-      res.json({ cubes: cleanCubes, totalGames: gamesToPack.length, dimensionSummary, oversizedGames });
+
+      res.json({
+        cubes: cleanCubes,
+        totalGames: gamesToPack.length,
+        stats,
+        dimensionSummary,
+        oversizedGames,
+      });
       console.log('   ✅ JSON response sent successfully');
       
     } catch (jsonError) {

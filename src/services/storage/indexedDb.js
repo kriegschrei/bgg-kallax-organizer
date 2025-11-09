@@ -9,27 +9,25 @@ const STORE_DIMENSIONS = 'dimensionOverrides';
 const STORE_SETTINGS = 'userSettings';
 const STORE_RESULTS = 'lastResults';
 
+const STORE_DEFINITIONS = [
+  { name: STORE_EXCLUDED, options: { keyPath: 'id' } },
+  { name: STORE_ORIENTATION, options: { keyPath: 'id' } },
+  { name: STORE_DIMENSIONS, options: { keyPath: 'id' } },
+  { name: STORE_SETTINGS, options: { keyPath: 'id' } },
+  { name: STORE_RESULTS, options: { keyPath: 'id' } },
+];
+
 let dbPromise = null;
 
 function getDb() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_EXCLUDED)) {
-          db.createObjectStore(STORE_EXCLUDED, { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains(STORE_ORIENTATION)) {
-          db.createObjectStore(STORE_ORIENTATION, { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains(STORE_DIMENSIONS)) {
-          db.createObjectStore(STORE_DIMENSIONS, { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
-          db.createObjectStore(STORE_SETTINGS, { keyPath: 'id' });
-        }
-        if (!db.objectStoreNames.contains(STORE_RESULTS)) {
-          db.createObjectStore(STORE_RESULTS, { keyPath: 'id' });
-        }
+        STORE_DEFINITIONS.forEach(({ name, options }) => {
+          if (!db.objectStoreNames.contains(name)) {
+            db.createObjectStore(name, options);
+          }
+        });
       },
     });
   }
@@ -43,147 +41,126 @@ function withTimestamp(payload = {}) {
   };
 }
 
-export async function getExcludedGames() {
+async function readAll(storeName) {
   const db = await getDb();
-  return db.getAll(STORE_EXCLUDED);
+  return db.getAll(storeName);
 }
 
-export async function saveExcludedGame(game) {
-  if (!game?.id) {
-    return;
-  }
-  const db = await getDb();
-  await db.put(STORE_EXCLUDED, withTimestamp(game));
-}
-
-export async function removeExcludedGame(id) {
-  if (!id) {
-    return;
-  }
-  const db = await getDb();
-  await db.delete(STORE_EXCLUDED, id);
-}
-
-export async function getOrientationOverrides() {
-  const db = await getDb();
-  return db.getAll(STORE_ORIENTATION);
-}
-
-export async function saveOrientationOverride(override) {
-  if (!override?.id || !override?.orientation) {
-    return;
-  }
-  const db = await getDb();
-  await db.put(STORE_ORIENTATION, withTimestamp(override));
-}
-
-export async function removeOrientationOverride(id) {
-  if (!id) {
-    return;
-  }
-  const db = await getDb();
-  await db.delete(STORE_ORIENTATION, id);
-}
-
-export async function getDimensionOverrides() {
-  const db = await getDb();
-  return db.getAll(STORE_DIMENSIONS);
-}
-
-export async function saveDimensionOverride(override) {
-  if (!override?.id) {
-    return;
-  }
-  const { length, width, depth } = override;
-  if (
-    typeof length !== 'number' ||
-    typeof width !== 'number' ||
-    typeof depth !== 'number' ||
-    Number.isNaN(length) ||
-    Number.isNaN(width) ||
-    Number.isNaN(depth)
-  ) {
-    return;
-  }
-
-  const db = await getDb();
-  await db.put(
-    STORE_DIMENSIONS,
-    withTimestamp({
-      ...override,
-      length,
-      width,
-      depth,
-    }),
-  );
-}
-
-export async function removeDimensionOverride(id) {
-  if (!id) {
-    return;
-  }
-  const db = await getDb();
-  await db.delete(STORE_DIMENSIONS, id);
-}
-
-export async function getUserSettings() {
-  const db = await getDb();
-  return db.get(STORE_SETTINGS, 'appSettings');
-}
-
-export async function saveUserSettings(settings) {
-  const db = await getDb();
-  await db.put(
-    STORE_SETTINGS,
-    withTimestamp({
-      id: 'appSettings',
-      ...(settings || {}),
-    }),
-  );
-}
-
-export async function clearUserSettings() {
-  const db = await getDb();
-  await db.delete(STORE_SETTINGS, 'appSettings');
-}
-
-export async function clearAllOverrides() {
-  const db = await getDb();
-  await Promise.all([
-    db.clear(STORE_EXCLUDED),
-    db.clear(STORE_ORIENTATION),
-    db.clear(STORE_DIMENSIONS),
-  ]);
-}
-
-export async function saveLastResult(result) {
-  if (!result) {
-    return;
-  }
-  const db = await getDb();
-  await db.put(
-    STORE_RESULTS,
-    withTimestamp({
-      id: 'lastResult',
-      ...result,
-    }),
-  );
-}
-
-export async function getLastResult() {
+async function readOne(storeName, key, { ignoreNotFound = false } = {}) {
   const db = await getDb();
   try {
-    return await db.get(STORE_RESULTS, 'lastResult');
+    return await db.get(storeName, key);
   } catch (error) {
-    if (error?.name === 'NotFoundError') {
+    if (ignoreNotFound && error?.name === 'NotFoundError') {
       return null;
     }
     throw error;
   }
 }
 
-export async function clearLastResult() {
+async function putRecord(storeName, record) {
   const db = await getDb();
-  await db.delete(STORE_RESULTS, 'lastResult');
+  await db.put(storeName, withTimestamp(record));
+}
+
+async function deleteById(storeName, id) {
+  if (!id) {
+    return;
+  }
+  const db = await getDb();
+  await db.delete(storeName, id);
+}
+
+function hasValidDimensions({ length, width, depth }) {
+  return [length, width, depth].every(
+    (value) => typeof value === 'number' && !Number.isNaN(value),
+  );
+}
+
+export async function getExcludedGames() {
+  return readAll(STORE_EXCLUDED);
+}
+
+export async function saveExcludedGame(game) {
+  if (!game?.id) {
+    return;
+  }
+  await putRecord(STORE_EXCLUDED, game);
+}
+
+export async function removeExcludedGame(id) {
+  await deleteById(STORE_EXCLUDED, id);
+}
+
+export async function getOrientationOverrides() {
+  return readAll(STORE_ORIENTATION);
+}
+
+export async function saveOrientationOverride(override) {
+  if (!override?.id || !override?.orientation) {
+    return;
+  }
+  await putRecord(STORE_ORIENTATION, override);
+}
+
+export async function removeOrientationOverride(id) {
+  await deleteById(STORE_ORIENTATION, id);
+}
+
+export async function getDimensionOverrides() {
+  return readAll(STORE_DIMENSIONS);
+}
+
+export async function saveDimensionOverride(override) {
+  if (!override?.id) {
+    return;
+  }
+  if (!hasValidDimensions(override)) {
+    return;
+  }
+
+  await putRecord(STORE_DIMENSIONS, {
+    ...override,
+    length: override.length,
+    width: override.width,
+    depth: override.depth,
+  });
+}
+
+export async function removeDimensionOverride(id) {
+  await deleteById(STORE_DIMENSIONS, id);
+}
+
+export async function getUserSettings() {
+  return readOne(STORE_SETTINGS, 'appSettings');
+}
+
+export async function saveUserSettings(settings) {
+  await putRecord(STORE_SETTINGS, {
+    id: 'appSettings',
+    ...(settings || {}),
+  });
+}
+
+export async function clearUserSettings() {
+  await deleteById(STORE_SETTINGS, 'appSettings');
+}
+
+export async function saveLastResult(result) {
+  if (!result) {
+    return;
+  }
+  await putRecord(STORE_RESULTS, {
+    id: 'lastResult',
+    ...result,
+  });
+}
+
+export async function getLastResult() {
+  return readOne(STORE_RESULTS, 'lastResult', { ignoreNotFound: true });
+}
+
+export async function clearLastResult() {
+  await deleteById(STORE_RESULTS, 'lastResult');
 }
 

@@ -12,6 +12,8 @@ import {
   FaChevronRight,
   FaUser,
 } from 'react-icons/fa';
+import DimensionForm from './DimensionForm';
+import IconButton from './IconButton';
 import './CubeVisualization.css';
 
 const KALLAX_WIDTH = 13;
@@ -575,32 +577,29 @@ export default function CubeVisualization({
                     </span>
                   </div>
                   <div className="game-actions-row">
-                    <button
-                      type="button"
+                    <IconButton
                       className={`game-action orientation${forcedOrientation ? ' active' : ''}`}
                       onClick={() => handleOrientationCycle(game, forcedOrientation)}
                       disabled={interactionsDisabled}
                       title={orientationTitle}
-                    >
-                      {orientationIcon}
-                      <span className="sr-only">Cycle orientation override</span>
-                    </button>
-                    <button
-                      type="button"
+                      icon={orientationIcon}
+                      srLabel="Cycle orientation override"
+                    />
+                    <IconButton
                       className={`game-action dimension${editingThisGame ? ' active' : ''}`}
                       onClick={() =>
                         editingThisGame ? closeDimensionEditor() : openDimensionEditor(game)
                       }
                       disabled={interactionsDisabled}
                       title="Edit custom dimensions"
-                    >
-                      <FaRulerCombined aria-hidden="true" className="button-icon" />
-                      <span className="sr-only">
-                        {editingThisGame ? 'Close custom dimension editor' : 'Edit custom dimensions'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
+                      icon={<FaRulerCombined aria-hidden="true" className="button-icon" />}
+                      srLabel={
+                        editingThisGame
+                          ? 'Close custom dimension editor'
+                          : 'Edit custom dimensions'
+                      }
+                    />
+                    <IconButton
                       className="game-action delete"
                       onClick={() => handleExcludeClick(game, isExcluded)}
                       disabled={interactionsDisabled || isExcluded}
@@ -609,10 +608,9 @@ export default function CubeVisualization({
                           ? 'Already excluded from future runs'
                           : 'Exclude this game from future sorts'
                       }
-                    >
-                      <FaTrashAlt aria-hidden="true" className="button-icon" />
-                      <span className="sr-only">Exclude game from future sorts</span>
-                    </button>
+                      icon={<FaTrashAlt aria-hidden="true" className="button-icon" />}
+                      srLabel="Exclude game from future sorts"
+                    />
                   </div>
                   <div className="game-dimension-row">
                     <span
@@ -647,16 +645,14 @@ export default function CubeVisualization({
                       />
                     )}
                     {userDims && (
-                      <button
-                        type="button"
+                      <IconButton
                         className="dimension-clear"
                         onClick={() => handleClearDimensionOverride(game)}
                         disabled={interactionsDisabled}
                         title="Remove custom dimensions"
-                      >
-                        <FaTimes aria-hidden="true" className="button-icon" />
-                        <span className="sr-only">Remove custom dimensions</span>
-                      </button>
+                        icon={<FaTimes aria-hidden="true" className="button-icon" />}
+                        srLabel="Remove custom dimensions"
+                      />
                     )}
                   </div>
                   {(isExcluded || forcedOrientation || userDims) && (
@@ -669,70 +665,20 @@ export default function CubeVisualization({
                     </div>
                   )}
                   {editingThisGame && (
-                    <form
+                    <DimensionForm
                       className="dimension-edit-form"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        handleDimensionSave(game);
-                      }}
-                    >
-                      <div className="dimension-edit-grid">
-                        <label>
-                          Length (in)
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={dimensionEditor.length}
-                            onChange={(event) =>
-                              handleDimensionFieldChange('length', event.target.value)
-                            }
-                            required
-                          />
-                        </label>
-                        <label>
-                          Width (in)
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={dimensionEditor.width}
-                            onChange={(event) =>
-                              handleDimensionFieldChange('width', event.target.value)
-                            }
-                            required
-                          />
-                        </label>
-                        <label>
-                          Depth (in)
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            value={dimensionEditor.depth}
-                            onChange={(event) =>
-                              handleDimensionFieldChange('depth', event.target.value)
-                            }
-                            required
-                          />
-                        </label>
-                      </div>
-                      {dimensionEditor.error && (
-                        <p className="dimension-edit-error">{dimensionEditor.error}</p>
-                      )}
-                      <div className="dimension-edit-actions">
-                        <button type="submit" className="primary" disabled={interactionsDisabled}>
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={closeDimensionEditor}
-                          className="secondary"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
+                      gridClassName="dimension-edit-grid"
+                      errorClassName="dimension-edit-error"
+                      actionsClassName="dimension-edit-actions"
+                      primaryButtonClassName="primary"
+                      secondaryButtonClassName="secondary"
+                      values={dimensionEditor}
+                      error={dimensionEditor.error}
+                      disabled={interactionsDisabled}
+                      onChange={handleDimensionFieldChange}
+                      onSubmit={() => handleDimensionSave(game)}
+                      onCancel={closeDimensionEditor}
+                    />
                   )}
                   {hasBadges && (
                     <div className="game-badges-section">

@@ -9,11 +9,12 @@ import {
   FaChevronDown,
 } from 'react-icons/fa';
 import SortablePriorities from './components/SortablePriorities';
-import ToggleSwitch from './components/ToggleSwitch';
+import SettingsToggleGroup from './components/SettingsToggleGroup';
+import IconButton from './components/IconButton';
 import CollectionStatusToggle from './components/CollectionStatusToggle';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
-import { fetchPackedCubes } from './services/bggApi';
+import { fetchPackedCubes } from './services/bgcubeApi';
 import {
   getExcludedGames,
   saveExcludedGame,
@@ -157,6 +158,7 @@ function App() {
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
   const [cubes, setCubes] = useState(null);
+  const [stats, setStats] = useState(null);
   const [oversizedGames, setOversizedGames] = useState([]);
   const [missingVersionWarning, setMissingVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
@@ -403,6 +405,7 @@ function App() {
         }
 
         setCubes(storedResult.response.cubes);
+        setStats(storedResult.response.stats || null);
         setOversizedGames(storedResult.response.oversizedGames || []);
         setHasStoredData(true);
 
@@ -742,6 +745,8 @@ function App() {
     setCollectionFilters({ ...DEFAULT_COLLECTION_FILTERS });
     setFilterPanelsCollapsed({ ...DEFAULT_FILTER_PANEL_STATE });
     setCubes(null);
+    setStats(null);
+    setStats(null);
     setOversizedGames([]);
     setMissingVersionWarning(null);
     setLastRequestConfig(null);
@@ -758,12 +763,25 @@ function App() {
     }
   }, []);
 
-  const handleOptimizeSpaceChange = (checked) => {
-    setOptimizeSpace(checked);
-    if (checked) {
-      setRespectSortOrder(false);
-    }
-  };
+  const handleOptimizeSpaceChange = useCallback(
+    (checked) => {
+      setOptimizeSpace(checked);
+      if (checked) {
+        setRespectSortOrder(false);
+      }
+    },
+    [setOptimizeSpace, setRespectSortOrder]
+  );
+
+  const handleIncludeExpansionsChange = useCallback(
+    (next) => {
+      setIncludeExpansions(next);
+      if (!next) {
+        setGroupExpansions(false);
+      }
+    },
+    [setGroupExpansions, setIncludeExpansions]
+  );
 
   const activeFilterLabels = useMemo(() => {
     const labels = [];
@@ -882,6 +900,98 @@ function App() {
     return { headerBadgeTags: limited, headerBadgeOverflow: overflow };
   }, [activeFilterLabels, collapsedBadgeLimit]);
 
+  const preferenceToggles = useMemo(
+    () => [
+      {
+        id: 'optimizeSpace',
+        label: 'Optimize for space',
+        checked: optimizeSpace,
+        onChange: handleOptimizeSpaceChange,
+        disabled: loading,
+        tooltip: 'Ignore all sorting preferences and pack games in as few cubes as possible',
+      },
+      {
+        id: 'includeExpansions',
+        label: 'Include expansions',
+        checked: includeExpansions,
+        onChange: handleIncludeExpansionsChange,
+        disabled: loading,
+      },
+      {
+        id: 'groupExpansions',
+        label: 'Group expansions with base game',
+        checked: groupExpansions,
+        onChange: setGroupExpansions,
+        disabled: loading || !includeExpansions || optimizeSpace,
+        tooltip: 'Keep expansions with their base game in the same cube when possible',
+      },
+      {
+        id: 'groupSeries',
+        label: 'Group series',
+        checked: groupSeries,
+        onChange: setGroupSeries,
+        disabled: loading || optimizeSpace,
+        tooltip: 'Keep games from the same series/family together in the same cube when possible',
+      },
+      {
+        id: 'fitOversized',
+        label: 'Fit oversized games',
+        checked: fitOversized,
+        onChange: setFitOversized,
+        disabled: loading,
+        tooltip: 'Set oversized games dimension to 13 inches to fit in cubes',
+      },
+      {
+        id: 'lockRotation',
+        label: 'Lock rotation',
+        checked: lockRotation,
+        onChange: setLockRotation,
+        disabled: loading,
+        tooltip:
+          'Disabled: Prefer stacking preference, may rotate some games to fit.\nEnabled: Force games to follow stacking preference',
+      },
+      {
+        id: 'respectSortOrder',
+        label: 'Respect sorting priority',
+        checked: respectSortOrder,
+        onChange: setRespectSortOrder,
+        disabled: loading || optimizeSpace,
+        tooltip:
+          'Games will not be backfilled to earlier cubes for better fit to match sorting preferences. May use more space.',
+      },
+      {
+        id: 'bypassVersionWarning',
+        label: 'Bypass version warning',
+        checked: bypassVersionWarning,
+        onChange: setBypassVersionWarning,
+        disabled: loading,
+        tooltip:
+          'You will not be warned about missing versions or dimensions. This may result in incorrect data and longer processing times.',
+        tooltipIcon: FaExclamationTriangle,
+        tooltipIconClassName: 'warning-icon',
+      },
+    ],
+    [
+      optimizeSpace,
+      handleOptimizeSpaceChange,
+      loading,
+      includeExpansions,
+      handleIncludeExpansionsChange,
+      groupExpansions,
+      setGroupExpansions,
+      groupSeries,
+      setGroupSeries,
+      fitOversized,
+      setFitOversized,
+      lockRotation,
+      setLockRotation,
+      respectSortOrder,
+      setRespectSortOrder,
+      bypassVersionWarning,
+      setBypassVersionWarning,
+    ]
+  );
+
   const filterControls = (
     <>
       <div className="options-row">
@@ -897,16 +1007,15 @@ function App() {
           />
         </div>
         <div className="options-actions">
-          <button
-            type="button"
+          <IconButton
             className="reset-settings-button"
             onClick={handleResetSettings}
             disabled={loading}
             title="Restore all search options to their default values"
+            icon={<FaUndoAlt aria-hidden="true" className="button-icon" />}
           >
-            <FaUndoAlt aria-hidden="true" className="button-icon" />
             <span>Reset settings</span>
-          </button>
+          </IconButton>
         </div>
       </div>
 
@@ -944,78 +1053,7 @@ function App() {
               </div>
             </div>
 
-            <div className="preferences-toggle-grid">
-              <ToggleSwitch
-                id="optimizeSpace"
-                label="Optimize for space"
-                checked={optimizeSpace}
-                onChange={handleOptimizeSpaceChange}
-                disabled={loading}
-                tooltip="Ignore all sorting preferences and pack games in as few cubes as possible"
-              />
-              <ToggleSwitch
-                id="includeExpansions"
-                label="Include expansions"
-                checked={includeExpansions}
-                onChange={(next) => {
-                  setIncludeExpansions(next);
-                  if (!next) {
-                    setGroupExpansions(false);
-                  }
-                }}
-                disabled={loading}
-              />
-              <ToggleSwitch
-                id="groupExpansions"
-                label="Group expansions with base game"
-                checked={groupExpansions}
-                onChange={setGroupExpansions}
-                disabled={loading || !includeExpansions || optimizeSpace}
-                tooltip="Keep expansions with their base game in the same cube when possible"
-              />
-              <ToggleSwitch
-                id="groupSeries"
-                label="Group series"
-                checked={groupSeries}
-                onChange={setGroupSeries}
-                disabled={loading || optimizeSpace}
-                tooltip="Keep games from the same series/family together in the same cube when possible"
-              />
-              <ToggleSwitch
-                id="fitOversized"
-                label="Fit oversized games"
-                checked={fitOversized}
-                onChange={setFitOversized}
-                disabled={loading}
-                tooltip="Set oversized games dimension to 13 inches to fit in cubes"
-              />
-              <ToggleSwitch
-                id="lockRotation"
-                label="Lock rotation"
-                checked={lockRotation}
-                onChange={setLockRotation}
-                disabled={loading}
-                tooltip={`Disabled: Prefer stacking preference, may rotate some games to fit.\nEnabled: Force games to follow stacking preference`}
-              />
-              <ToggleSwitch
-                id="respectSortOrder"
-                label="Respect sorting priority"
-                checked={respectSortOrder}
-                onChange={setRespectSortOrder}
-                disabled={loading || optimizeSpace}
-                tooltip="Games will not be backfilled to earlier cubes for better fit to match sorting preferences. May use more space."
-              />
-              <ToggleSwitch
-                id="bypassVersionWarning"
-                label="Bypass version warning"
-                checked={bypassVersionWarning}
-                onChange={setBypassVersionWarning}
-                disabled={loading}
-                tooltip="You will not be warned about missing versions or dimensions. This may result in incorrect data and longer processing times."
-                tooltipIcon={FaExclamationTriangle}
-                tooltipIconClassName="warning-icon"
-              />
-            </div>
+            <SettingsToggleGroup toggles={preferenceToggles} />
           </div>
         )}
 
@@ -1226,6 +1264,7 @@ function App() {
       setProgress('Rendering results...');
 
       setCubes(response.cubes);
+      setStats(response.stats || null);
       setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
@@ -1234,6 +1273,7 @@ function App() {
         requestConfig,
         response: {
           cubes: response.cubes,
+          stats: response.stats || null,
           oversizedGames: response.oversizedGames || [],
           fitOversized,
           verticalStacking,
@@ -1267,6 +1307,7 @@ function App() {
     setProgress('Attempting fallback dimension lookup. This may take a little while...');
     setMissingVersionWarning(null);
     setOversizedGames([]);
+    setStats(null);
     setFiltersCollapsed(true);
     setIsFilterDrawerOpen(false);
 
@@ -1340,6 +1381,7 @@ function App() {
 
       setProgress('Rendering results...');
       setCubes(response.cubes);
+      setStats(response.stats || null);
       setOversizedGames(response.oversizedGames || []);
       setProgress('');
       setLoading(false);
@@ -1357,6 +1399,7 @@ function App() {
         requestConfig: normalizedRequestConfig,
         response: {
           cubes: response.cubes,
+          stats: response.stats || null,
           oversizedGames: response.oversizedGames || [],
           fitOversized: normalizedRequestConfig.fitOversized,
           verticalStacking: normalizedRequestConfig.verticalStacking,
@@ -1556,6 +1599,7 @@ function App() {
         <Results
           cubes={cubes}
           verticalStacking={verticalStacking}
+          stats={stats}
           oversizedGames={oversizedGames}
           fitOversized={fitOversized}
           priorities={priorities}

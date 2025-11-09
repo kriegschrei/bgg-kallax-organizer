@@ -131,6 +131,8 @@ const getCollapsedBadgeLimit = (width) => {
   return 0;
 };
 
+const MOBILE_BREAKPOINT = 768;
+
 function App() {
   const formRef = useRef(null);
   const [username, setUsername] = useState('');
@@ -169,6 +171,13 @@ function App() {
   );
   const [hasStoredData, setHasStoredData] = useState(false);
   const initialCollapseAppliedRef = useRef(false);
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(() =>
+    typeof window === 'undefined' ? false : window.innerWidth < MOBILE_BREAKPOINT
+  );
+  const filterDrawerCloseRef = useRef(null);
+  const searchPanelHeaderRef = useRef(null);
+  const previousBodyOverflowRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -176,7 +185,9 @@ function App() {
     }
 
     const handleResize = () => {
-      setCollapsedBadgeLimit(getCollapsedBadgeLimit(window.innerWidth));
+      const width = window.innerWidth;
+      setCollapsedBadgeLimit(getCollapsedBadgeLimit(width));
+      setIsMobileLayout(width < MOBILE_BREAKPOINT);
     };
 
     handleResize();
@@ -329,38 +340,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const widgetId = 'ko-fi-overlay-widget';
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (document.getElementById(widgetId)) {
-      window.kofiWidgetOverlay?.draw?.('kriegschrei', {
-        type: 'floating-chat',
-        'floating-chat.donateButton.text': 'Support me',
-        'floating-chat.donateButton.background-color': '#00b9fe',
-        'floating-chat.donateButton.text-color': '#fff',
-      });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.id = widgetId;
-    script.src = 'https://storage.ko-fi.com/cdn/scripts/overlay-widget.js';
-    script.async = true;
-    script.onload = () => {
-      window.kofiWidgetOverlay?.draw?.('kriegschrei', {
-        type: 'floating-chat',
-        'floating-chat.donateButton.text': 'Support me',
-        'floating-chat.donateButton.background-color': '#00b9fe',
-        'floating-chat.donateButton.text-color': '#fff',
-      });
-    };
-
-    document.body.appendChild(script);
-  }, []);
-
-  useEffect(() => {
     if (!settingsHydrated) {
       return;
     }
@@ -455,6 +434,55 @@ function App() {
       isCancelled = true;
     };
   }, [settingsHydrated, lastResultHydrated, cubes]);
+
+  useEffect(() => {
+    if (!isMobileLayout) {
+      setIsFilterDrawerOpen(false);
+    }
+  }, [isMobileLayout]);
+
+  useEffect(() => {
+    if (!isMobileLayout || !isFilterDrawerOpen) {
+      if (previousBodyOverflowRef.current !== null) {
+        document.body.style.overflow = previousBodyOverflowRef.current || '';
+        previousBodyOverflowRef.current = null;
+      }
+      return;
+    }
+
+    previousBodyOverflowRef.current = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflowRef.current || '';
+      previousBodyOverflowRef.current = null;
+    };
+  }, [isFilterDrawerOpen, isMobileLayout]);
+
+  useEffect(() => {
+    if (!isFilterDrawerOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsFilterDrawerOpen(false);
+        searchPanelHeaderRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isFilterDrawerOpen]);
+
+  useEffect(() => {
+    if (isFilterDrawerOpen) {
+      filterDrawerCloseRef.current?.focus();
+    }
+  }, [isFilterDrawerOpen]);
 
   const excludedGamesList = useMemo(
     () => Object.values(excludedGamesMap),
@@ -720,6 +748,7 @@ function App() {
     setError(null);
     setProgress('');
     setHasStoredData(false);
+    setIsFilterDrawerOpen(false);
 
     try {
       await clearUserSettings();
@@ -853,6 +882,182 @@ function App() {
     return { headerBadgeTags: limited, headerBadgeOverflow: overflow };
   }, [activeFilterLabels, collapsedBadgeLimit]);
 
+  const filterControls = (
+    <>
+      <div className="options-row">
+        <div className="options-field">
+          <label htmlFor="username">BoardGameGeek Username</label>
+          <input
+            type="text"
+            id="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter your BGG username"
+            disabled={loading}
+          />
+        </div>
+        <div className="options-actions">
+          <button
+            type="button"
+            className="reset-settings-button"
+            onClick={handleResetSettings}
+            disabled={loading}
+            title="Restore all search options to their default values"
+          >
+            <FaUndoAlt aria-hidden="true" className="button-icon" />
+            <span>Reset settings</span>
+          </button>
+        </div>
+      </div>
+
+      {!hasIncludeStatuses && (
+        <div className="collection-filters-warning" role="alert">
+          <FaExclamationTriangle aria-hidden className="collection-filters-warning__icon" />
+          <span>Select at least one collection status to organize.</span>
+        </div>
+      )}
+
+      <div className="filter-panels-grid">
+        {renderFilterPanel(
+          'preferences',
+          'Preferences',
+          <div className="preferences-panel">
+            <div className="stacking-row">
+              <span className="stacking-label">Stacking</span>
+              <div className="toggle-button-group toggle-button-group--compact">
+                <button
+                  type="button"
+                  className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
+                  onClick={() => setVerticalStacking(false)}
+                  disabled={loading}
+                >
+                  Horizontal
+                </button>
+                <button
+                  type="button"
+                  className={`toggle-button ${verticalStacking ? 'active' : ''}`}
+                  onClick={() => setVerticalStacking(true)}
+                  disabled={loading}
+                >
+                  Vertical
+                </button>
+              </div>
+            </div>
+
+            <div className="preferences-toggle-grid">
+              <ToggleSwitch
+                id="optimizeSpace"
+                label="Optimize for space"
+                checked={optimizeSpace}
+                onChange={handleOptimizeSpaceChange}
+                disabled={loading}
+                tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible"
+              />
+              <ToggleSwitch
+                id="includeExpansions"
+                label="Include expansions"
+                checked={includeExpansions}
+                onChange={(next) => {
+                  setIncludeExpansions(next);
+                  if (!next) {
+                    setGroupExpansions(false);
+                  }
+                }}
+                disabled={loading}
+              />
+              <ToggleSwitch
+                id="groupExpansions"
+                label="Group expansions with base game"
+                checked={groupExpansions}
+                onChange={setGroupExpansions}
+                disabled={loading || !includeExpansions || optimizeSpace}
+                tooltip="Keep expansions with their base game in the same cube when possible"
+              />
+              <ToggleSwitch
+                id="groupSeries"
+                label="Group series"
+                checked={groupSeries}
+                onChange={setGroupSeries}
+                disabled={loading || optimizeSpace}
+                tooltip="Keep games from the same series/family together in the same cube when possible"
+              />
+              <ToggleSwitch
+                id="fitOversized"
+                label="Fit oversized games"
+                checked={fitOversized}
+                onChange={setFitOversized}
+                disabled={loading}
+                tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
+              />
+              <ToggleSwitch
+                id="lockRotation"
+                label="Lock rotation"
+                checked={lockRotation}
+                onChange={setLockRotation}
+                disabled={loading}
+                tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
+              />
+              <ToggleSwitch
+                id="respectSortOrder"
+                label="Respect ordering priority"
+                checked={respectSortOrder}
+                onChange={setRespectSortOrder}
+                disabled={loading || optimizeSpace}
+                tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space"
+              />
+              <ToggleSwitch
+                id="bypassVersionWarning"
+                label="Bypass version warning"
+                checked={bypassVersionWarning}
+                onChange={setBypassVersionWarning}
+                disabled={loading}
+                tooltip="You will not be warned about missing versions. This may result in incorrect data and longer processing times."
+                tooltipIcon={FaExclamationTriangle}
+                tooltipIconClassName="warning-icon"
+              />
+            </div>
+          </div>
+        )}
+
+        {renderFilterPanel(
+          'collections',
+          'Collections',
+          <div className="collection-status-content">
+            {(includeStatusList.length > 1 || excludeStatusList.length > 0) && (
+              <div className="collection-status-helper" role="note">
+                Include matches any selected category. Exclude removes games with those categories.
+              </div>
+            )}
+            <div className="collection-status-grid">
+              {COLLECTION_STATUSES.map((status) => (
+                <CollectionStatusToggle
+                  key={status.key}
+                  label={status.label}
+                  value={collectionFilters[status.key]}
+                  onChange={(nextState) => handleCollectionFilterChange(status.key, nextState)}
+                  disabled={loading}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {renderFilterPanel(
+          'priorities',
+          'Sorting',
+          <SortablePriorities
+            priorities={priorities}
+            onChange={setPriorities}
+            disabled={optimizeSpace}
+          />
+        )}
+      </div>
+    </>
+  );
+
+  const searchPanelBodyId = isMobileLayout ? 'filter-drawer' : 'search-panel-content';
+  const isPanelCollapsed = isMobileLayout ? !isFilterDrawerOpen : filtersCollapsed;
+
   useEffect(() => {
     if (initialCollapseAppliedRef.current) {
       return;
@@ -867,12 +1072,23 @@ function App() {
     initialCollapseAppliedRef.current = true;
   }, [settingsHydrated, lastResultHydrated, hasStoredData, cubes]);
 
+  const closeFilterDrawer = useCallback(() => {
+    setIsFilterDrawerOpen(false);
+    searchPanelHeaderRef.current?.focus();
+  }, []);
+
   const toggleFiltersCollapsed = useCallback(() => {
     if (loading) {
       return;
     }
+
+    if (isMobileLayout) {
+      setIsFilterDrawerOpen((prev) => !prev);
+      return;
+    }
+
     setFiltersCollapsed((prev) => !prev);
-  }, [loading]);
+  }, [isMobileLayout, loading]);
 
   const handleHeaderClick = useCallback(
     (event) => {
@@ -925,6 +1141,7 @@ function App() {
     setProgress('Fetching your collection from BoardGameGeek...');
     setMissingVersionWarning(null);
     setFiltersCollapsed(true);
+    setIsFilterDrawerOpen(false);
 
     try {
       const trimmedUsername = username.trim();
@@ -1044,6 +1261,7 @@ function App() {
     setMissingVersionWarning(null);
     setOversizedGames([]);
     setFiltersCollapsed(true);
+    setIsFilterDrawerOpen(false);
 
     try {
       const effectiveBypassVersionWarning =
@@ -1156,6 +1374,19 @@ function App() {
           <p className="subtitle">
             Organize your <a href="https://boardgamegeek.com" target="_blank" rel="noopener noreferrer" className="subtitle-link">BoardGameGeek</a> collection into <a href="https://www.ikea.com/us/en/cat/kallax-shelving-units-58285/" target="_blank" rel="noopener noreferrer" className="subtitle-link">IKEA Kallax shelving units</a>
           </p>
+          <div className="kofi-widget" aria-live="polite">
+            <a
+              href="https://ko-fi.com/A0A11G62JT"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img
+                src="https://storage.ko-fi.com/cdn/kofi6.png?v=6"
+                alt="Buy Me a Coffee at ko-fi.com"
+                height="36"
+              />
+            </a>
+          </div>
         </div>
       </header>
 
@@ -1165,24 +1396,27 @@ function App() {
         </div>
       )}
 
-      <section className={`card search-panel ${filtersCollapsed ? 'collapsed' : ''}`}>
+      <section className={`card search-panel ${isPanelCollapsed ? 'collapsed' : ''}`}>
         <form ref={formRef} onSubmit={handleSubmit} className="search-panel-form">
           <div
-            className={`search-panel-header ${filtersCollapsed ? 'is-collapsed' : ''} ${
+            className={`search-panel-header ${isPanelCollapsed ? 'is-collapsed' : ''} ${
               loading ? 'is-disabled' : ''
             }`}
             role="button"
             tabIndex={loading ? -1 : 0}
-            aria-expanded={!filtersCollapsed}
-            aria-controls="search-panel-content"
+            aria-expanded={!isPanelCollapsed}
+            aria-controls={searchPanelBodyId}
             onClick={handleHeaderClick}
             onKeyDown={handleHeaderKeyDown}
-            title={filtersCollapsed ? 'Show search options' : 'Hide search options'}
+            title={
+              isPanelCollapsed ? 'Show search options' : 'Hide search options'
+            }
+            ref={searchPanelHeaderRef}
           >
             <div className="search-panel-primary">
               <div className="search-panel-toggle">
                 <span className="disclosure-arrow search-panel-icon" aria-hidden>
-                  {filtersCollapsed ? (
+                  {isPanelCollapsed ? (
                     <FaChevronRight className="disclosure-arrow-icon" />
                   ) : (
                     <FaChevronDown className="disclosure-arrow-icon" />
@@ -1227,176 +1461,58 @@ function App() {
               </div>
             )}
           </div>
-          <div className="search-panel-body" id="search-panel-content">
-            <div className="options-row">
-              <div className="options-field">
-                <label htmlFor="username">BoardGameGeek Username</label>
-                <input
-                  type="text"
-                  id="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your BGG username"
-                  disabled={loading}
-                />
-              </div>
-              <div className="options-actions">
-                <button
-                  type="button"
-                  className="reset-settings-button"
-                  onClick={handleResetSettings}
-                  disabled={loading}
-                  title="Restore all search options to their default values"
-                >
-                  <FaUndoAlt aria-hidden="true" className="button-icon" />
-                  <span>Reset settings</span>
-                </button>
-              </div>
+          {!isMobileLayout && (
+            <div className="search-panel-body" id="search-panel-content">
+              {filterControls}
             </div>
+          )}
 
-            {!hasIncludeStatuses && (
-              <div className="collection-filters-warning" role="alert">
-                <FaExclamationTriangle aria-hidden className="collection-filters-warning__icon" />
-                <span>Select at least one collection status to organize.</span>
+          {isMobileLayout && (
+            <>
+              <div
+                className={`filter-drawer-backdrop ${isFilterDrawerOpen ? 'is-visible' : ''}`}
+                onClick={closeFilterDrawer}
+                aria-hidden="true"
+              />
+              <div
+                className={`filter-drawer ${isFilterDrawerOpen ? 'is-open' : ''}`}
+                role="dialog"
+                aria-modal={isFilterDrawerOpen}
+                aria-hidden={!isFilterDrawerOpen}
+                aria-labelledby="filter-drawer-title"
+                id="filter-drawer"
+              >
+                <div className="filter-drawer__header">
+                  <h2 id="filter-drawer-title">Options</h2>
+                  <button
+                    type="button"
+                    className="filter-drawer__close"
+                    onClick={closeFilterDrawer}
+                    ref={filterDrawerCloseRef}
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="filter-drawer__body">
+                  {filterControls}
+                </div>
+                <div className="filter-drawer__footer">
+                  <button
+                    type="submit"
+                    className="filter-drawer__submit search-panel-submit"
+                    disabled={loading || !hasIncludeStatuses}
+                    title={
+                      !hasIncludeStatuses
+                        ? 'Select at least one collection status to organize'
+                        : undefined
+                    }
+                  >
+                    {loading ? 'Processing...' : 'Organize Collection'}
+                  </button>
+                </div>
               </div>
-            )}
-
-            <div className="filter-panels-grid">
-              {renderFilterPanel(
-                'preferences',
-                'Preferences',
-                <div className="preferences-panel">
-                  <div className="stacking-row">
-                    <span className="stacking-label">Stacking</span>
-                    <div className="toggle-button-group toggle-button-group--compact">
-                      <button
-                        type="button"
-                        className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
-                        onClick={() => setVerticalStacking(false)}
-                        disabled={loading}
-                      >
-                        Horizontal
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-button ${verticalStacking ? 'active' : ''}`}
-                        onClick={() => setVerticalStacking(true)}
-                        disabled={loading}
-                      >
-                        Vertical
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="preferences-toggle-grid">
-                    <ToggleSwitch
-                      id="optimizeSpace"
-                      label="Optimize for space"
-                      checked={optimizeSpace}
-                      onChange={handleOptimizeSpaceChange}
-                      disabled={loading}
-                      tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible"
-                    />
-                    <ToggleSwitch
-                      id="includeExpansions"
-                      label="Include expansions"
-                      checked={includeExpansions}
-                      onChange={(next) => {
-                        setIncludeExpansions(next);
-                        if (!next) {
-                          setGroupExpansions(false);
-                        }
-                      }}
-                      disabled={loading}
-                    />
-                    <ToggleSwitch
-                      id="groupExpansions"
-                      label="Group expansions with base game"
-                      checked={groupExpansions}
-                      onChange={setGroupExpansions}
-                      disabled={loading || !includeExpansions || optimizeSpace}
-                      tooltip="Keep expansions with their base game in the same cube when possible"
-                    />
-                    <ToggleSwitch
-                      id="groupSeries"
-                      label="Group series"
-                      checked={groupSeries}
-                      onChange={setGroupSeries}
-                      disabled={loading || optimizeSpace}
-                      tooltip="Keep games from the same series/family together in the same cube when possible"
-                    />
-                    <ToggleSwitch
-                      id="fitOversized"
-                      label="Fit oversized games"
-                      checked={fitOversized}
-                      onChange={setFitOversized}
-                      disabled={loading}
-                      tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
-                    />
-                    <ToggleSwitch
-                      id="lockRotation"
-                      label="Lock rotation"
-                      checked={lockRotation}
-                      onChange={setLockRotation}
-                      disabled={loading}
-                      tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
-                    />
-                    <ToggleSwitch
-                      id="respectSortOrder"
-                      label="Respect ordering priority"
-                      checked={respectSortOrder}
-                      onChange={setRespectSortOrder}
-                      disabled={loading || optimizeSpace}
-                      tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space"
-                    />
-                    <ToggleSwitch
-                      id="bypassVersionWarning"
-                      label="Bypass version warning"
-                      checked={bypassVersionWarning}
-                      onChange={setBypassVersionWarning}
-                      disabled={loading}
-                      tooltip="You will not be warned about missing versions. This may result in incorrect data and longer processing times."
-                      tooltipIcon={FaExclamationTriangle}
-                      tooltipIconClassName="warning-icon"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {renderFilterPanel(
-                'collections',
-                'Collections',
-                <div className="collection-status-content">
-                  {(includeStatusList.length > 1 || excludeStatusList.length > 0) && (
-                    <div className="collection-status-helper" role="note">
-                      Include matches any selected category. Exclude removes games with those categories.
-                    </div>
-                  )}
-                  <div className="collection-status-grid">
-                    {COLLECTION_STATUSES.map((status) => (
-                      <CollectionStatusToggle
-                        key={status.key}
-                        label={status.label}
-                        value={collectionFilters[status.key]}
-                        onChange={(nextState) => handleCollectionFilterChange(status.key, nextState)}
-                        disabled={loading}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {renderFilterPanel(
-                'priorities',
-                'Sorting',
-                <SortablePriorities
-                  priorities={priorities}
-                  onChange={setPriorities}
-                  disabled={optimizeSpace}
-                />
-              )}
-            </div>
-          </div>
+            </>
+          )}
         </form>
       </section>
 

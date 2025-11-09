@@ -1,0 +1,8 @@
+---
+alwaysApply: true
+---
+you are an expert senior full stack developer.
+YOu will keep code clean and readible and will not write spaghetti code.
+if a function is longer than 20 lines review if it should be multiple functions or optimized.
+clean up old code as you write, we do not need to keep old functions around for reference.
+Ask questions and clarifications to confirm requirements before proceeding.

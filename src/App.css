@@ -542,7 +542,6 @@ header {
 
 .search-panel-header {
   display: flex;
-  flex-direction: column;
   gap: 0.75rem;
   padding: 0.75rem 1.25rem;
   background-color: rgba(99, 102, 241, 0.08);
@@ -553,23 +552,31 @@ header {
   outline: none;
 }
 
-.search-panel-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.35rem 0.6rem;
-  flex: 0 0 auto;
-  white-space: nowrap;
-  line-height: 1;
-  cursor: inherit;
-}
-
 .search-panel-primary {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   gap: 0.75rem;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+}
+
+.search-panel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.35rem 0.6rem;
+  white-space: nowrap;
+  line-height: 1;
+  cursor: inherit;
+  min-width: 0;
+}
+
+.search-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  gap: 0.75rem;
 }
 
 .search-panel-label {
@@ -615,7 +622,14 @@ header {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  justify-content: flex-start;
+  justify-content: flex-end;
+  align-items: center;
+  align-content: flex-start;
+  align-self: stretch;
+  margin-left: auto;
+  max-height: 3rem;
+  overflow: hidden;
+  row-gap: 0.25rem;
 }
 
 .search-panel-tag {
@@ -680,40 +694,6 @@ header {
   white-space: nowrap;
   flex: 0 0 auto;
   border-radius: 4px;
-}
-
-.search-panel.collapsed .search-panel-header {
-  flex-direction: row;
-  align-items: center;
-  gap: 1rem;
-  --collapsed-control-height: 2.9rem;
-  padding: 0.4rem 1.25rem;
-}
-
-.search-panel.collapsed .search-panel-primary {
-  flex: 0 0 auto;
-}
-
-.search-panel.collapsed .search-panel-toggle,
-.search-panel.collapsed .search-panel-submit {
-  height: var(--collapsed-control-height);
-  padding-top: 0;
-  padding-bottom: 0;
-}
-
-.search-panel.collapsed .search-panel-submit {
-  margin-left: 0.75rem;
-}
-
-.search-panel.collapsed .search-panel-tags {
-  flex: 1 1 auto;
-  justify-content: flex-end;
-  align-items: center;
-  align-content: flex-start;
-  margin-left: 1rem;
-  max-height: var(--collapsed-control-height);
-  overflow: hidden;
-  row-gap: 0.25rem;
 }
 
 .search-panel-body {

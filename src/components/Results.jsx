@@ -20,6 +20,9 @@ import IconButton from './IconButton';
 import OverridesSection from './OverridesSection';
 import './Results.css';
 
+const getScrollableListClassName = (length) =>
+  length > 8 ? 'callout__list scrollable' : 'callout__list';
+
 export default function Results({
   cubes,
   verticalStacking,
@@ -55,6 +58,15 @@ export default function Results({
     stats && stats.avgUtilization !== null && stats.avgUtilization !== undefined
       ? `${stats.avgUtilization}%`
       : 'N/A';
+  const statsSummaryItems = useMemo(
+    () => [
+      { label: 'Total Games', value: totalGamesDisplay },
+      { label: 'Kallax Cubes Needed', value: totalCubesDisplay },
+      { label: 'Avg Games/Cube', value: avgGamesPerCubeDisplay },
+      { label: 'Avg Space Utilization', value: avgUtilizationDisplay },
+    ],
+    [totalGamesDisplay, totalCubesDisplay, avgGamesPerCubeDisplay, avgUtilizationDisplay]
+  );
   const [excludedExpanded, setExcludedExpanded] = useState(false);
   const [orientationExpanded, setOrientationExpanded] = useState(false);
   const [dimensionOverridesExpanded, setDimensionOverridesExpanded] = useState(false);
@@ -304,22 +316,12 @@ export default function Results({
     <div className="results">
  
       <div className="stats-summary card">
-        <div className="stat">
-          <span className="stat-value">{totalGamesDisplay}</span>
-          <span className="stat-label">Total Games</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value">{totalCubesDisplay}</span>
-          <span className="stat-label">Kallax Cubes Needed</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value">{avgGamesPerCubeDisplay}</span>
-          <span className="stat-label">Avg Games/Cube</span>
-        </div>
-        <div className="stat">
-          <span className="stat-value">{avgUtilizationDisplay}</span>
-          <span className="stat-label">Avg Space Utilization</span>
-        </div>
+        {statsSummaryItems.map(({ label, value }) => (
+          <div key={label} className="stat">
+            <span className="stat-value">{value}</span>
+            <span className="stat-label">{label}</span>
+          </div>
+        ))}
       </div>
 
       {(hasExcludedGames || hasOrientationOverrides || hasDimensionOverrides) && (
@@ -333,7 +335,7 @@ export default function Results({
               title="Manual exclusions"
               count={sortedExcludedGames.length}
               description="Excluded games will not be included the next time you organize your collection."
-              listClassName={`callout__list ${sortedExcludedGames.length > 8 ? 'scrollable' : ''}`}
+              listClassName={getScrollableListClassName(sortedExcludedGames.length)}
             >
               {sortedExcludedGames.map((game) => (
                 <li key={game.id} className="override-list-item">
@@ -363,7 +365,7 @@ export default function Results({
               title="Orientation overrides"
               count={sortedOrientationOverrides.length}
               description="These games will ignore rotation settings and be placed exactly as chosen."
-              listClassName={`callout__list ${sortedOrientationOverrides.length > 8 ? 'scrollable' : ''}`}
+              listClassName={getScrollableListClassName(sortedOrientationOverrides.length)}
             >
               {sortedOrientationOverrides.map((game) => {
                 const orientationLabel = game.orientation === 'horizontal' ? 'Horizontal' : 'Vertical';
@@ -413,7 +415,7 @@ export default function Results({
               title="Custom dimensions"
               count={sortedDimensionOverrides.length}
               description="Your overrides will be used instead of the dimensions supplied by BoardGameGeek."
-              listClassName={`callout__list ${sortedDimensionOverrides.length > 8 ? 'scrollable' : ''}`}
+              listClassName={getScrollableListClassName(sortedDimensionOverrides.length)}
             >
               {sortedDimensionOverrides.map((game) => {
                 const isEditing = panelDimensionEditor.gameId === game.id;
@@ -489,7 +491,7 @@ export default function Results({
                   <div className="callout__description">
                     No specific BoardGameGeek version was selected for these game{gamesWithGuessedVersions.length !== 1 ? 's' : ''}. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.
                   </div>
-                  <ul className={`callout__list ${gamesWithGuessedVersions.length > 8 ? 'scrollable' : ''}`}>
+                  <ul className={getScrollableListClassName(gamesWithGuessedVersions.length)}>
                     {gamesWithGuessedVersions.map((game) => (
                       <li key={game.id}>
                         {game.versionsUrl ? (
@@ -525,7 +527,7 @@ export default function Results({
                   <div className="callout__description">
                     The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact.
                   </div>
-                  <ul className={`callout__list ${gamesUsingFallbackForSelectedVersion.length > 8 ? 'scrollable' : ''}`}>
+                  <ul className={getScrollableListClassName(gamesUsingFallbackForSelectedVersion.length)}>
                     {gamesUsingFallbackForSelectedVersion.map((game) => (
                       <li key={game.id}>
                         {game.versionsUrl ? (
@@ -571,7 +573,7 @@ export default function Results({
                     Default dimensions of 12.8" × 12.8" × 1.8" were assumed and marked with the warning icon{' '}
                     <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
                   </div>
-                  <ul className={`callout__list ${gamesWithMissingDimensions.length > 8 ? 'scrollable' : ''}`}>
+                  <ul className={getScrollableListClassName(gamesWithMissingDimensions.length)}>
                     {gamesWithMissingDimensions.map((game) => (
                       <li key={game.id}>
                         {game.correctionUrl ? (
@@ -611,7 +613,7 @@ export default function Results({
                     {' '}
                     If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
                   </div>
-                  <ul className={`callout__list ${oversizedWarningGames.length > 8 ? 'scrollable' : ''}`}>
+                  <ul className={getScrollableListClassName(oversizedWarningGames.length)}>
                     {oversizedWarningGames.map((game) => {
                       const link = game.correctionUrl || game.versionsUrl;
                       return (

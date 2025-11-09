@@ -14,6 +14,7 @@ import IconButton from './components/IconButton';
 import CollectionStatusToggle from './components/CollectionStatusToggle';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
+import FilterPanel from './components/FilterPanel';
 import { fetchPackedCubes } from './services/bgcubeApi';
 import {
   getExcludedGames,
@@ -514,36 +515,6 @@ function App() {
     [collectionFilters]
   );
   const hasIncludeStatuses = includeStatusList.length > 0;
-  const renderFilterPanel = (panelKey, title, content) => {
-    const isCollapsed = Boolean(filterPanelsCollapsed[panelKey]);
-    return (
-      <section
-        key={panelKey}
-        className={`filter-panel ${isCollapsed ? 'filter-panel--collapsed' : ''}`}
-      >
-        <button
-          type="button"
-          className="filter-panel__header"
-          onClick={() => toggleFilterPanel(panelKey)}
-          aria-expanded={!isCollapsed}
-          aria-controls={`filter-panel-${panelKey}`}
-        >
-          <span className="filter-panel__chevron" aria-hidden>
-            <FaChevronRight className="filter-panel__chevron-icon" />
-          </span>
-          <span className="filter-panel__title">{title}</span>
-        </button>
-        <div
-          className="filter-panel__body"
-          id={`filter-panel-${panelKey}`}
-          hidden={isCollapsed}
-        >
-          {content}
-        </div>
-      </section>
-    );
-  };
-
   const handleExcludeGame = useCallback(async (game) => {
     if (!game?.id) {
       return;
@@ -1027,9 +998,12 @@ function App() {
       )}
 
       <div className="filter-panels-grid">
-        {renderFilterPanel(
-          'preferences',
-          'Preferences',
+        <FilterPanel
+          panelKey="preferences"
+          title="Preferences"
+          collapsed={Boolean(filterPanelsCollapsed.preferences)}
+          onToggle={() => toggleFilterPanel('preferences')}
+        >
           <div className="preferences-panel">
             <div className="stacking-row">
               <span className="stacking-label">Stacking</span>
@@ -1055,11 +1029,14 @@ function App() {
 
             <SettingsToggleGroup toggles={preferenceToggles} />
           </div>
-        )}
+        </FilterPanel>
 
-        {renderFilterPanel(
-          'collections',
-          'Collections',
+        <FilterPanel
+          panelKey="collections"
+          title="Collections"
+          collapsed={Boolean(filterPanelsCollapsed.collections)}
+          onToggle={() => toggleFilterPanel('collections')}
+        >
           <div className="collection-status-content">
             {(includeStatusList.length > 1 || excludeStatusList.length > 0) && (
               <div className="collection-status-helper" role="note">
@@ -1078,17 +1055,20 @@ function App() {
               ))}
             </div>
           </div>
-        )}
+        </FilterPanel>
 
-        {renderFilterPanel(
-          'priorities',
-          'Sorting',
+        <FilterPanel
+          panelKey="priorities"
+          title="Sorting"
+          collapsed={Boolean(filterPanelsCollapsed.priorities)}
+          onToggle={() => toggleFilterPanel('priorities')}
+        >
           <SortablePriorities
             priorities={priorities}
             onChange={setPriorities}
             disabled={optimizeSpace}
           />
-        )}
+        </FilterPanel>
       </div>
     </>
   );

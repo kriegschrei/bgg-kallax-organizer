@@ -45,6 +45,25 @@
   --color-callout-manual-accent: #3b82f6;
   --color-callout-manual-text: #1e3a8a;
 
+  --color-status-neutral-bg: #f4f6fb;
+  --color-status-neutral-border: rgba(99, 102, 241, 0.12);
+  --color-status-neutral-border-strong: rgba(99, 102, 241, 0.2);
+  --color-status-neutral-icon-bg: rgba(99, 102, 241, 0.18);
+  --color-status-neutral-icon-color: #4a5fc1;
+  --color-status-neutral-text: #34495e;
+
+  --color-status-include: #1e8449;
+  --color-status-include-bg: rgba(46, 204, 113, 0.12);
+  --color-status-include-bg-hover: rgba(46, 204, 113, 0.18);
+  --color-status-include-border: rgba(46, 204, 113, 0.4);
+  --color-status-include-icon-bg: rgba(46, 204, 113, 0.25);
+
+  --color-status-exclude: #922b21;
+  --color-status-exclude-bg: rgba(231, 76, 60, 0.12);
+  --color-status-exclude-bg-hover: rgba(231, 76, 60, 0.18);
+  --color-status-exclude-border: rgba(231, 76, 60, 0.4);
+  --color-status-exclude-icon-bg: rgba(231, 76, 60, 0.25);
+
   --radius-xs: 3px;
   --radius-sm: 4px;
   --radius-md: 6px;

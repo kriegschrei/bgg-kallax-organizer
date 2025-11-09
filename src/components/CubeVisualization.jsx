@@ -410,7 +410,7 @@ export default function CubeVisualization({
   };
 
   return (
-    <div className="cube-visualization">
+    <div className="cube-visualization card">
       <h3>Cube #{cube.id}</h3>
       <div className="visualization-container">
         <div className="front-view">

@@ -951,7 +951,7 @@ function App() {
                 checked={optimizeSpace}
                 onChange={handleOptimizeSpaceChange}
                 disabled={loading}
-                tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible"
+                tooltip="Ignore all sorting preferences and pack games in as few cubes as possible"
               />
               <ToggleSwitch
                 id="includeExpansions"
@@ -987,7 +987,7 @@ function App() {
                 checked={fitOversized}
                 onChange={setFitOversized}
                 disabled={loading}
-                tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
+                tooltip="Set oversized games dimension to 13 inches to fit in cubes"
               />
               <ToggleSwitch
                 id="lockRotation"
@@ -995,15 +995,15 @@ function App() {
                 checked={lockRotation}
                 onChange={setLockRotation}
                 disabled={loading}
-                tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
+                tooltip={`Disabled: Prefer stacking preference, may rotate some games to fit.\nEnabled: Force games to follow stacking preference`}
               />
               <ToggleSwitch
                 id="respectSortOrder"
-                label="Respect ordering priority"
+                label="Respect sorting priority"
                 checked={respectSortOrder}
                 onChange={setRespectSortOrder}
                 disabled={loading || optimizeSpace}
-                tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space"
+                tooltip="Games will not be backfilled to earlier cubes for better fit to match sorting preferences. May use more space."
               />
               <ToggleSwitch
                 id="bypassVersionWarning"
@@ -1011,7 +1011,7 @@ function App() {
                 checked={bypassVersionWarning}
                 onChange={setBypassVersionWarning}
                 disabled={loading}
-                tooltip="You will not be warned about missing versions. This may result in incorrect data and longer processing times."
+                tooltip="You will not be warned about missing versions or dimensions. This may result in incorrect data and longer processing times."
                 tooltipIcon={FaExclamationTriangle}
                 tooltipIconClassName="warning-icon"
               />
@@ -1538,6 +1538,7 @@ function App() {
           verticalStacking={verticalStacking}
           oversizedGames={oversizedGames}
           fitOversized={fitOversized}
+          priorities={priorities}
           excludedGames={excludedGamesList}
           onExcludeGame={handleExcludeGame}
           onRestoreExcludedGame={handleReincludeGame}

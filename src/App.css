@@ -307,9 +307,48 @@ header {
   margin-bottom: 1.25rem;
 }
 
-.options-field {
+.username-field {
   flex: 1 1 240px;
   min-width: 220px;
+}
+
+.username-field--inline {
+  flex: 1 1 200px;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.username-field--inline label {
+  font-size: 0.85rem;
+}
+
+.username-field label {
+  display: block;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.username-field input {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #bdc3c7;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.username-field input:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.username-field input:disabled {
+  background: #ecf0f1;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .options-actions {

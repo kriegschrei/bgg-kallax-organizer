@@ -1,4 +1,5 @@
 import React from 'react';
+import DimensionInput from './DimensionInput';
 
 function DimensionForm({
   className,
@@ -25,42 +26,24 @@ function DimensionForm({
     onChange?.(field, event.target.value);
   };
 
+  const dimensionFields = [
+    { key: 'length', label: 'Length (in)' },
+    { key: 'width', label: 'Width (in)' },
+    { key: 'depth', label: 'Depth (in)' },
+  ];
+
   return (
     <form className={className} onSubmit={handleSubmit}>
       <div className={gridClassName}>
-        <label>
-          Length (in)
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={values.length}
-            onChange={handleFieldChange('length')}
-            required
+        {dimensionFields.map(({ key, label }) => (
+          <DimensionInput
+            key={key}
+            label={label}
+            value={values?.[key] ?? ''}
+            onChange={handleFieldChange(key)}
+            disabled={disabled}
           />
-        </label>
-        <label>
-          Width (in)
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={values.width}
-            onChange={handleFieldChange('width')}
-            required
-          />
-        </label>
-        <label>
-          Depth (in)
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            value={values.depth}
-            onChange={handleFieldChange('depth')}
-            required
-          />
-        </label>
+        ))}
       </div>
       {error ? <p className={errorClassName}>{error}</p> : null}
       <div className={actionsClassName}>

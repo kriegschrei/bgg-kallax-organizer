@@ -1,4 +1,5 @@
 import React from 'react';
+import { FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import {
   DndContext,
   closestCenter,
@@ -73,15 +74,17 @@ function SortableItem({ id, priority, onToggle, onToggleOrder, disabled = false 
         title={priority.order === 'asc' ? 'Ascending (Low to High)' : 'Descending (High to Low)'}
         disabled={disabled}
       >
-        {priority.order === 'asc' ? '↑' : '↓'}
+        {priority.order === 'asc' ? (
+          <FaArrowUp aria-hidden="true" />
+        ) : (
+          <FaArrowDown aria-hidden="true" />
+        )}
       </button>
     </div>
   );
 }
 
 export default function SortablePriorities({ priorities, onChange, disabled = false }) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
-  
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -130,58 +133,36 @@ export default function SortablePriorities({ priorities, onChange, disabled = fa
 
   return (
     <div className={`sortable-priorities ${disabled ? 'disabled' : ''}`}>
-      {isExpanded ? (
-        <div className="sortable-priorities-header-expanded" onClick={() => setIsExpanded(false)}>
-          <div className="sortable-priorities-header">
-            <h3>Sorting Priorities</h3>
-            <span className="expand-toggle">{isExpanded ? '▼' : '▶'}</span>
-          </div>
-          <p className="hint">
-            Games are packed to minimize cubes. When multiple games fit, the highest priority enabled field is used for selection.
-            Use ↑ for ascending (low to high) or ↓ for descending (high to low).
-            {disabled && <strong> Disabled when "Optimize for space" is enabled.</strong>}
-          </p>
-        </div>
-      ) : (
-        <div className="sortable-priorities-collapsed" onClick={() => setIsExpanded(true)}>
-          <div className="sortable-priorities-header">
-            <h3>Sorting Priorities</h3>
-            <span className="expand-toggle">▶</span>
-          </div>
-          <div className="sortable-priorities-summary">
-            <span className="summary-text">
-              {enabledCount} of {priorities.length} enabled
-              {disabled && <span className="disabled-badge"> (Disabled by Optimize for Space)</span>}
-            </span>
-            <span className="summary-hint">Click to expand and configure</span>
-          </div>
-        </div>
-      )}
-      {isExpanded && (
-        <>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={priorities.map(p => p.field)}
-              strategy={verticalListSortingStrategy}
-            >
-              {priorities.map((priority) => (
-                <SortableItem
-                  key={priority.field}
-                  id={priority.field}
-                  priority={priority}
-                  onToggle={handleToggle}
-                  onToggleOrder={handleToggleOrder}
-                  disabled={disabled}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-        </>
-      )}
+      <div className="sortable-priorities-summary">
+        <span className="summary-text">
+          {enabledCount} of {priorities.length} enabled
+          {disabled && <span className="disabled-badge"> (Disabled by Optimize for Space)</span>}
+        </span>
+        <span className="summary-hint">
+          Toggle priorities on/off, drag to reorder, and use the arrows to switch sort direction.
+        </span>
+      </div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={priorities.map(p => p.field)}
+          strategy={verticalListSortingStrategy}
+        >
+          {priorities.map((priority) => (
+            <SortableItem
+              key={priority.field}
+              id={priority.field}
+              priority={priority}
+              onToggle={handleToggle}
+              onToggleOrder={handleToggleOrder}
+              disabled={disabled}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
     </div>
   );
 }

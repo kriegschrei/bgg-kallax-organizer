@@ -1,4 +1,4 @@
-# Backend Server for BGG Kallax Organizer
+# Backend Server for BGCube
 
 This Express server acts as a proxy for the BoardGameGeek XML API2, keeping your API token secure.
 

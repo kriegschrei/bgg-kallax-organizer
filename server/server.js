@@ -150,6 +150,41 @@ function parseBoolean(value, defaultValue = false) {
   return defaultValue;
 }
 
+const COLLECTION_STATUS_KEYS = [
+  'own',
+  'preordered',
+  'wanttoplay',
+  'prevowned',
+  'fortrade',
+  'want',
+  'wanttobuy',
+  'wishlist',
+];
+const COLLECTION_STATUS_SET = new Set(COLLECTION_STATUS_KEYS);
+
+function isStatusActive(value) {
+  if (value === undefined || value === null) {
+    return false;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value !== 0;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'y') {
+      return true;
+    }
+    if (normalized === '' || normalized === '0' || normalized === 'false' || normalized === 'no' || normalized === 'n') {
+      return false;
+    }
+    const numeric = Number.parseFloat(normalized);
+    if (Number.isFinite(numeric)) {
+      return numeric !== 0;
+    }
+  }
+  return Boolean(value);
+}
+
 // SSE endpoint for progress updates
 app.get('/api/games/:username/progress', (req, res) => {
   const username = normalizeUsername(req.params.username);
@@ -1788,10 +1823,59 @@ app.post('/api/games/:username', async (req, res) => {
     `${username}-${Date.now()}`;
   
   try {
-    const includePreorderedFlag = parseBoolean(
-      bodyOptions.includePreordered ?? queryOptions.includePreordered,
-      false
+    const parseStatusList = (value) => {
+      if (Array.isArray(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return [];
+        }
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch (error) {
+          // Not JSON, fall back to comma-separated list
+        }
+        return trimmed
+          .split(',')
+          .map((part) => part.trim())
+          .filter(Boolean);
+      }
+      return [];
+    };
+
+    const rawIncludeStatuses = parseStatusList(
+      bodyOptions.includeStatuses ?? queryOptions.includeStatuses
     );
+    const rawExcludeStatuses = parseStatusList(
+      bodyOptions.excludeStatuses ?? queryOptions.excludeStatuses
+    );
+
+    const includeStatuses = Array.from(
+      new Set(
+        rawIncludeStatuses
+          .map((status) => (typeof status === 'string' ? status.toLowerCase() : ''))
+          .filter((status) => COLLECTION_STATUS_SET.has(status))
+      )
+    );
+    const excludeStatuses = Array.from(
+      new Set(
+        rawExcludeStatuses
+          .map((status) => (typeof status === 'string' ? status.toLowerCase() : ''))
+          .filter((status) => COLLECTION_STATUS_SET.has(status))
+      )
+    );
+
+    let fallbackToOwn = false;
+    if (includeStatuses.length === 0) {
+      includeStatuses.push('own');
+      fallbackToOwn = true;
+    }
+
     const includeExpansionsFlag = parseBoolean(
       bodyOptions.includeExpansions ?? queryOptions.includeExpansions,
       false
@@ -1864,7 +1948,8 @@ app.post('/api/games/:username', async (req, res) => {
 
     console.log('🎮 Processing games for user:', username);
     console.log('   Options:', {
-      includePreordered: includePreorderedFlag,
+      includeStatuses,
+      excludeStatuses,
       includeExpansions: includeExpansionsFlag,
       lockRotation: lockRotationFlag,
       optimizeSpace: optimizeSpaceFlag,
@@ -1872,23 +1957,26 @@ app.post('/api/games/:username', async (req, res) => {
       groupExpansions: groupExpansionsFlag,
       groupSeries: groupSeriesFlag,
     });
+    if (fallbackToOwn) {
+      console.log('   ⚠️  No include statuses provided. Defaulting to ["own"].');
+    }
     
     sendProgress(requestId, 'Starting to process your collection...', { step: 'init' });
 
     // Step 1: Fetch collection with version info (check cache first)
     const collectionParams = new URLSearchParams({
       username,
-      own: 1,
       stats: 1,
       version: 1, // Include version info for each item
     });
-    
-    if (includePreorderedFlag) {
-      collectionParams.append('preordered', 1);
-    }
+
+    includeStatuses.forEach((statusKey) => {
+      collectionParams.append(statusKey, 1);
+    });
 
     const collectionUrl = `${BGG_API_BASE}/collection?${collectionParams.toString()}`;
-    const collectionKey = `user:${username}:${includePreorderedFlag}:${includeExpansionsFlag}`;
+    const includeKeySegment = includeStatuses.slice().sort().join('|') || 'none';
+    const collectionKey = `user:${username}:includes:${includeKeySegment}:expansions:${includeExpansionsFlag}`;
     
     let collection;
     let collectionResponse;
@@ -1955,7 +2043,11 @@ app.post('/api/games/:username', async (req, res) => {
     
     if (!collection.items || !collection.items.item) {
       console.warn('⚠️  No items in collection');
-      return res.json({ cubes: [], totalGames: 0 });
+      return res.json({
+        cubes: [],
+        totalGames: 0,
+        message: 'No games were found in the BoardGameGeek collection for this username.',
+      });
     }
 
     let items = Array.isArray(collection.items.item) 
@@ -1964,6 +2056,41 @@ app.post('/api/games/:username', async (req, res) => {
 
     console.log(`   Found ${items.length} items in collection`);
     sendProgress(requestId, `Found ${items.length} games in your collection`, { step: 'collection', count: items.length });
+
+    const beforeStatusFilter = items.length;
+    items = items.filter((item) => {
+      const statusAttributes = item.status?.[0]?.$ || {};
+
+      const matchesExclude = excludeStatuses.some((statusKey) =>
+        isStatusActive(statusAttributes[statusKey])
+      );
+      if (matchesExclude) {
+        return false;
+      }
+
+      const matchesInclude = includeStatuses.some((statusKey) =>
+        isStatusActive(statusAttributes[statusKey])
+      );
+      return matchesInclude;
+    });
+
+    const statusFilteredOut = beforeStatusFilter - items.length;
+    if (statusFilteredOut > 0) {
+      console.log(`   → Filtered out ${statusFilteredOut} item(s) due to collection status preferences`);
+    }
+
+    if (items.length === 0) {
+      sendProgress(requestId, 'No games matched the selected collection filters.', {
+        step: 'collection',
+        count: 0,
+        filteredOut: statusFilteredOut,
+      });
+      return res.json({
+        cubes: [],
+        totalGames: 0,
+        message: 'No games matched the selected collection filters.',
+      });
+    }
 
     const missingVersionGames = new Map();
 
@@ -2042,7 +2169,11 @@ app.post('/api/games/:username', async (req, res) => {
     console.log(`   ${items.length} items after deduplication (includes multiple versions)`);
 
     if (items.length === 0) {
-      return res.json({ cubes: [], totalGames: 0 });
+      return res.json({
+        cubes: [],
+        totalGames: 0,
+        message: 'No games matched the selected filters.',
+      });
     }
 
     // Extract version info from collection

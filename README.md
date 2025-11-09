@@ -1,4 +1,4 @@
-# BGG Kallax Organizer
+# BGCube
 
 A web application to help organize your BoardGameGeek collection into IKEA Kallax cube organizers.
 

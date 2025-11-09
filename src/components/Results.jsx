@@ -34,6 +34,7 @@ export default function Results({
   onRemoveDimensionOverride,
   overridesReady = true,
   isLoading = false,
+  priorities = [],
 }) {
   const stats = calculateStats(cubes, verticalStacking);
   const [excludedExpanded, setExcludedExpanded] = useState(false);
@@ -721,6 +722,7 @@ export default function Results({
             key={cube.id}
             cube={cube}
             verticalStacking={verticalStacking}
+            priorities={priorities}
             excludedLookup={excludedLookup}
             orientationLookup={orientationLookup}
             dimensionLookup={dimensionLookup}

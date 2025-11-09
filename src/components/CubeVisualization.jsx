@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FaTrashAlt,
   FaArrowsAltV,
@@ -8,6 +8,9 @@ import {
   FaTimes,
   FaExclamationTriangle,
   FaBoxOpen,
+  FaChevronDown,
+  FaChevronRight,
+  FaUser,
 } from 'react-icons/fa';
 import './CubeVisualization.css';
 
@@ -20,9 +23,164 @@ function getGameColor(index, total) {
   return `hsl(${(index * 360) / total}, 70%, 80%)`;
 }
 
+const PRIORITY_BADGE_BUILDERS = {
+  categories: (game) =>
+    Array.isArray(game.categories)
+      ? game.categories
+          .filter((category) => typeof category === 'string' && category.trim().length > 0)
+          .map((category, index) => ({
+            key: `category-${index}-${category}`,
+            label: category.trim(),
+            field: 'categories',
+          }))
+      : [],
+  families: (game) =>
+    Array.isArray(game.families)
+      ? game.families
+          .filter((family) => typeof family === 'string' && family.trim().length > 0)
+          .map((family, index) => ({
+            key: `family-${index}-${family}`,
+            label: family.trim(),
+            field: 'families',
+          }))
+      : [],
+  bggRank: (game) => {
+    const rank = Number.isFinite(game.bggRank) ? game.bggRank : null;
+    if (rank === null) {
+      return [];
+    }
+    return [
+      {
+        key: `bgg-rank-${game.id}`,
+        label: `Rank #${rank}`,
+        field: 'bggRank',
+      },
+    ];
+  },
+  minPlayers: (game) => {
+    const value = Number.isFinite(game.minPlayers) ? game.minPlayers : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `min-players-${game.id}`,
+        label: `Min Players: ${value}`,
+        field: 'minPlayers',
+      },
+    ];
+  },
+  maxPlayers: (game) => {
+    const value = Number.isFinite(game.maxPlayers) ? game.maxPlayers : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `max-players-${game.id}`,
+        label: `Max Players: ${value}`,
+        field: 'maxPlayers',
+      },
+    ];
+  },
+  bestPlayerCount: (game) => {
+    const value =
+      typeof game.bestPlayerCount === 'string' ? game.bestPlayerCount.trim() : game.bestPlayerCount;
+    if (!value && value !== 0) {
+      return [];
+    }
+    return [
+      {
+        key: `best-player-${game.id}`,
+        label: `Best Player Count: ${value}`,
+        field: 'bestPlayerCount',
+      },
+    ];
+  },
+  minPlaytime: (game) => {
+    const value = Number.isFinite(game.minPlaytime) ? game.minPlaytime : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `min-playtime-${game.id}`,
+        label: `Min Playtime: ${value}m`,
+        field: 'minPlaytime',
+      },
+    ];
+  },
+  maxPlaytime: (game) => {
+    const value = Number.isFinite(game.maxPlaytime) ? game.maxPlaytime : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `max-playtime-${game.id}`,
+        label: `Max Playtime: ${value}m`,
+        field: 'maxPlaytime',
+      },
+    ];
+  },
+  age: (game) => {
+    const value = Number.isFinite(game.age) ? game.age : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `age-${game.id}`,
+        label: `Age: ${value}+`,
+        field: 'age',
+      },
+    ];
+  },
+  communityAge: (game) => {
+    const value = Number.isFinite(game.communityAge) ? game.communityAge : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `community-age-${game.id}`,
+        label: `Community Age: ${value}+`,
+        field: 'communityAge',
+      },
+    ];
+  },
+  weight: (game) => {
+    const value = Number.isFinite(game.weight) ? game.weight : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `weight-${game.id}`,
+        label: `Weight: ${value.toFixed(2)}`,
+        field: 'weight',
+      },
+    ];
+  },
+  bggRating: (game) => {
+    const value =
+      Number.isFinite(game.bggRating) && game.bggRating > 0 ? Number(game.bggRating) : null;
+    if (value === null) {
+      return [];
+    }
+    return [
+      {
+        key: `bgg-rating-${game.id}`,
+        label: `BGG Rating: ${value.toFixed(2)}`,
+        field: 'bggRating',
+      },
+    ];
+  },
+};
+
 export default function CubeVisualization({
   cube,
-  verticalStacking,
+  priorities = [],
   excludedLookup = {},
   orientationLookup = {},
   dimensionLookup = {},
@@ -44,27 +202,78 @@ export default function CubeVisualization({
     error: '',
   });
   const interactionsDisabled = !overridesReady || isLoading;
+  const [badgeVisibility, setBadgeVisibility] = useState({});
 
-  const formatDimensions = (dims) => {
-    if (!dims) {
-      return '—';
+  const gameIdsKey = useMemo(
+    () => (Array.isArray(cube.games) ? cube.games.map((game) => game.id).join('|') : ''),
+    [cube.games]
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(cube.games)) {
+      return;
     }
+    setBadgeVisibility((prev) => {
+      const next = {};
+      cube.games.forEach((game) => {
+        if (game?.id == null) {
+          return;
+        }
+        next[game.id] = prev[game.id] ?? false;
+      });
+      return next;
+    });
+  }, [gameIdsKey, cube.games]);
 
-    const normalize = (value) =>
-      typeof value === 'number' && Number.isFinite(value) && value > 0
-        ? value
-        : null;
+  const activePriorityFields = useMemo(
+    () =>
+      priorities
+        .filter(
+          (priority) =>
+            priority?.enabled &&
+            typeof priority.field === 'string' &&
+            priority.field !== 'name' &&
+            PRIORITY_BADGE_BUILDERS[priority.field]
+        )
+        .map((priority) => priority.field),
+    [priorities]
+  );
 
-    const length = normalize(dims.length ?? dims.height ?? dims.x ?? null);
-    const width = normalize(dims.width ?? dims.y ?? null);
-    const depth = normalize(dims.depth ?? dims.z ?? null);
+  const buildBadgesForGame = useCallback(
+    (game) => {
+      if (activePriorityFields.length === 0) {
+        return [];
+      }
+      const badges = [];
+      activePriorityFields.forEach((field) => {
+        const builder = PRIORITY_BADGE_BUILDERS[field];
+        if (!builder) {
+          return;
+        }
+        const fieldBadges = builder(game);
+        if (!Array.isArray(fieldBadges) || fieldBadges.length === 0) {
+          return;
+        }
+        fieldBadges.forEach((badge, index) => {
+          const fallbackKey = `${field}-${game.id}-${index}`;
+          badges.push({
+            field,
+            label: badge.label,
+            key: badge.key ?? fallbackKey,
+          });
+        });
+      });
+      return badges;
+    },
+    [activePriorityFields]
+  );
 
-    const segments = [length, width, depth].map((value) =>
-      value !== null ? `${value.toFixed(2)}"` : '—'
-    );
-
-    return segments.join(' × ');
-  };
+  const toggleBadgeVisibility = useCallback((gameId) => {
+    setBadgeVisibility((prev) => ({
+      ...prev,
+      [gameId]: !prev[gameId],
+    }));
+  }, []);
 
   const closeDimensionEditor = () => {
     setDimensionEditor({
@@ -278,7 +487,6 @@ export default function CubeVisualization({
               const forcedOrientation = orientationLookup[game.id] || null;
               const userDims = dimensionLookup[game.id] || null;
               const editingThisGame = dimensionEditor.gameId === game.id;
-              const bggDims = game.bggDimensions || game.dimensions;
               const dimensionWarning = game.dimensions?.missingDimensions;
               const oversizedWarning = game.oversizedX || game.oversizedY;
               const orientationIcon =
@@ -292,113 +500,121 @@ export default function CubeVisualization({
               const orientationTitle = forcedOrientation
                 ? `Forced ${forcedOrientation} orientation. Click to change or clear.`
                 : 'Cycle orientation override (vertical → horizontal → none)';
+              const badges = buildBadgesForGame(game);
+              const hasBadges = badges.length > 0;
+              const isBadgesExpanded = badgeVisibility[game.id] ?? false;
 
               return (
                 <li
                   key={game.id}
-                  className={`game-list-item${isExcluded ? ' is-excluded' : ''}${userDims ? ' has-dimension-override' : ''}`}
+                  className={`game-list-item${isExcluded ? ' is-excluded' : ''}${userDims ? ' has-dimension-override' : ''}${
+                    isBadgesExpanded ? ' badges-expanded' : ''
+                  }`}
                   style={{
                     backgroundColor,
                     borderLeft: `4px solid ${borderColor}`,
                   }}
                 >
-                  <div className="game-header-row">
-                    <strong>{game.name}</strong>
-                    <div className="game-actions">
-                      <button
-                        type="button"
-                        className={`game-action orientation${forcedOrientation ? ' active' : ''}`}
-                        onClick={() => handleOrientationCycle(game, forcedOrientation)}
-                        disabled={interactionsDisabled}
-                        title={orientationTitle}
-                      >
-                        {orientationIcon}
-                        <span className="sr-only">Cycle orientation override</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`game-action dimension${editingThisGame ? ' active' : ''}`}
-                        onClick={() =>
-                          editingThisGame ? closeDimensionEditor() : openDimensionEditor(game)
-                        }
-                        disabled={interactionsDisabled}
-                        title="Edit custom dimensions"
-                      >
-                        <FaRulerCombined aria-hidden="true" className="button-icon" />
-                        <span className="sr-only">
-                          {editingThisGame ? 'Close custom dimension editor' : 'Edit custom dimensions'}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        className="game-action delete"
-                        onClick={() => handleExcludeClick(game, isExcluded)}
-                        disabled={interactionsDisabled || isExcluded}
-                        title={
-                          isExcluded
-                            ? 'Already excluded from future runs'
-                            : 'Exclude this game from future sorts'
-                        }
-                      >
-                        <FaTrashAlt aria-hidden="true" className="button-icon" />
-                        <span className="sr-only">Exclude game from future sorts</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div className="game-details">
-                    <span className="dimension-info">
-                      {orientedDims.x.toFixed(1)}" × {orientedDims.y.toFixed(1)}" × {orientedDims.z.toFixed(1)}"
-                      {dimensionWarning && (
-                        <FaExclamationTriangle
-                          className="inline-icon icon-end warning-icon"
-                          title="Dimensions not available in BGG"
-                          aria-hidden="true"
-                        />
-                      )}
-                      {oversizedWarning && (
-                        <FaBoxOpen
-                          className="inline-icon icon-end oversized-icon"
-                          title={`This game may be too large for the cube (${game.oversizedX ? 'width' : ''}${
-                            game.oversizedX && game.oversizedY ? ' and ' : ''
-                          }${game.oversizedY ? 'height' : ''} > 13")`}
-                          aria-hidden="true"
-                        />
-                      )}
+                  <div className="game-title-row">
+                    <span className="game-title">
+                      <span className="game-index">{index + 1}.</span>
+                      <span className="game-name">{game.name}</span>
                     </span>
-                    {game.categories && game.categories.length > 0 && (
-                      <span className="category">{game.categories[0]}</span>
-                    )}
-                    {game.bggRank && <span className="rank">Rank: #{game.bggRank}</span>}
                   </div>
-                  <div className="game-tags">
-                    {isExcluded && <span className="override-pill">Excluded</span>}
-                    {forcedOrientation && (
-                      <span className="override-pill">Forced {forcedOrientation}</span>
-                    )}
-                    {userDims && <span className="override-pill">Custom dims</span>}
+                  <div className="game-actions-row">
+                    <button
+                      type="button"
+                      className={`game-action orientation${forcedOrientation ? ' active' : ''}`}
+                      onClick={() => handleOrientationCycle(game, forcedOrientation)}
+                      disabled={interactionsDisabled}
+                      title={orientationTitle}
+                    >
+                      {orientationIcon}
+                      <span className="sr-only">Cycle orientation override</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`game-action dimension${editingThisGame ? ' active' : ''}`}
+                      onClick={() =>
+                        editingThisGame ? closeDimensionEditor() : openDimensionEditor(game)
+                      }
+                      disabled={interactionsDisabled}
+                      title="Edit custom dimensions"
+                    >
+                      <FaRulerCombined aria-hidden="true" className="button-icon" />
+                      <span className="sr-only">
+                        {editingThisGame ? 'Close custom dimension editor' : 'Edit custom dimensions'}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="game-action delete"
+                      onClick={() => handleExcludeClick(game, isExcluded)}
+                      disabled={interactionsDisabled || isExcluded}
+                      title={
+                        isExcluded
+                          ? 'Already excluded from future runs'
+                          : 'Exclude this game from future sorts'
+                      }
+                    >
+                      <FaTrashAlt aria-hidden="true" className="button-icon" />
+                      <span className="sr-only">Exclude game from future sorts</span>
+                    </button>
                   </div>
-                  <div className="game-dimensions">
-                    <div className="dimension-row">
-                      <span className="dimension-label">BGG:</span>
-                      <span>{formatDimensions(bggDims)}</span>
-                    </div>
+                  <div className="game-dimension-row">
+                    <span
+                      className={`game-dimension-chip${userDims ? ' has-user-dimensions' : ''}`}
+                    >
+                      {userDims && (
+                        <FaUser
+                          aria-hidden="true"
+                          className="dimension-override-icon"
+                          title="Custom dimensions applied"
+                        />
+                      )}
+                      <span className="game-dimension-text">
+                        {orientedDims.x.toFixed(1)}" × {orientedDims.y.toFixed(1)}" ×{' '}
+                        {orientedDims.z.toFixed(1)}"
+                      </span>
+                    </span>
+                    {dimensionWarning && (
+                      <FaExclamationTriangle
+                        className="dimension-icon warning-icon"
+                        title="Dimensions not available in BGG"
+                        aria-hidden="true"
+                      />
+                    )}
+                    {oversizedWarning && (
+                      <FaBoxOpen
+                        className="dimension-icon oversized-icon"
+                        title={`This game may be too large for the cube (${game.oversizedX ? 'width' : ''}${
+                          game.oversizedX && game.oversizedY ? ' and ' : ''
+                        }${game.oversizedY ? 'height' : ''} > 13")`}
+                        aria-hidden="true"
+                      />
+                    )}
                     {userDims && (
-                      <div className="dimension-row">
-                        <span className="dimension-label">Yours:</span>
-                        <span>{formatDimensions(userDims)}</span>
-                        <button
-                          type="button"
-                          className="dimension-clear"
-                          onClick={() => handleClearDimensionOverride(game)}
-                          disabled={interactionsDisabled}
-                          title="Remove custom dimensions"
-                        >
-                          <FaTimes aria-hidden="true" className="button-icon" />
-                          <span className="sr-only">Remove custom dimensions</span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="dimension-clear"
+                        onClick={() => handleClearDimensionOverride(game)}
+                        disabled={interactionsDisabled}
+                        title="Remove custom dimensions"
+                      >
+                        <FaTimes aria-hidden="true" className="button-icon" />
+                        <span className="sr-only">Remove custom dimensions</span>
+                      </button>
                     )}
                   </div>
+                  {(isExcluded || forcedOrientation || userDims) && (
+                    <div className="game-status-flags">
+                      {isExcluded && <span className="override-pill">Excluded</span>}
+                      {forcedOrientation && (
+                        <span className="override-pill">Forced {forcedOrientation}</span>
+                      )}
+                      {userDims && <span className="override-pill">Custom dims</span>}
+                    </div>
+                  )}
                   {editingThisGame && (
                     <form
                       className="dimension-edit-form"
@@ -464,6 +680,30 @@ export default function CubeVisualization({
                         </button>
                       </div>
                     </form>
+                  )}
+                  {hasBadges && (
+                    <div className="game-badges-section">
+                      <button
+                        type="button"
+                        className="badge-toggle"
+                        onClick={() => toggleBadgeVisibility(game.id)}
+                        aria-expanded={isBadgesExpanded}
+                      >
+                        {isBadgesExpanded ? (
+                          <FaChevronDown aria-hidden="true" className="badge-toggle-icon" />
+                        ) : (
+                          <FaChevronRight aria-hidden="true" className="badge-toggle-icon" />
+                        )}
+                        <span className="badge-toggle-label">Details</span>
+                      </button>
+                      <div className="game-badge-list">
+                        {badges.map((badge) => (
+                          <span key={badge.key} className={`game-badge game-badge-${badge.field}`}>
+                            {badge.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </li>
               );

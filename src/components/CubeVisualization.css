@@ -152,7 +152,25 @@
 
 .game-name {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.game-base-name {
+  flex: 1 1 auto;
+  min-width: 0;
   word-break: break-word;
+}
+
+.game-version {
+  flex: 0 0 auto;
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 .game-dimension-row {

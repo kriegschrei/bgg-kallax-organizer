@@ -23,6 +23,30 @@ function getGameColor(index, total) {
   return `hsl(${(index * 360) / total}, 70%, 80%)`;
 }
 
+function splitNameAndVersion(fullName) {
+  if (typeof fullName !== 'string') {
+    return { name: '', version: null };
+  }
+
+  const trimmed = fullName.trim();
+  if (!trimmed) {
+    return { name: '', version: null };
+  }
+
+  const trailingVersionMatch = trimmed.match(/^(.*)\s+\(([^()]+)\)\s*$/);
+
+  if (trailingVersionMatch) {
+    const baseName = trailingVersionMatch[1]?.trim() ?? '';
+    const version = trailingVersionMatch[2]?.trim() ?? null;
+
+    if (baseName) {
+      return { name: baseName, version: version || null };
+    }
+  }
+
+  return { name: trimmed, version: null };
+}
+
 const PRIORITY_BADGE_BUILDERS = {
   categories: (game) =>
     Array.isArray(game.categories)
@@ -489,6 +513,30 @@ export default function CubeVisualization({
               const editingThisGame = dimensionEditor.gameId === game.id;
               const dimensionWarning = game.dimensions?.missingDimensions;
               const oversizedWarning = game.oversizedX || game.oversizedY;
+              const rawName = typeof game.name === 'string' ? game.name.trim() : '';
+              const { name: parsedName, version: detectedVersion } = splitNameAndVersion(rawName);
+              const rawVersionId =
+                typeof game.selectedVersionId === 'string'
+                  ? game.selectedVersionId.trim()
+                  : game.selectedVersionId;
+              const normalizedVersionId =
+                typeof rawVersionId === 'string' ? rawVersionId.toLowerCase() : rawVersionId;
+              const hasExplicitVersion =
+                normalizedVersionId !== null &&
+                normalizedVersionId !== undefined &&
+                normalizedVersionId !== '' &&
+                normalizedVersionId !== 'default' &&
+                normalizedVersionId !== 'no-version';
+              const versionNameProp =
+                typeof game.versionName === 'string' ? game.versionName.trim() : '';
+              const displayName = (parsedName || rawName || '').trim();
+              const candidateVersionName = (versionNameProp || detectedVersion || '').trim();
+              const versionLabel = candidateVersionName
+                ? candidateVersionName
+                : hasExplicitVersion
+                ? 'Default Version'
+                : 'No Version Selected';
+              const showVersionLine = Boolean(displayName) && Boolean(versionLabel);
               const orientationIcon =
                 forcedOrientation === 'horizontal' ? (
                   <FaArrowsAltH aria-hidden="true" className="button-icon" />
@@ -518,7 +566,12 @@ export default function CubeVisualization({
                   <div className="game-title-row">
                     <span className="game-title">
                       <span className="game-index">{index + 1}.</span>
-                      <span className="game-name">{game.name}</span>
+                      <span className="game-name">
+                        <span className="game-base-name">{displayName}</span>
+                        {showVersionLine && (
+                          <span className="game-version">{versionLabel}</span>
+                        )}
+                      </span>
                     </span>
                   </div>
                   <div className="game-actions-row">

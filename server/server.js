@@ -109,6 +109,20 @@ function extractVersionId(game, fallbackVersionId = null) {
   return null;
 }
 
+function extractVersionLabelFromName(name) {
+  if (!name || typeof name !== 'string') {
+    return null;
+  }
+
+  const match = name.trim().match(/\(([^()]+)\)\s*$/);
+  if (!match) {
+    return null;
+  }
+
+  const label = match[1]?.trim();
+  return label && label.length > 0 ? label : null;
+}
+
 function extractBaseGameId(game) {
   if (!game) return null;
   if (game.baseGameId && /^\d+$/.test(game.baseGameId)) {
@@ -2353,6 +2367,10 @@ app.post('/api/games/:username', async (req, res) => {
             const versionInfo = versionMap.get(key);
             const game = processGameItem(item, versionInfo, versionId);
 
+            if (!game.versionName && versionInfo?.name) {
+              game.versionName = versionInfo.name;
+            }
+
             const missingVersionInfo = missingVersionGames.get(gameId);
             game.missingVersion = !!missingVersionInfo;
             if (missingVersionInfo) {
@@ -2414,10 +2432,18 @@ app.post('/api/games/:username', async (req, res) => {
           
           // Check version cache first, then versionMap from collection
           let dimensions = null;
+          let versionName = null;
           const cachedVersion = getVersion(gameId, versionId);
-          if (cachedVersion && cachedVersion.dimensions && !cachedVersion.dimensions.missingDimensions) {
-            dimensions = cachedVersion.dimensions;
-          } else {
+          if (cachedVersion) {
+            if (cachedVersion.dimensions && !cachedVersion.dimensions.missingDimensions) {
+              dimensions = cachedVersion.dimensions;
+            }
+            if (cachedVersion.name) {
+              versionName = cachedVersion.name;
+            }
+          }
+
+          if (!dimensions) {
             // Fall back to versionMap from collection
             const versionInfo = versionMap.get(key);
             if (versionInfo) {
@@ -2427,10 +2453,15 @@ app.post('/api/games/:username', async (req, res) => {
                 depth: parseFloat(versionInfo.depth),
                 missingDimensions: false
               };
+              if (!versionName && versionInfo.name) {
+                versionName = versionInfo.name;
+              }
             }
           }
           
           // Reconstruct game from cached data - explicitly exclude _group and _groupId
+          const fallbackVersionLabel =
+            versionName || gameData.versionName || extractVersionLabelFromName(gameData.name) || null;
           const game = {
             id: gameData.id,
             name: gameData.name,
@@ -2449,6 +2480,7 @@ app.post('/api/games/:username', async (req, res) => {
             baseGameId: gameData.baseGameId || null,
             isExpansion: gameData.isExpansion || false,
             familyIds: gameData.familyIds || [],
+            versionName: fallbackVersionLabel,
             dimensions: dimensions || {
               length: 0,
               width: 0,
@@ -2456,6 +2488,9 @@ app.post('/api/games/:username', async (req, res) => {
               missingDimensions: true
             }
           };
+          if (!gameData.versionName && fallbackVersionLabel) {
+            gameData.versionName = fallbackVersionLabel;
+          }
           
           const missingVersionInfo = missingVersionGames.get(gameId);
           game.missingVersion = !!missingVersionInfo;
@@ -2612,9 +2647,14 @@ app.post('/api/games/:username', async (req, res) => {
                         console.log(`      ✓ Found dimensions for ${game.name}: ${dimensions.width}"×${dimensions.length}"×${dimensions.depth}"`);
                         
                         // Cache the dimensions with the user's actual versionId
+                        const fallbackVersionLabel =
+                          game.versionName || extractVersionLabelFromName(game.name) || null;
+                        if (!game.versionName && fallbackVersionLabel) {
+                          game.versionName = fallbackVersionLabel;
+                        }
                         const versionDataToCache = {
                           versionId: versionId,
-                          name: null,
+                          name: fallbackVersionLabel,
                           yearPublished: null,
                           dimensions: dimensions,
                           usedAlternateVersionDims: !game.missingVersion
@@ -2640,9 +2680,14 @@ app.post('/api/games/:username', async (req, res) => {
                           missingDimensions: true
                         };
                         
+                        const fallbackVersionLabel =
+                          game.versionName || extractVersionLabelFromName(game.name) || null;
+                        if (!game.versionName && fallbackVersionLabel) {
+                          game.versionName = fallbackVersionLabel;
+                        }
                         const versionDataToCache = {
                           versionId: versionId,
-                          name: null,
+                          name: fallbackVersionLabel,
                           yearPublished: null,
                           dimensions: defaultDimensions,
                           usedAlternateVersionDims: false
@@ -2694,9 +2739,14 @@ app.post('/api/games/:username', async (req, res) => {
           const parts = game.id.split('-');
           if (parts.length >= 2) {
             const versionId = parts[parts.length - 1];
+            const fallbackVersionLabel =
+              game.versionName || extractVersionLabelFromName(game.name) || null;
+            if (!game.versionName && fallbackVersionLabel) {
+              game.versionName = fallbackVersionLabel;
+            }
             const versionDataToCache = {
               versionId: versionId,
-              name: null,
+              name: fallbackVersionLabel,
               yearPublished: null,
               dimensions: defaultDimensions,
               usedAlternateVersionDims: false
@@ -3064,6 +3114,8 @@ app.post('/api/games/:username', async (req, res) => {
               
               // Create a completely new object with only the properties we want
               // Use safe property access and create new objects for nested properties
+              const versionLabel =
+                game.versionName || extractVersionLabelFromName(game.name) || null;
               const cleanGame = {
                 id: game.id,
                 name: game.name,
@@ -3093,14 +3145,10 @@ app.post('/api/games/:username', async (req, res) => {
                 missingVersion: !!game.missingVersion,
                 versionsUrl: game.versionsUrl || null,
                 usedAlternateVersionDims: !!game.usedAlternateVersionDims,
-              correctionUrl: game.correctionUrl || null,
-              versionsUrl: game.versionsUrl || null,
-              selectedVersionId: game.selectedVersionId || null
+                versionName: versionLabel,
+                correctionUrl: game.correctionUrl || null,
+                selectedVersionId: game.selectedVersionId || null,
               };
-          cleanGame.bggDimensions = game.bggDimensions ? { ...game.bggDimensions } : null;
-          cleanGame.userDimensions = game.userDimensions ? { ...game.userDimensions } : null;
-          cleanGame.forcedOrientation = game.forcedOrientation || null;
-          cleanGame.appliedOrientation = game.appliedOrientation || null;
               cleanGame.bggDimensions = game.bggDimensions ? { ...game.bggDimensions } : null;
               cleanGame.userDimensions = game.userDimensions ? { ...game.userDimensions } : null;
               cleanGame.forcedOrientation = game.forcedOrientation || null;
@@ -3138,6 +3186,8 @@ app.post('/api/games/:username', async (req, res) => {
               }
             }
             
+            const versionLabel =
+              game.versionName || extractVersionLabelFromName(game.name) || null;
             const cleanGame = {
               id: game.id,
               name: game.name,
@@ -3167,8 +3217,8 @@ app.post('/api/games/:username', async (req, res) => {
               missingVersion: !!game.missingVersion,
               versionsUrl: game.versionsUrl || null,
               usedAlternateVersionDims: !!game.usedAlternateVersionDims,
+              versionName: versionLabel,
               correctionUrl: game.correctionUrl || null,
-              versionsUrl: game.versionsUrl || null,
               selectedVersionId: game.selectedVersionId || null
             };
             
@@ -3448,6 +3498,7 @@ function processGameItem(item, versionInfo = null, versionId = null) {
   return {
     id: gameId,
     name,
+    versionName: versionInfo?.name || null,
     // Dimensions (for packing)
     dimensions,
     // All sorting priority fields (keep complete arrays for categories/families)

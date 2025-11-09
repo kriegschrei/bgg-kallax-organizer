@@ -1,5 +1,7 @@
+
 import React from 'react';
 import CollapsibleCallout from './CollapsibleCallout';
+import { getScrollableListClassName } from '../utils/results';
 
 function WarningCallout({
   variant = 'warning',
@@ -10,8 +12,13 @@ function WarningCallout({
   title,
   count,
   description,
-  items,
+  items = [],
+  renderItem,
+  children,
 }) {
+  const hasList =
+    Array.isArray(items) && items.length > 0 && typeof renderItem === 'function';
+
   return (
     <CollapsibleCallout
       variant={variant}
@@ -23,7 +30,14 @@ function WarningCallout({
       count={count}
     >
       {description ? <div className="callout__description">{description}</div> : null}
-      {items}
+      {children}
+      {hasList ? (
+        <ul className={getScrollableListClassName(items.length)}>
+          {items.map((item, index) => (
+            <li key={item?.id ?? index}>{renderItem(item, index)}</li>
+          ))}
+        </ul>
+      ) : null}
     </CollapsibleCallout>
   );
 }

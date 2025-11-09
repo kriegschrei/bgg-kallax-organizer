@@ -16,20 +16,23 @@ import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
 import { getGameColor, splitNameAndVersion } from '../utils/cubeVisualization';
 
-const resolveDisplayDimensions = (overrideEntry, orientedDims) => {
-  if (!overrideEntry) {
+const resolveDisplayDimensions = (overrideEntry, orientedDims, dimensionEditor, gameId) => {
+  const source =
+    dimensionEditor && dimensionEditor.gameId === gameId ? dimensionEditor : overrideEntry;
+
+  if (!source) {
     return orientedDims;
   }
 
   const normalize = (value, fallback) => {
-    const numeric = Number.parseFloat(value);
+    const numeric = typeof value === 'string' ? Number.parseFloat(value) : value;
     return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
   };
 
   return {
-    x: normalize(overrideEntry.length, orientedDims.x),
-    y: normalize(overrideEntry.width, orientedDims.y),
-    z: normalize(overrideEntry.depth, orientedDims.z),
+    x: normalize(source.length, orientedDims.x),
+    y: normalize(source.width, orientedDims.y),
+    z: normalize(source.depth, orientedDims.z),
   };
 };
 
@@ -63,7 +66,7 @@ function CubeGameList({
           const isExcluded = Boolean(excludedLookup[game.id]);
           const forcedOrientation = orientationLookup[game.id] || null;
           const userDims = dimensionLookup[game.id] || null;
-          const displayDims = resolveDisplayDimensions(userDims, orientedDims);
+          const displayDims = resolveDisplayDimensions(userDims, orientedDims, dimensionEditor, game.id);
           const editingThisGame = dimensionEditor.gameId === game.id;
           const dimensionWarning = game.dimensions?.missingDimensions;
           const oversizedWarning = game.oversizedX || game.oversizedY;

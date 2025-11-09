@@ -105,13 +105,6 @@ export default function Results({
     []
   );
 
-  const buildScrollableList = (items, renderItem) => (
-    <ul className={getScrollableListClassName(items.length)}>
-      {items.map((item, index) => (
-        <li key={item?.id ?? index}>{renderItem(item)}</li>
-      ))}
-    </ul>
-  );
   const renderDisclosureIcon = useCallback(
     (expanded) => (
       <span className="disclosure-arrow">
@@ -518,18 +511,19 @@ export default function Results({
               description={`No specific BoardGameGeek version was selected for these game${
                 gamesWithGuessedVersions.length !== 1 ? 's' : ''
               }. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.`}
-              items={buildScrollableList(gamesWithGuessedVersions, (game) => (
+              items={gamesWithGuessedVersions}
+              renderItem={(game) => (
                 <>
-                        {game.versionsUrl ? (
-                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                            {game.name}
-                          </a>
-                        ) : (
-                          game.name
-                        )}
-                        {` (Cube #${game.cubeId})`}
+                  {game.versionsUrl ? (
+                    <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                      {game.name}
+                    </a>
+                  ) : (
+                    game.name
+                  )}
+                  {` (Cube #${game.cubeId})`}
                 </>
-                    ))}
+              )}
             />
           )}
           {showSelectedVersionFallback && (
@@ -542,26 +536,32 @@ export default function Results({
               title="Version Missing Size"
               count={gamesUsingFallbackForSelectedVersion.length}
               description="The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact."
-              items={buildScrollableList(gamesUsingFallbackForSelectedVersion, (game) => (
+              items={gamesUsingFallbackForSelectedVersion}
+              renderItem={(game) => (
                 <>
-                        {game.versionsUrl ? (
-                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                            {game.name}
-                          </a>
-                        ) : (
-                          game.name
-                        )}
-                        {` (Cube #${game.cubeId})`}
-                        {game.correctionUrl && (
-                          <>
-                            {` — `}
-                      <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
-                              Submit dimensions
-                            </a>
-                          </>
-                        )}
+                  {game.versionsUrl ? (
+                    <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                      {game.name}
+                    </a>
+                  ) : (
+                    game.name
+                  )}
+                  {` (Cube #${game.cubeId})`}
+                  {game.correctionUrl && (
+                    <>
+                      {` — `}
+                      <a
+                        href={game.correctionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="callout__link"
+                      >
+                        Submit dimensions
+                      </a>
+                    </>
+                  )}
                 </>
-                    ))}
+              )}
             />
           )}
           {gamesWithMissingDimensions.length > 0 && (
@@ -578,21 +578,27 @@ export default function Results({
                   {gamesWithMissingDimensions.length !== 1 ? 's' : ''}{' '}
                   {gamesWithMissingDimensions.length !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions.
                   Default dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
-                    <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
+                  <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
                 </>
               }
-              items={buildScrollableList(gamesWithMissingDimensions, (game) => (
+              items={gamesWithMissingDimensions}
+              renderItem={(game) => (
                 <>
-                        {game.correctionUrl ? (
-                    <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
-                            {game.name}
-                          </a>
-                        ) : (
-                          game.name
-                        )}
-                        {` (Cube #${game.cubeId})`}
+                  {game.correctionUrl ? (
+                    <a
+                      href={game.correctionUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="callout__link"
+                    >
+                      {game.name}
+                    </a>
+                  ) : (
+                    game.name
+                  )}
+                  {` (Cube #${game.cubeId})`}
                 </>
-                    ))}
+              )}
             />
           )}
           {showOversizedWarning && (
@@ -605,27 +611,28 @@ export default function Results({
               count={oversizedWarningGames.length}
               description={
                 <>
-                    {fitOversized
-                      ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
+                  {fitOversized
+                    ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
                     : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
-                    If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
+                  If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
                 </>
               }
-              items={buildScrollableList(oversizedWarningGames, (game) => {
-                      const link = game.correctionUrl || game.versionsUrl;
-                      return (
+              items={oversizedWarningGames}
+              renderItem={(game) => {
+                const link = game.correctionUrl || game.versionsUrl;
+                return (
                   <>
-                          {link ? (
+                    {link ? (
                       <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
-                              {game.name}
-                            </a>
-                          ) : (
-                            game.name
-                          )}
-                          {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
+                        {game.name}
+                      </a>
+                    ) : (
+                      game.name
+                    )}
+                    {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
                   </>
-                      );
-                    })}
+                );
+              }}
             />
           )}
         </div>

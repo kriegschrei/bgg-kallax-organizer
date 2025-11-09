@@ -1015,7 +1015,7 @@ function App() {
                 {filtersCollapsed ? '▶' : '▼'}
               </span>
               <span className="search-panel-label">
-                <strong className="search-panel-title">Search Options</strong>
+                <strong className="search-panel-title">Options</strong>
                 {activeFilterCount > 0 && (
                   <span className="search-panel-count" aria-label={`${activeFilterCount} active filters`}>
                     {activeFilterCount}

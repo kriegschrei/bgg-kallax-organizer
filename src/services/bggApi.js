@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { gzip } from 'pako';
 
 // Use backend proxy instead of calling BGG directly
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
@@ -11,7 +12,6 @@ const apiClient = axios.create({
   }
 });
 
-// New simplified method that calls server-processed endpoint and returns packed cubes
 // Supports SSE progress updates via onProgress callback
 export const fetchPackedCubes = async (
   username,
@@ -103,7 +103,21 @@ export const fetchPackedCubes = async (
       ...additionalParams,
     };
     
-    const response = await apiClient.post(`${API_BASE}/games/${username}`, payload);
+    const payloadString = JSON.stringify(payload);
+    const textEncoder = new TextEncoder();
+    const compressedPayload = gzip(textEncoder.encode(payloadString));
+
+    const response = await apiClient.post(
+      `${API_BASE}/games/${username}`,
+      compressedPayload,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Encoding': 'gzip',
+          'Accept-Encoding': 'gzip, deflate, br',
+        },
+      }
+    );
     
     // Close SSE connection
     if (eventSource) {
@@ -121,7 +135,6 @@ export const fetchPackedCubes = async (
     if (eventSource) {
       eventSource.close();
     }
-    
     console.error('❌ Frontend: Error fetching packed cubes');
     console.error('   Error:', error.message);
     throw error;

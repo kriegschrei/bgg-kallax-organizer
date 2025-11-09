@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { parseString } from 'xml2js';
@@ -29,6 +30,17 @@ const BGG_TOKEN = process.env.BGG_API_TOKEN;
 
 // Middleware
 app.use(cors());
+const compressionFilter = (req, res) => {
+  // Skip compressing Server-Sent Events (SSE) responses
+  if (req.path?.endsWith('/progress')) {
+    return false;
+  }
+  if (req.headers.accept?.includes('text/event-stream')) {
+    return false;
+  }
+  return compression.filter(req, res);
+};
+app.use(compression({ filter: compressionFilter }));
 app.use(express.json());
 
 // Increase timeout for long-running requests (2 minutes)

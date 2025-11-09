@@ -269,8 +269,8 @@ export default function Results({
 
   return (
     <div className="results">
-      <h2>Packing Results</h2>
-      
+      <h2>Results</h2>
+
       <div className="stats-summary card">
         <div className="stat">
           <span className="stat-value">{stats.totalGames}</span>
@@ -299,7 +299,7 @@ export default function Results({
                 onClick={() => setExcludedExpanded(!excludedExpanded)}
                 aria-expanded={excludedExpanded}
               >
-                <span className="warning-arrow">{excludedExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{excludedExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaTrashAlt className="inline-icon" aria-hidden="true" />
                   Manual exclusions ({sortedExcludedGames.length})
@@ -342,7 +342,7 @@ export default function Results({
                 onClick={() => setOrientationExpanded(!orientationExpanded)}
                 aria-expanded={orientationExpanded}
               >
-                <span className="warning-arrow">{orientationExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{orientationExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaArrowsAlt className="inline-icon" aria-hidden="true" />
                   Orientation overrides ({sortedOrientationOverrides.length})
@@ -407,7 +407,7 @@ export default function Results({
                 onClick={() => setDimensionOverridesExpanded(!dimensionOverridesExpanded)}
                 aria-expanded={dimensionOverridesExpanded}
               >
-                <span className="warning-arrow">{dimensionOverridesExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{dimensionOverridesExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaRulerCombined className="inline-icon" aria-hidden="true" />
                   Custom dimensions ({sortedDimensionOverrides.length})
@@ -545,7 +545,7 @@ export default function Results({
                 onClick={() => setGuessedVersionsExpanded(!guessedVersionsExpanded)}
                 aria-expanded={guessedVersionsExpanded}
               >
-                <span className="warning-arrow">{guessedVersionsExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{guessedVersionsExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaInfoCircle className="inline-icon" aria-hidden="true" />
                   Missing Version ({gamesWithGuessedVersions.length})
@@ -581,7 +581,7 @@ export default function Results({
                 onClick={() => setSelectedVersionFallbackExpanded(!selectedVersionFallbackExpanded)}
                 aria-expanded={selectedVersionFallbackExpanded}
               >
-                <span className="warning-arrow">{selectedVersionFallbackExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{selectedVersionFallbackExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaTools className="inline-icon" aria-hidden="true" />
                   Version Missing Size ({gamesUsingFallbackForSelectedVersion.length})
@@ -625,7 +625,7 @@ export default function Results({
                 onClick={() => setMissingDimsExpanded(!missingDimsExpanded)}
                 aria-expanded={missingDimsExpanded}
               >
-                <span className="warning-arrow">{missingDimsExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{missingDimsExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaExclamationTriangle className="inline-icon" aria-hidden="true" />
                   No Sizes Found ({gamesWithMissingDimensions.length})
@@ -663,7 +663,7 @@ export default function Results({
                 onClick={() => setExceedingCapacityExpanded(!exceedingCapacityExpanded)}
                 aria-expanded={exceedingCapacityExpanded}
               >
-                <span className="warning-arrow">{exceedingCapacityExpanded ? '▼' : '▶'}</span>
+                <span className="disclosure-arrow">{exceedingCapacityExpanded ? '▼' : '▶'}</span>
                 <strong>
                   <FaBoxOpen className="inline-icon" aria-hidden="true" />
                   Over Capacity ({oversizedWarningGames.length})

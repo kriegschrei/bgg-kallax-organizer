@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { FaUndoAlt, FaExclamationTriangle, FaBug } from 'react-icons/fa';
+import { FaUndoAlt, FaExclamationTriangle, FaBug, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import SortablePriorities from './components/SortablePriorities';
 import ToggleSwitch from './components/ToggleSwitch';
 import Results from './components/Results';
@@ -87,7 +87,7 @@ function App() {
   const [groupExpansions, setGroupExpansions] = useState(false);
   const [groupSeries, setGroupSeries] = useState(false);
   const [verticalStacking, setVerticalStacking] = useState(true);
-  const [allowAlternateRotation, setAllowAlternateRotation] = useState(true);
+  const [lockRotation, setLockRotation] = useState(false);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
   const [fitOversized, setFitOversized] = useState(false);
@@ -141,7 +141,7 @@ function App() {
             groupExpansions: storedGroupExpansions,
             groupSeries: storedGroupSeries,
             verticalStacking: storedVerticalStacking,
-            allowAlternateRotation: storedAllowAlternateRotation,
+            lockRotation: storedLockRotation,
             optimizeSpace: storedOptimizeSpace,
             respectSortOrder: storedRespectSortOrder,
             fitOversized: storedFitOversized,
@@ -168,8 +168,8 @@ function App() {
           if (typeof storedVerticalStacking === 'boolean') {
             setVerticalStacking(storedVerticalStacking);
           }
-          if (typeof storedAllowAlternateRotation === 'boolean') {
-            setAllowAlternateRotation(storedAllowAlternateRotation);
+          if (typeof storedLockRotation === 'boolean') {
+            setLockRotation(storedLockRotation);
           }
           if (typeof storedOptimizeSpace === 'boolean') {
             setOptimizeSpace(storedOptimizeSpace);
@@ -250,13 +250,13 @@ function App() {
       groupExpansions,
       groupSeries,
       verticalStacking,
-      allowAlternateRotation,
+      lockRotation,
       optimizeSpace,
       respectSortOrder,
       fitOversized,
       filtersCollapsed,
       priorities,
-    bypassVersionWarning,
+      bypassVersionWarning,
     };
 
     saveUserSettings(settingsToPersist).catch((persistError) => {
@@ -270,7 +270,7 @@ function App() {
     groupExpansions,
     groupSeries,
     verticalStacking,
-    allowAlternateRotation,
+    lockRotation,
     optimizeSpace,
     respectSortOrder,
     fitOversized,
@@ -307,6 +307,9 @@ function App() {
         }
         if (typeof storedResult.response.verticalStacking === 'boolean') {
           setVerticalStacking(storedResult.response.verticalStacking);
+        }
+        if (typeof storedResult.response.lockRotation === 'boolean') {
+          setLockRotation(storedResult.response.lockRotation);
         }
         if (storedResult.requestConfig) {
           setLastRequestConfig(storedResult.requestConfig);
@@ -505,7 +508,7 @@ function App() {
     setGroupExpansions(false);
     setGroupSeries(false);
     setVerticalStacking(true);
-    setAllowAlternateRotation(true);
+    setLockRotation(false);
     setOptimizeSpace(false);
     setRespectSortOrder(false);
     setFitOversized(false);
@@ -530,63 +533,81 @@ function App() {
   const handleOptimizeSpaceChange = (checked) => {
     setOptimizeSpace(checked);
     if (checked) {
-      // Disable all manual sorting controls when optimize space is enabled
-      setPriorities((prev) => prev.map((p) => ({ ...p, enabled: false })));
       setRespectSortOrder(false);
     }
   };
 
   const activeFilterLabels = useMemo(() => {
     const labels = [];
-    const pushLabel = (condition, label) => {
+    const pushLabel = (condition, key, content) => {
       if (condition) {
-        labels.push(label);
+        labels.push({ key, content });
       }
     };
 
-    pushLabel(includePreordered, 'Pre-ordered games');
-    pushLabel(includeExpansions, 'Include expansions');
-    pushLabel(groupExpansions, 'Group expansions');
-    pushLabel(groupSeries, 'Group series');
-    pushLabel(respectSortOrder, 'Respect priority order');
-    pushLabel(optimizeSpace, 'Optimize for space');
-    pushLabel(fitOversized, 'Fit oversized games');
-    pushLabel(bypassVersionWarning, 'Bypass version warning');
-    pushLabel(!verticalStacking, 'Horizontal stacking');
-    pushLabel(!allowAlternateRotation, 'Lock rotation');
+    pushLabel(includePreordered, 'includePreordered', 'Pre-ordered games');
+    pushLabel(includeExpansions, 'includeExpansions', 'Include expansions');
+    pushLabel(groupExpansions, 'groupExpansions', 'Group expansions');
+    pushLabel(groupSeries, 'groupSeries', 'Group series');
+    pushLabel(respectSortOrder, 'respectSortOrder', 'Respect priority order');
+    pushLabel(optimizeSpace, 'optimizeSpace', 'Optimize for space');
+    pushLabel(fitOversized, 'fitOversized', 'Fit oversized games');
+    pushLabel(bypassVersionWarning, 'bypassVersionWarning', 'Bypass version warning');
+    pushLabel(!verticalStacking, 'horizontalStacking', 'Horizontal stacking');
+    pushLabel(lockRotation, 'lockRotation', 'Lock rotation');
 
-    priorities.forEach((priority) => {
-      const defaultConfig = DEFAULT_PRIORITIES_BY_FIELD[priority.field];
-      const baseLabel = PRIORITY_LABELS[priority.field] || priority.field;
-      const orderLabel = priority.order === 'desc' ? ' (desc)' : '';
+    if (!optimizeSpace) {
+      const enabledPriorities = [];
+      const disabledDefaultLabels = [];
 
-      if (!defaultConfig) {
+      priorities.forEach((priority) => {
+        const defaultConfig = DEFAULT_PRIORITIES_BY_FIELD[priority.field];
+        const baseLabel = PRIORITY_LABELS[priority.field] || priority.field;
+        const ArrowIcon = priority.order === 'desc' ? FaArrowDown : FaArrowUp;
+
         if (priority.enabled) {
-          labels.push(`Priority: ${baseLabel}${orderLabel}`);
+          enabledPriorities.push({
+            field: priority.field,
+            label: baseLabel,
+            Icon: ArrowIcon,
+            order: priority.order,
+          });
+        } else if (defaultConfig?.enabled) {
+          disabledDefaultLabels.push(baseLabel);
         }
-        return;
+      });
+
+      if (enabledPriorities.length > 0) {
+        pushLabel(true, 'priority:enabled', (
+          <span className="priority-badge-content">
+            Priority:{' '}
+            {enabledPriorities.map((priority, index) => (
+              <React.Fragment key={`${priority.field}-${priority.order}`}>
+                <span className="priority-entry">
+                  {priority.label}{' '}
+                  <priority.Icon aria-hidden className="priority-badge-icon" />
+                </span>
+                {index < enabledPriorities.length - 1 && (
+                  <span className="priority-separator">, </span>
+                )}
+              </React.Fragment>
+            ))}
+          </span>
+        ));
       }
 
-      if (!defaultConfig.enabled && priority.enabled) {
-        labels.push(`Priority: ${baseLabel}${orderLabel}`);
+      if (disabledDefaultLabels.length > 0) {
+        pushLabel(
+          true,
+          'priority:disabled-defaults',
+          `Priority disabled: ${disabledDefaultLabels.join(', ')}`
+        );
       }
-
-      if (defaultConfig.enabled && !priority.enabled) {
-        labels.push(`Priority disabled: ${baseLabel}`);
-      }
-
-      if (
-        priority.enabled &&
-        defaultConfig.enabled &&
-        priority.order !== defaultConfig.order
-      ) {
-        labels.push(`Priority order: ${baseLabel}${orderLabel}`);
-      }
-    });
+    }
 
     return labels;
   }, [
-    allowAlternateRotation,
+    lockRotation,
     fitOversized,
     bypassVersionWarning,
     groupExpansions,
@@ -640,7 +661,7 @@ function App() {
         includeExpansions,
         priorities,
         verticalStacking,
-        allowAlternateRotation,
+        lockRotation,
         optimizeSpace,
         respectSortOrder,
         fitOversized,
@@ -660,7 +681,7 @@ function App() {
         includeExpansions,
         priorities,
         verticalStacking,
-        allowAlternateRotation,
+        lockRotation,
         optimizeSpace,
         respectSortOrder,
         fitOversized,
@@ -706,6 +727,7 @@ function App() {
           oversizedGames: response.oversizedGames || [],
           fitOversized,
           verticalStacking,
+          lockRotation,
         },
       }).catch((storageError) => {
         console.error('Unable to persist last result', storageError);
@@ -758,13 +780,18 @@ function App() {
             dimensionOverrides: dimensionOverridesList.map((item) => ({ ...item })),
           };
 
+      const fallbackLockRotation =
+        typeof lastRequestConfig.lockRotation === 'boolean'
+          ? lastRequestConfig.lockRotation
+          : lockRotation;
+
       const response = await fetchPackedCubes(
         lastRequestConfig.username,
         lastRequestConfig.includePreordered,
         lastRequestConfig.includeExpansions,
         lastRequestConfig.priorities,
         lastRequestConfig.verticalStacking,
-        lastRequestConfig.allowAlternateRotation,
+        fallbackLockRotation,
         lastRequestConfig.optimizeSpace,
         lastRequestConfig.respectSortOrder,
         lastRequestConfig.fitOversized,
@@ -794,13 +821,18 @@ function App() {
       setProgress('');
       setLoading(false);
 
+      const normalizedRequestConfig = { ...lastRequestConfig, lockRotation: fallbackLockRotation };
+
+      setLastRequestConfig(normalizedRequestConfig);
+
       saveLastResult({
-        requestConfig: lastRequestConfig,
+        requestConfig: normalizedRequestConfig,
         response: {
           cubes: response.cubes,
           oversizedGames: response.oversizedGames || [],
-          fitOversized: lastRequestConfig.fitOversized,
-          verticalStacking: lastRequestConfig.verticalStacking,
+          fitOversized: normalizedRequestConfig.fitOversized,
+          verticalStacking: normalizedRequestConfig.verticalStacking,
+          lockRotation: fallbackLockRotation,
         },
       }).catch((storageError) => {
         console.error('Unable to persist last result', storageError);
@@ -856,9 +888,9 @@ function App() {
             </div>
             {filtersCollapsed && activeFilterCount > 0 && (
               <div className="search-panel-tags" aria-label="Active filters">
-                {activeFilterLabels.map((label) => (
-                  <span key={label} className="search-panel-tag">
-                    {label}
+                {activeFilterLabels.map(({ key, content }) => (
+                  <span key={key} className="search-panel-tag">
+                    {content}
                   </span>
                 ))}
               </div>
@@ -951,10 +983,10 @@ function App() {
                   />
 
                   <ToggleSwitch
-                    id="allowAlternateRotation"
-                    label="Allow alternate rotation"
-                    checked={allowAlternateRotation}
-                    onChange={setAllowAlternateRotation}
+                    id="lockRotation"
+                    label="Lock Game Rotation"
+                    checked={lockRotation}
+                    onChange={setLockRotation}
                     disabled={loading}
                     tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
                   />

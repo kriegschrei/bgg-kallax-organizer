@@ -430,6 +430,26 @@ header {
   pointer-events: none;
 }
 
+.search-panel-tag .priority-badge-content {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.priority-badge-icon {
+  font-size: 0.9em;
+}
+
+.priority-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.priority-separator {
+  margin: 0 0.2rem;
+}
+
 .search-panel-body {
   padding: 1.5rem;
   transition: max-height 0.3s ease, opacity 0.3s ease, padding-top 0.3s ease, padding-bottom 0.3s ease;

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { FaUndoAlt, FaExclamationTriangle, FaBug, FaArrowUp, FaArrowDown } from 'react-icons/fa';
 import SortablePriorities from './components/SortablePriorities';
 import ToggleSwitch from './components/ToggleSwitch';
@@ -80,7 +80,28 @@ const parseDimensionValue = (value) => {
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
 };
 
+const getCollapsedBadgeLimit = (width) => {
+  if (!Number.isFinite(width) || width <= 0) {
+    return 4;
+  }
+
+  if (width >= 1280) {
+    return 4;
+  }
+  if (width >= 1080) {
+    return 3;
+  }
+  if (width >= 900) {
+    return 2;
+  }
+  if (width >= 720) {
+    return 1;
+  }
+  return 0;
+};
+
 function App() {
+  const formRef = useRef(null);
   const [username, setUsername] = useState('');
   const [includePreordered, setIncludePreordered] = useState(false);
   const [includeExpansions, setIncludeExpansions] = useState(false);
@@ -107,12 +128,36 @@ function App() {
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [lastResultHydrated, setLastResultHydrated] = useState(false);
+  const [collapsedBadgeLimit, setCollapsedBadgeLimit] = useState(() =>
+    typeof window === 'undefined' ? 4 : getCollapsedBadgeLimit(window.innerWidth)
+  );
+  const [hasStoredData, setHasStoredData] = useState(false);
+  const initialCollapseAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const handleResize = () => {
+      setCollapsedBadgeLimit(getCollapsedBadgeLimit(window.innerWidth));
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
 
     async function hydrateFromStorage() {
       try {
+        let foundStoredData = false;
+
         const [
           storedExcluded,
           storedOrientation,
@@ -133,6 +178,14 @@ function App() {
         setOrientationOverridesMap(arrayToMap(storedOrientation));
         setDimensionOverridesMap(arrayToMap(storedDimensions));
 
+        if (
+          (Array.isArray(storedExcluded) && storedExcluded.length > 0) ||
+          (Array.isArray(storedOrientation) && storedOrientation.length > 0) ||
+          (Array.isArray(storedDimensions) && storedDimensions.length > 0)
+        ) {
+          foundStoredData = true;
+        }
+
         if (storedSettings && typeof storedSettings === 'object') {
           const {
             username: storedUsername,
@@ -149,6 +202,10 @@ function App() {
             bypassVersionWarning: storedBypassVersionWarning,
             priorities: storedPriorities,
           } = storedSettings;
+
+          if (Object.keys(storedSettings).length > 0) {
+            foundStoredData = true;
+          }
 
           if (typeof storedUsername === 'string') {
             setUsername(storedUsername);
@@ -190,6 +247,8 @@ function App() {
             setPriorities(storedPriorities);
           }
         }
+
+        setHasStoredData(foundStoredData);
       } catch (storageError) {
         console.error('Unable to load stored preferences', storageError);
       } finally {
@@ -301,6 +360,7 @@ function App() {
 
         setCubes(storedResult.response.cubes);
         setOversizedGames(storedResult.response.oversizedGames || []);
+        setHasStoredData(true);
 
         if (typeof storedResult.response.fitOversized === 'boolean') {
           setFitOversized(storedResult.response.fitOversized);
@@ -521,6 +581,7 @@ function App() {
   setLastRequestConfig(null);
   setError(null);
   setProgress('');
+    setHasStoredData(false);
 
     try {
       await clearUserSettings();
@@ -622,12 +683,85 @@ function App() {
 
   const activeFilterCount = activeFilterLabels.length;
 
-  const toggleFiltersCollapsed = () => {
+  const { collapsedBadgeTags, collapsedBadgeOverflow } = useMemo(() => {
+    if (!filtersCollapsed || activeFilterLabels.length === 0 || collapsedBadgeLimit <= 0) {
+      return { collapsedBadgeTags: [], collapsedBadgeOverflow: 0 };
+    }
+
+    const limited = activeFilterLabels.slice(0, collapsedBadgeLimit);
+    const overflow = Math.max(0, activeFilterLabels.length - limited.length);
+
+    return { collapsedBadgeTags: limited, collapsedBadgeOverflow: overflow };
+  }, [filtersCollapsed, activeFilterLabels, collapsedBadgeLimit]);
+
+  useEffect(() => {
+    if (initialCollapseAppliedRef.current) {
+      return;
+    }
+
+    if (!settingsHydrated || !lastResultHydrated) {
+      return;
+    }
+
+    const shouldCollapse = hasStoredData || (Array.isArray(cubes) && cubes.length > 0);
+    setFiltersCollapsed(shouldCollapse);
+    initialCollapseAppliedRef.current = true;
+  }, [settingsHydrated, lastResultHydrated, hasStoredData, cubes]);
+
+  const toggleFiltersCollapsed = useCallback(() => {
     if (loading) {
       return;
     }
     setFiltersCollapsed((prev) => !prev);
-  };
+  }, [loading]);
+
+  const handleHeaderClick = useCallback(
+    (event) => {
+      if (loading) {
+        return;
+      }
+
+      const target = event?.target;
+      if (
+        target instanceof Element &&
+        target.closest('.search-panel-submit')
+      ) {
+        return;
+      }
+
+      toggleFiltersCollapsed();
+    },
+    [loading, toggleFiltersCollapsed]
+  );
+
+  const handleHeaderKeyDown = useCallback(
+    (event) => {
+      if (loading) {
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        toggleFiltersCollapsed();
+      }
+    },
+    [loading, toggleFiltersCollapsed]
+  );
+
+  const handleCollapsedSubmit = useCallback(() => {
+    if (loading) {
+      return;
+    }
+    const formElement = formRef.current;
+    if (!formElement) {
+      return;
+    }
+    if (typeof formElement.requestSubmit === 'function') {
+      formElement.requestSubmit();
+      return;
+    }
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    formElement.dispatchEvent(submitEvent);
+  }, [loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -863,42 +997,60 @@ function App() {
       )}
 
       <section className={`card search-panel ${filtersCollapsed ? 'collapsed' : ''}`}>
-        <div className="search-panel-header">
-          <button
-            type="button"
-            className="search-panel-toggle"
-            onClick={toggleFiltersCollapsed}
-            aria-expanded={!filtersCollapsed}
-            aria-controls="search-panel-content"
-            disabled={loading}
-            title={filtersCollapsed ? 'Show search options' : 'Hide search options'}
-          >
-            <div className="search-panel-title-row">
-              <span className="search-panel-title">Search Options</span>
-              <div className="search-panel-controls">
+        <div
+          className={`search-panel-header ${filtersCollapsed ? 'is-collapsed' : ''} ${
+            loading ? 'is-disabled' : ''
+          }`}
+          role="button"
+          tabIndex={loading ? -1 : 0}
+          aria-expanded={!filtersCollapsed}
+          aria-controls="search-panel-content"
+          onClick={handleHeaderClick}
+          onKeyDown={handleHeaderKeyDown}
+          title={filtersCollapsed ? 'Show search options' : 'Hide search options'}
+        >
+          <div className="search-panel-primary">
+            <div className="search-panel-toggle">
+              <span className="disclosure-arrow search-panel-icon" aria-hidden>
+                {filtersCollapsed ? '▶' : '▼'}
+              </span>
+              <span className="search-panel-label">
+                <strong className="search-panel-title">Search Options</strong>
                 {activeFilterCount > 0 && (
-                  <span className="search-panel-badge" aria-label={`${activeFilterCount} active filters`}>
+                  <span className="search-panel-count" aria-label={`${activeFilterCount} active filters`}>
                     {activeFilterCount}
                   </span>
                 )}
-                <span className="search-panel-icon" aria-hidden>
-                  ▾
-                </span>
-              </div>
+              </span>
             </div>
-            {filtersCollapsed && activeFilterCount > 0 && (
-              <div className="search-panel-tags" aria-label="Active filters">
-                {activeFilterLabels.map(({ key, content }) => (
-                  <span key={key} className="search-panel-tag">
-                    {content}
-                  </span>
-                ))}
-              </div>
+            {filtersCollapsed && (
+              <button
+                type="button"
+                className="search-panel-submit"
+                onClick={handleCollapsedSubmit}
+                disabled={loading}
+              >
+                {loading ? 'Processing...' : 'Organize Collection'}
+              </button>
             )}
-          </button>
+          </div>
+          {filtersCollapsed && activeFilterCount > 0 && collapsedBadgeLimit > 0 && (
+            <div className="search-panel-tags" aria-label="Active filters">
+              {collapsedBadgeTags.map(({ key, content }) => (
+                <span key={key} className="search-panel-tag">
+                  {content}
+                </span>
+              ))}
+              {collapsedBadgeOverflow > 0 && (
+                <span key="filter-overflow" className="search-panel-tag">
+                  and {collapsedBadgeOverflow} more
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="search-panel-body" id="search-panel-content">
-          <form onSubmit={handleSubmit} className="search-panel-form">
+          <form ref={formRef} onSubmit={handleSubmit} className="search-panel-form">
             <div className="form-layout">
               <div className="form-left">
                 <div className="form-group">

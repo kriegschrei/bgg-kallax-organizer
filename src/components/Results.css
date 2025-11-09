@@ -4,30 +4,36 @@
 
 .stats-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.stats-summary.card {
+  padding: 0.5rem;
 }
 
 .stat {
   text-align: center;
-  padding: 1rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 8px;
+  padding: 0.5rem;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+  border-radius: 6px;
   color: white;
+  box-shadow: 0 3px 8px rgba(17, 24, 39, 0.08);
 }
 
 .stat-value {
   display: block;
-  font-size: 2rem;
+  font-size: 1.4rem;
   font-weight: bold;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
 }
 
 .stat-label {
   display: block;
-  font-size: 0.9rem;
-  opacity: 0.9;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  letter-spacing: 0.02em;
 }
 
 .cubes-container {
@@ -151,12 +157,10 @@
   line-height: 1.6;
 }
 
-.warning-arrow {
-  display: inline-block;
+.warning-box .disclosure-arrow {
   font-size: 0.8em;
-  color: #856404;
+  color: inherit;
   margin-top: 0.1em;
-  transition: transform 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -207,7 +211,7 @@
 .warning-box.info-box .warning-header,
 .warning-box.info-box .warning-header strong,
 .warning-box.info-box .warning-description,
-.warning-box.info-box .warning-arrow {
+.warning-box.info-box .disclosure-arrow {
   color: #0b5394;
 }
 
@@ -235,7 +239,7 @@
 .warning-box.selected-version-box .warning-header,
 .warning-box.selected-version-box .warning-header strong,
 .warning-box.selected-version-box .warning-description,
-.warning-box.selected-version-box .warning-arrow {
+.warning-box.selected-version-box .disclosure-arrow {
   color: #0f4c45;
 }
 
@@ -313,7 +317,7 @@
 .warning-box.manual-box .warning-header,
 .warning-box.manual-box .warning-header strong,
 .warning-box.manual-box .warning-description,
-.warning-box.manual-box .warning-arrow {
+.warning-box.manual-box .disclosure-arrow {
   color: inherit;
 }
 

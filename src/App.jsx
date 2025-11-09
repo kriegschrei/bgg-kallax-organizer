@@ -885,7 +885,7 @@ function App() {
   const filterControls = (
     <>
       <div className="options-row">
-        <div className="options-field">
+        <div className="username-field">
           <label htmlFor="username">BoardGameGeek Username</label>
           <input
             type="text"
@@ -1055,22 +1055,27 @@ function App() {
     </>
   );
 
+  const hydrationComplete = settingsHydrated && lastResultHydrated;
+  const isFirstRun = hydrationComplete && !hasStoredData && cubes === null;
   const searchPanelBodyId = isMobileLayout ? 'filter-drawer' : 'search-panel-content';
   const isPanelCollapsed = isMobileLayout ? !isFilterDrawerOpen : filtersCollapsed;
+  const shouldShowInlineUsername =
+    isMobileLayout && (!hydrationComplete || isFirstRun);
 
   useEffect(() => {
     if (initialCollapseAppliedRef.current) {
       return;
     }
 
-    if (!settingsHydrated || !lastResultHydrated) {
+    if (!hydrationComplete) {
       return;
     }
 
-    const shouldCollapse = hasStoredData || (Array.isArray(cubes) && cubes.length > 0);
+    const shouldCollapse =
+      !isFirstRun && (hasStoredData || (Array.isArray(cubes) && cubes.length > 0));
     setFiltersCollapsed(shouldCollapse);
     initialCollapseAppliedRef.current = true;
-  }, [settingsHydrated, lastResultHydrated, hasStoredData, cubes]);
+  }, [hydrationComplete, hasStoredData, cubes, isFirstRun]);
 
   const closeFilterDrawer = useCallback(() => {
     setIsFilterDrawerOpen(false);
@@ -1099,7 +1104,9 @@ function App() {
       const target = event?.target;
       if (
         target instanceof Element &&
-        (target.closest('.search-panel-submit') || target.closest('.search-panel-actions'))
+        (target.closest('.search-panel-submit') ||
+          target.closest('.search-panel-actions') ||
+          target.closest('.username-field'))
       ) {
         return;
       }
@@ -1431,6 +1438,19 @@ function App() {
                   )}
                 </span>
               </div>
+              {shouldShowInlineUsername && (
+                <div className="username-field username-field--inline">
+                  <label htmlFor="username-inline">BoardGameGeek Username</label>
+                  <input
+                    type="text"
+                    id="username-inline"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your BGG username"
+                    disabled={loading}
+                  />
+                </div>
+              )}
               <div className="search-panel-actions">
                 <button
                   type="submit"

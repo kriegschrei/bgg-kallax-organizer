@@ -179,7 +179,6 @@ export default function CubeVisualization({
       <h3>Cube #{cube.id}</h3>
       <div className="visualization-container">
         <div className="front-view">
-          <h4>Front View</h4>
           <svg
             width={canvasWidth}
             height={canvasHeight}
@@ -267,11 +266,9 @@ export default function CubeVisualization({
               );
             })}
           </svg>
-          <p className="dimension-label">13" W × 13" H</p>
         </div>
         
         <div className="list-view">
-          <h4>Game List (In Order)</h4>
           <ol>
             {cube.games.map((game, index) => {
               const backgroundColor = getGameColor(index, cube.games.length);

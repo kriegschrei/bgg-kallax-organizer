@@ -1,0 +1,96 @@
+.collection-status-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: #f4f6fb;
+  color: #34495e;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.collection-status-toggle:hover:not(:disabled) {
+  background: #e7ecf9;
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateY(-1px);
+}
+
+.collection-status-toggle:focus-visible {
+  outline: 3px solid rgba(99, 102, 241, 0.45);
+  outline-offset: 2px;
+}
+
+.collection-status-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.collection-status-toggle__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  background: rgba(99, 102, 241, 0.18);
+  color: #4a5fc1;
+  flex-shrink: 0;
+}
+
+.collection-status-toggle__label {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.collection-status-toggle--include {
+  background: rgba(46, 204, 113, 0.12);
+  border-color: rgba(46, 204, 113, 0.4);
+  color: #1e8449;
+}
+
+.collection-status-toggle--include .collection-status-toggle__icon {
+  background: rgba(46, 204, 113, 0.25);
+  color: #1e8449;
+}
+
+.collection-status-toggle--exclude {
+  background: rgba(231, 76, 60, 0.12);
+  border-color: rgba(231, 76, 60, 0.4);
+  color: #922b21;
+}
+
+.collection-status-toggle--exclude .collection-status-toggle__icon {
+  background: rgba(231, 76, 60, 0.25);
+  color: #922b21;
+}
+
+.collection-status-toggle--neutral {
+  background: #f4f6fb;
+  border-color: rgba(99, 102, 241, 0.12);
+  color: #34495e;
+}
+
+.collection-status-toggle--neutral .collection-status-toggle__icon {
+  background: rgba(99, 102, 241, 0.18);
+  color: #4a5fc1;
+}
+
+.collection-status-toggle--include:hover:not(:disabled) {
+  background: rgba(46, 204, 113, 0.18);
+}
+
+.collection-status-toggle--exclude:hover:not(:disabled) {
+  background: rgba(231, 76, 60, 0.18);
+}
+
+.collection-status-toggle--neutral:hover:not(:disabled) {
+  background: #e7ecf9;
+}
+

@@ -1,7 +1,16 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { FaUndoAlt, FaExclamationTriangle, FaBug, FaArrowUp, FaArrowDown } from 'react-icons/fa';
+import {
+  FaUndoAlt,
+  FaExclamationTriangle,
+  FaBug,
+  FaArrowUp,
+  FaArrowDown,
+  FaChevronRight,
+  FaChevronDown,
+} from 'react-icons/fa';
 import SortablePriorities from './components/SortablePriorities';
 import ToggleSwitch from './components/ToggleSwitch';
+import CollectionStatusToggle from './components/CollectionStatusToggle';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
 import { fetchPackedCubes } from './services/bggApi';
@@ -65,6 +74,28 @@ const PRIORITY_LABELS = {
   bggRating: 'BGG Rating',
 };
 
+const COLLECTION_STATUSES = [
+  { key: 'own', label: 'Own' },
+  { key: 'preordered', label: 'Pre-Ordered' },
+  { key: 'wanttoplay', label: 'Want To Play' },
+  { key: 'prevowned', label: 'Previously Owned' },
+  { key: 'fortrade', label: 'For Trade' },
+  { key: 'want', label: 'Want' },
+  { key: 'wanttobuy', label: 'Want To Buy' },
+  { key: 'wishlist', label: 'Wishlist' },
+];
+
+const DEFAULT_COLLECTION_FILTERS = COLLECTION_STATUSES.reduce((acc, status) => {
+  acc[status.key] = status.key === 'own' ? 'include' : 'neutral';
+  return acc;
+}, {});
+
+const FILTER_PANEL_KEYS = ['preferences', 'collections', 'priorities'];
+const DEFAULT_FILTER_PANEL_STATE = FILTER_PANEL_KEYS.reduce((acc, key) => {
+  acc[key] = true; // collapsed by default
+  return acc;
+}, {});
+
 const arrayToMap = (items = []) =>
   Array.isArray(items)
     ? items.reduce((acc, item) => {
@@ -103,7 +134,6 @@ const getCollapsedBadgeLimit = (width) => {
 function App() {
   const formRef = useRef(null);
   const [username, setUsername] = useState('');
-  const [includePreordered, setIncludePreordered] = useState(false);
   const [includeExpansions, setIncludeExpansions] = useState(false);
   const [groupExpansions, setGroupExpansions] = useState(false);
   const [groupSeries, setGroupSeries] = useState(false);
@@ -114,6 +144,9 @@ function App() {
   const [fitOversized, setFitOversized] = useState(false);
   const [bypassVersionWarning, setBypassVersionWarning] = useState(false);
   const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
+  const [collectionFilters, setCollectionFilters] = useState(
+    () => ({ ...DEFAULT_COLLECTION_FILTERS })
+  );
   const [excludedGamesMap, setExcludedGamesMap] = useState({});
   const [orientationOverridesMap, setOrientationOverridesMap] = useState({});
   const [dimensionOverridesMap, setDimensionOverridesMap] = useState({});
@@ -126,6 +159,9 @@ function App() {
   const [missingVersionWarning, setMissingVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [filterPanelsCollapsed, setFilterPanelsCollapsed] = useState(
+    () => ({ ...DEFAULT_FILTER_PANEL_STATE })
+  );
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [lastResultHydrated, setLastResultHydrated] = useState(false);
   const [collapsedBadgeLimit, setCollapsedBadgeLimit] = useState(() =>
@@ -189,7 +225,6 @@ function App() {
         if (storedSettings && typeof storedSettings === 'object') {
           const {
             username: storedUsername,
-            includePreordered: storedIncludePreordered,
             includeExpansions: storedIncludeExpansions,
             groupExpansions: storedGroupExpansions,
             groupSeries: storedGroupSeries,
@@ -199,8 +234,10 @@ function App() {
             respectSortOrder: storedRespectSortOrder,
             fitOversized: storedFitOversized,
             filtersCollapsed: storedFiltersCollapsed,
+            filterPanelsCollapsed: storedFilterPanelsCollapsed,
             bypassVersionWarning: storedBypassVersionWarning,
             priorities: storedPriorities,
+            collectionFilters: storedCollectionFilters,
           } = storedSettings;
 
           if (Object.keys(storedSettings).length > 0) {
@@ -209,9 +246,6 @@ function App() {
 
           if (typeof storedUsername === 'string') {
             setUsername(storedUsername);
-          }
-          if (typeof storedIncludePreordered === 'boolean') {
-            setIncludePreordered(storedIncludePreordered);
           }
           if (typeof storedIncludeExpansions === 'boolean') {
             setIncludeExpansions(storedIncludeExpansions);
@@ -243,8 +277,37 @@ function App() {
           if (typeof storedFiltersCollapsed === 'boolean') {
             setFiltersCollapsed(storedFiltersCollapsed);
           }
+          if (
+            storedFilterPanelsCollapsed &&
+            typeof storedFilterPanelsCollapsed === 'object'
+          ) {
+            setFilterPanelsCollapsed((prev) => ({
+              ...prev,
+              ...FILTER_PANEL_KEYS.reduce((acc, key) => {
+                if (typeof storedFilterPanelsCollapsed[key] === 'boolean') {
+                  acc[key] = storedFilterPanelsCollapsed[key];
+                }
+                return acc;
+              }, {}),
+            }));
+          }
           if (Array.isArray(storedPriorities) && storedPriorities.length > 0) {
             setPriorities(storedPriorities);
+          }
+          if (
+            storedCollectionFilters &&
+            typeof storedCollectionFilters === 'object'
+          ) {
+            setCollectionFilters((prev) => ({
+              ...prev,
+              ...COLLECTION_STATUSES.reduce((acc, status) => {
+                const value = storedCollectionFilters[status.key];
+                if (value === 'include' || value === 'exclude' || value === 'neutral') {
+                  acc[status.key] = value;
+                }
+                return acc;
+              }, {}),
+            }));
           }
         }
 
@@ -304,7 +367,6 @@ function App() {
 
     const settingsToPersist = {
       username,
-      includePreordered,
       includeExpansions,
       groupExpansions,
       groupSeries,
@@ -316,6 +378,8 @@ function App() {
       filtersCollapsed,
       priorities,
       bypassVersionWarning,
+      collectionFilters,
+      filterPanelsCollapsed,
     };
 
     saveUserSettings(settingsToPersist).catch((persistError) => {
@@ -324,7 +388,6 @@ function App() {
   }, [
     settingsHydrated,
     username,
-    includePreordered,
     includeExpansions,
     groupExpansions,
     groupSeries,
@@ -336,6 +399,8 @@ function App() {
     filtersCollapsed,
     priorities,
     bypassVersionWarning,
+    collectionFilters,
+    filterPanelsCollapsed,
   ]);
 
   useEffect(() => {
@@ -403,6 +468,50 @@ function App() {
     () => Object.values(dimensionOverridesMap),
     [dimensionOverridesMap]
   );
+  const includeStatusList = useMemo(
+    () =>
+      COLLECTION_STATUSES.filter((status) => collectionFilters[status.key] === 'include').map(
+        (status) => status.key
+      ),
+    [collectionFilters]
+  );
+  const excludeStatusList = useMemo(
+    () =>
+      COLLECTION_STATUSES.filter((status) => collectionFilters[status.key] === 'exclude').map(
+        (status) => status.key
+      ),
+    [collectionFilters]
+  );
+  const hasIncludeStatuses = includeStatusList.length > 0;
+  const renderFilterPanel = (panelKey, title, content) => {
+    const isCollapsed = Boolean(filterPanelsCollapsed[panelKey]);
+    return (
+      <section
+        key={panelKey}
+        className={`filter-panel ${isCollapsed ? 'filter-panel--collapsed' : ''}`}
+      >
+        <button
+          type="button"
+          className="filter-panel__header"
+          onClick={() => toggleFilterPanel(panelKey)}
+          aria-expanded={!isCollapsed}
+          aria-controls={`filter-panel-${panelKey}`}
+        >
+          <span className="filter-panel__chevron" aria-hidden>
+            <FaChevronRight className="filter-panel__chevron-icon" />
+          </span>
+          <span className="filter-panel__title">{title}</span>
+        </button>
+        <div
+          className="filter-panel__body"
+          id={`filter-panel-${panelKey}`}
+          hidden={isCollapsed}
+        >
+          {content}
+        </div>
+      </section>
+    );
+  };
 
   const handleExcludeGame = useCallback(async (game) => {
     if (!game?.id) {
@@ -561,9 +670,36 @@ function App() {
     }
   }, []);
 
+  const handleCollectionFilterChange = useCallback((statusKey, nextState) => {
+    if (!COLLECTION_STATUSES.some((status) => status.key === statusKey)) {
+      return;
+    }
+    if (!['include', 'exclude', 'neutral'].includes(nextState)) {
+      return;
+    }
+    setCollectionFilters((prev) => {
+      if (prev[statusKey] === nextState) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [statusKey]: nextState,
+      };
+    });
+  }, []);
+
+  const toggleFilterPanel = useCallback((panelKey) => {
+    if (!FILTER_PANEL_KEYS.includes(panelKey)) {
+      return;
+    }
+    setFilterPanelsCollapsed((prev) => ({
+      ...prev,
+      [panelKey]: !prev[panelKey],
+    }));
+  }, []);
+
   const handleResetSettings = useCallback(async () => {
     setUsername('');
-    setIncludePreordered(false);
     setIncludeExpansions(false);
     setGroupExpansions(false);
     setGroupSeries(false);
@@ -575,17 +711,19 @@ function App() {
     setBypassVersionWarning(false);
     setFiltersCollapsed(false);
     setPriorities(DEFAULT_PRIORITIES.map((priority) => ({ ...priority })));
-  setCubes(null);
-  setOversizedGames([]);
-  setMissingVersionWarning(null);
-  setLastRequestConfig(null);
-  setError(null);
-  setProgress('');
+    setCollectionFilters({ ...DEFAULT_COLLECTION_FILTERS });
+    setFilterPanelsCollapsed({ ...DEFAULT_FILTER_PANEL_STATE });
+    setCubes(null);
+    setOversizedGames([]);
+    setMissingVersionWarning(null);
+    setLastRequestConfig(null);
+    setError(null);
+    setProgress('');
     setHasStoredData(false);
 
     try {
       await clearUserSettings();
-    await clearLastResult();
+      await clearLastResult();
     } catch (storageError) {
       console.error('Unable to clear stored user settings', storageError);
     }
@@ -606,7 +744,6 @@ function App() {
       }
     };
 
-    pushLabel(includePreordered, 'includePreordered', 'Pre-ordered games');
     pushLabel(includeExpansions, 'includeExpansions', 'Include expansions');
     pushLabel(groupExpansions, 'groupExpansions', 'Group expansions');
     pushLabel(groupSeries, 'groupSeries', 'Group series');
@@ -616,6 +753,27 @@ function App() {
     pushLabel(bypassVersionWarning, 'bypassVersionWarning', 'Bypass version warning');
     pushLabel(!verticalStacking, 'horizontalStacking', 'Horizontal stacking');
     pushLabel(lockRotation, 'lockRotation', 'Lock rotation');
+
+    if (includeStatusList.length > 0) {
+      const includeLabels = includeStatusList
+        .map((statusKey) => COLLECTION_STATUSES.find((status) => status.key === statusKey)?.label)
+        .filter(Boolean);
+      const showIncludeLabel =
+        includeLabels.length > 0 &&
+        !(includeStatusList.length === 1 && includeStatusList[0] === 'own');
+      if (showIncludeLabel) {
+        pushLabel(true, 'collectionInclude', `Include: ${includeLabels.join(', ')}`);
+      }
+    }
+
+    if (excludeStatusList.length > 0) {
+      const excludeLabels = excludeStatusList
+        .map((statusKey) => COLLECTION_STATUSES.find((status) => status.key === statusKey)?.label)
+        .filter(Boolean);
+      if (excludeLabels.length > 0) {
+        pushLabel(true, 'collectionExclude', `Exclude: ${excludeLabels.join(', ')}`);
+      }
+    }
 
     if (!optimizeSpace) {
       const enabledPriorities = [];
@@ -674,11 +832,12 @@ function App() {
     groupExpansions,
     groupSeries,
     includeExpansions,
-    includePreordered,
     optimizeSpace,
     priorities,
     respectSortOrder,
     verticalStacking,
+    includeStatusList,
+    excludeStatusList,
   ]);
 
   const activeFilterCount = activeFilterLabels.length;
@@ -748,7 +907,7 @@ function App() {
   );
 
   const handleCollapsedSubmit = useCallback(() => {
-    if (loading) {
+    if (loading || !hasIncludeStatuses) {
       return;
     }
     const formElement = formRef.current;
@@ -761,13 +920,17 @@ function App() {
     }
     const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
     formElement.dispatchEvent(submitEvent);
-  }, [loading]);
+  }, [hasIncludeStatuses, loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!username.trim()) {
       setError('Please enter a BoardGameGeek username');
+      return;
+    }
+
+    if (!hasIncludeStatuses) {
       return;
     }
 
@@ -788,10 +951,10 @@ function App() {
         orientationOverrides: orientationOverridesList.map((entry) => ({ ...entry })),
         dimensionOverrides: dimensionOverridesList.map((entry) => ({ ...entry })),
       };
-
       const requestConfig = {
         username: trimmedUsername,
-        includePreordered,
+        includeStatuses: includeStatusList,
+        excludeStatuses: excludeStatusList,
         includeExpansions,
         priorities,
         verticalStacking,
@@ -811,16 +974,19 @@ function App() {
       // Get fully processed and packed cubes from server with progress updates
       const response = await fetchPackedCubes(
         trimmedUsername,
-        includePreordered,
-        includeExpansions,
-        priorities,
-        verticalStacking,
-        lockRotation,
-        optimizeSpace,
-        respectSortOrder,
-        fitOversized,
-        effectiveGroupExpansions,
-        effectiveGroupSeries,
+        {
+          includeStatuses: includeStatusList,
+          excludeStatuses: excludeStatusList,
+          includeExpansions,
+          priorities,
+          verticalStacking,
+          lockRotation,
+          optimizeSpace,
+          respectSortOrder,
+          fitOversized,
+          groupExpansions: effectiveGroupExpansions,
+          groupSeries: effectiveGroupSeries,
+        },
         (progress) => {
           // Update progress message from SSE updates
           if (progress && progress.message) {
@@ -842,7 +1008,9 @@ function App() {
       }
       
       if (!response || !response.cubes || response.cubes.length === 0) {
-        setError('No owned games found for this user');
+        setError(
+          response?.message || 'No games matched your selected collections.'
+        );
         setLoading(false);
         return;
       }
@@ -919,18 +1087,28 @@ function App() {
           ? lastRequestConfig.lockRotation
           : lockRotation;
 
+      const fallbackIncludeStatuses = Array.isArray(lastRequestConfig.includeStatuses)
+        ? lastRequestConfig.includeStatuses
+        : includeStatusList;
+      const fallbackExcludeStatuses = Array.isArray(lastRequestConfig.excludeStatuses)
+        ? lastRequestConfig.excludeStatuses
+        : excludeStatusList;
+
       const response = await fetchPackedCubes(
         lastRequestConfig.username,
-        lastRequestConfig.includePreordered,
-        lastRequestConfig.includeExpansions,
-        lastRequestConfig.priorities,
-        lastRequestConfig.verticalStacking,
-        fallbackLockRotation,
-        lastRequestConfig.optimizeSpace,
-        lastRequestConfig.respectSortOrder,
-        lastRequestConfig.fitOversized,
-        lastRequestConfig.groupExpansions,
-        lastRequestConfig.groupSeries,
+        {
+          includeStatuses: fallbackIncludeStatuses,
+          excludeStatuses: fallbackExcludeStatuses,
+          includeExpansions: lastRequestConfig.includeExpansions,
+          priorities: lastRequestConfig.priorities,
+          verticalStacking: lastRequestConfig.verticalStacking,
+          lockRotation: fallbackLockRotation,
+          optimizeSpace: lastRequestConfig.optimizeSpace,
+          respectSortOrder: lastRequestConfig.respectSortOrder,
+          fitOversized: lastRequestConfig.fitOversized,
+          groupExpansions: lastRequestConfig.groupExpansions,
+          groupSeries: lastRequestConfig.groupSeries,
+        },
         (progress) => {
           if (progress && progress.message) {
             setProgress(progress.message);
@@ -944,7 +1122,9 @@ function App() {
       );
 
       if (!response || !response.cubes || response.cubes.length === 0) {
-        setError('No owned games found for this user');
+        setError(
+          response?.message || 'No games matched your selected collections.'
+        );
         setLoading(false);
         return;
       }
@@ -955,7 +1135,12 @@ function App() {
       setProgress('');
       setLoading(false);
 
-      const normalizedRequestConfig = { ...lastRequestConfig, lockRotation: fallbackLockRotation };
+      const normalizedRequestConfig = {
+        ...lastRequestConfig,
+        lockRotation: fallbackLockRotation,
+        includeStatuses: fallbackIncludeStatuses,
+        excludeStatuses: fallbackExcludeStatuses,
+      };
 
       setLastRequestConfig(normalizedRequestConfig);
 
@@ -1012,7 +1197,11 @@ function App() {
           <div className="search-panel-primary">
             <div className="search-panel-toggle">
               <span className="disclosure-arrow search-panel-icon" aria-hidden>
-                {filtersCollapsed ? '▶' : '▼'}
+                {filtersCollapsed ? (
+                  <FaChevronRight className="disclosure-arrow-icon" />
+                ) : (
+                  <FaChevronDown className="disclosure-arrow-icon" />
+                )}
               </span>
               <span className="search-panel-label">
                 <strong className="search-panel-title">Options</strong>
@@ -1028,7 +1217,12 @@ function App() {
                 type="button"
                 className="search-panel-submit"
                 onClick={handleCollapsedSubmit}
-                disabled={loading}
+                disabled={loading || !hasIncludeStatuses}
+                title={
+                  !hasIncludeStatuses
+                    ? 'Select at least one collection status to organize'
+                    : undefined
+                }
               >
                 {loading ? 'Processing...' : 'Organize Collection'}
               </button>
@@ -1043,7 +1237,7 @@ function App() {
               ))}
               {collapsedBadgeOverflow > 0 && (
                 <span key="filter-overflow" className="search-panel-tag">
-                  and {collapsedBadgeOverflow} more
+                  + {collapsedBadgeOverflow} more
                 </span>
               )}
             </div>
@@ -1051,154 +1245,184 @@ function App() {
         </div>
         <div className="search-panel-body" id="search-panel-content">
           <form ref={formRef} onSubmit={handleSubmit} className="search-panel-form">
-            <div className="form-layout">
-              <div className="form-left">
-                <div className="form-group">
-                  <label htmlFor="username">BoardGameGeek Username</label>
-                  <input
-                    type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your BGG username"
-                    disabled={loading}
-                  />
-                </div>
+            <div className="options-row">
+              <div className="options-field">
+                <label htmlFor="username">BoardGameGeek Username</label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your BGG username"
+                  disabled={loading}
+                />
+              </div>
+              <div className="options-actions">
+                <button
+                  type="submit"
+                  disabled={loading || !hasIncludeStatuses}
+                  title={
+                    !hasIncludeStatuses
+                      ? 'Select at least one collection status to organize'
+                      : undefined
+                  }
+                >
+                  {loading ? 'Processing...' : 'Organize Collection'}
+                </button>
+                <button
+                  type="button"
+                  className="reset-settings-button"
+                  onClick={handleResetSettings}
+                  disabled={loading}
+                  title="Restore all search options to their default values"
+                >
+                  <FaUndoAlt aria-hidden="true" className="button-icon" />
+                  <span>Reset settings</span>
+                </button>
+              </div>
+            </div>
 
-                <div className="toggle-list">
-                  <ToggleSwitch
-                    id="includePreordered"
-                    label="Include Pre-ordered Games"
-                    checked={includePreordered}
-                    onChange={setIncludePreordered}
-                    disabled={loading}
-                  />
+            {!hasIncludeStatuses && (
+              <div className="collection-filters-warning" role="alert">
+                <FaExclamationTriangle aria-hidden className="collection-filters-warning__icon" />
+                <span>Select at least one collection status to organize.</span>
+              </div>
+            )}
 
-                  <ToggleSwitch
-                    id="respectSortOrder"
-                    label="Respect ordering priority"
-                    checked={respectSortOrder}
-                    onChange={setRespectSortOrder}
-                    disabled={loading || optimizeSpace}
-                    tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space"
-                  />
+            <div className="filter-panels-grid">
+              {renderFilterPanel(
+                'preferences',
+                'Preferences',
+                <div className="preferences-panel">
+                  <div className="stacking-row">
+                    <span className="stacking-label">Stacking</span>
+                    <div className="toggle-button-group toggle-button-group--compact">
+                      <button
+                        type="button"
+                        className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
+                        onClick={() => setVerticalStacking(false)}
+                        disabled={loading}
+                      >
+                        Horizontal
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-button ${verticalStacking ? 'active' : ''}`}
+                        onClick={() => setVerticalStacking(true)}
+                        disabled={loading}
+                      >
+                        Vertical
+                      </button>
+                    </div>
+                  </div>
 
-                  <ToggleSwitch
-                    id="includeExpansions"
-                    label="Include expansions"
-                    checked={includeExpansions}
-                    onChange={(next) => {
-                      setIncludeExpansions(next);
-                      if (!next) {
-                        setGroupExpansions(false); // Disable grouping when expansions are disabled
-                      }
-                    }}
-                    disabled={loading}
-                  />
-
-                  <ToggleSwitch
-                    id="groupExpansions"
-                    label="Group expansions with base game"
-                    checked={groupExpansions}
-                    onChange={setGroupExpansions}
-                    disabled={loading || !includeExpansions || optimizeSpace}
-                    tooltip="Keep expansions with their base game in the same cube when possible"
-                  />
-
-                  <ToggleSwitch
-                    id="groupSeries"
-                    label="Group series"
-                    checked={groupSeries}
-                    onChange={setGroupSeries}
-                    disabled={loading || optimizeSpace}
-                    tooltip="Keep games from the same series/family together in the same cube when possible"
-                  />
-
-                  <ToggleSwitch
-                    id="fitOversized"
-                    label="Fit oversized games"
-                    checked={fitOversized}
-                    onChange={setFitOversized}
-                    disabled={loading}
-                    tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
-                  />
-
-                  <ToggleSwitch
-                    id="bypassVersionWarning"
-                    label="Bypass version warning"
-                    checked={bypassVersionWarning}
-                    onChange={setBypassVersionWarning}
-                    disabled={loading}
-                    tooltip="You will not be warned about missing versions. This may result in incorrect data and longer processing times."
-                    tooltipIcon={FaExclamationTriangle}
-                    tooltipIconClassName="warning-icon"
-                  />
-
-                  <ToggleSwitch
-                    id="lockRotation"
-                    label="Lock Game Rotation"
-                    checked={lockRotation}
-                    onChange={setLockRotation}
-                    disabled={loading}
-                    tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
-                  />
-
-                  <ToggleSwitch
-                    id="optimizeSpace"
-                    label="Optimize for space"
-                    checked={optimizeSpace}
-                    onChange={handleOptimizeSpaceChange}
-                    disabled={loading}
-                    tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Stacking Preference</label>
-                  <div className="toggle-button-group">
-                    <button
-                      type="button"
-                      className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
-                      onClick={() => setVerticalStacking(false)}
+                  <div className="preferences-toggle-grid">
+                    <ToggleSwitch
+                      id="optimizeSpace"
+                      label="Optimize for space"
+                      checked={optimizeSpace}
+                      onChange={handleOptimizeSpaceChange}
                       disabled={loading}
-                    >
-                      Horizontal
-                    </button>
-                    <button
-                      type="button"
-                      className={`toggle-button ${verticalStacking ? 'active' : ''}`}
-                      onClick={() => setVerticalStacking(true)}
+                      tooltip="Ignore all sorting priorities, allow rotation, and pack games in as few cubes as possible"
+                    />
+                    <ToggleSwitch
+                      id="includeExpansions"
+                      label="Include expansions"
+                      checked={includeExpansions}
+                      onChange={(next) => {
+                        setIncludeExpansions(next);
+                        if (!next) {
+                          setGroupExpansions(false);
+                        }
+                      }}
                       disabled={loading}
-                    >
-                      Vertical
-                    </button>
+                    />
+                    <ToggleSwitch
+                      id="groupExpansions"
+                      label="Group expansions with base game"
+                      checked={groupExpansions}
+                      onChange={setGroupExpansions}
+                      disabled={loading || !includeExpansions || optimizeSpace}
+                      tooltip="Keep expansions with their base game in the same cube when possible"
+                    />
+                    <ToggleSwitch
+                      id="groupSeries"
+                      label="Group series"
+                      checked={groupSeries}
+                      onChange={setGroupSeries}
+                      disabled={loading || optimizeSpace}
+                      tooltip="Keep games from the same series/family together in the same cube when possible"
+                    />
+                    <ToggleSwitch
+                      id="fitOversized"
+                      label="Fit oversized games"
+                      checked={fitOversized}
+                      onChange={setFitOversized}
+                      disabled={loading}
+                      tooltip="Force games up to 13 inches deep into the cube and optionally stuff even larger boxes at 12.8 inches."
+                    />
+                    <ToggleSwitch
+                      id="lockRotation"
+                      label="Lock rotation"
+                      checked={lockRotation}
+                      onChange={setLockRotation}
+                      disabled={loading}
+                      tooltip="Prefer vertical or horizontal, but may rotate games for better fit"
+                    />
+                    <ToggleSwitch
+                      id="respectSortOrder"
+                      label="Respect ordering priority"
+                      checked={respectSortOrder}
+                      onChange={setRespectSortOrder}
+                      disabled={loading || optimizeSpace}
+                      tooltip="Games will not be backfilled to earlier cubes for better fit, may use more space"
+                    />
+                    <ToggleSwitch
+                      id="bypassVersionWarning"
+                      label="Bypass version warning"
+                      checked={bypassVersionWarning}
+                      onChange={setBypassVersionWarning}
+                      disabled={loading}
+                      tooltip="You will not be warned about missing versions. This may result in incorrect data and longer processing times."
+                      tooltipIcon={FaExclamationTriangle}
+                      tooltipIconClassName="warning-icon"
+                    />
                   </div>
                 </div>
+              )}
 
-                <div className="form-actions">
-                  <button type="submit" disabled={loading}>
-                    {loading ? 'Processing...' : 'Organize Collection'}
-                  </button>
-                  <button
-                    type="button"
-                    className="reset-settings-button"
-                    onClick={handleResetSettings}
-                    disabled={loading}
-                    title="Restore all search options to their default values"
-                  >
-                    <FaUndoAlt aria-hidden="true" className="button-icon" />
-                    <span>Reset settings</span>
-                  </button>
+              {renderFilterPanel(
+                'collections',
+                'Collections',
+                <div className="collection-status-content">
+                  {(includeStatusList.length > 1 || excludeStatusList.length > 0) && (
+                    <div className="collection-status-helper" role="note">
+                      Include matches any selected category. Exclude removes games with those categories.
+                    </div>
+                  )}
+                  <div className="collection-status-grid">
+                    {COLLECTION_STATUSES.map((status) => (
+                      <CollectionStatusToggle
+                        key={status.key}
+                        label={status.label}
+                        value={collectionFilters[status.key]}
+                        onChange={(nextState) => handleCollectionFilterChange(status.key, nextState)}
+                        disabled={loading}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="form-right">
-                <SortablePriorities 
-                  priorities={priorities} 
+              {renderFilterPanel(
+                'priorities',
+                'Sorting',
+                <SortablePriorities
+                  priorities={priorities}
                   onChange={setPriorities}
                   disabled={optimizeSpace}
                 />
-              </div>
+              )}
             </div>
           </form>
         </div>

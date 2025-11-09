@@ -61,18 +61,9 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // New simplified method that calls server-processed endpoint and returns packed cubes
 // Supports SSE progress updates via onProgress callback
 export const fetchPackedCubes = async (
-  username, 
-  includePreordered = false, 
-  includeExpansions = false, 
-  priorities = [], 
-  verticalStacking = true, 
-  lockRotation = false, 
-  optimizeSpace = false, 
-  respectSortOrder = false, 
-  fitOversized = false,
-  groupExpansions = false,
-  groupSeries = false,
-  onProgress = null, // Optional callback for progress updates
+  username,
+  options = {},
+  onProgress = null,
   extraParams = {}
 ) => {
   const {
@@ -81,6 +72,20 @@ export const fetchPackedCubes = async (
     skipVersionCheck = false,
     ...additionalParams
   } = extraParams || {};
+
+  const {
+    includeStatuses = [],
+    excludeStatuses = [],
+    includeExpansions = false,
+    priorities = [],
+    verticalStacking = true,
+    lockRotation = false,
+    optimizeSpace = false,
+    respectSortOrder = false,
+    fitOversized = false,
+    groupExpansions = false,
+    groupSeries = false,
+  } = options || {};
 
   const requestId = providedRequestId || `${username}-${Date.now()}`;
   const overridesPayload = {
@@ -98,6 +103,8 @@ export const fetchPackedCubes = async (
   
   try {
     console.log('📡 Frontend: Fetching packed cubes from server');
+    console.log('   Include statuses:', includeStatuses);
+    console.log('   Exclude statuses:', excludeStatuses);
     
     // Set up SSE connection for progress updates if callback provided
     if (onProgress) {
@@ -126,7 +133,8 @@ export const fetchPackedCubes = async (
     }
     
     const payload = {
-      includePreordered,
+      includeStatuses,
+      excludeStatuses,
       includeExpansions,
       priorities,
       verticalStacking,

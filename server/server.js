@@ -1081,9 +1081,9 @@ function splitOversizedGroup(group, maxArea, primaryOrder) {
 }
 
 // Main packing function
-function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateRotation, optimizeSpace, respectSortOrder, fitOversized = false, groupExpansions = false, groupSeries = false) {
+function packGamesIntoCubes(games, priorities, verticalStacking, lockRotation, optimizeSpace, respectSortOrder, fitOversized = false, groupExpansions = false, groupSeries = false) {
   console.log(`📦 Starting to pack ${games.length} games`);
-  console.log(`   Options: vertical=${verticalStacking}, rotation=${allowAlternateRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, fitOversized=${fitOversized}`);
+  console.log(`   Options: vertical=${verticalStacking}, lockRotation=${lockRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, fitOversized=${fitOversized}`);
   
   // Determine primary order
   const primaryOrder = verticalStacking ? 'vertical' : 'horizontal';
@@ -1356,7 +1356,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
       } else {
         const primary = game.primaryOrientation || primaryOrder;
         orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
-        if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+        if (!lockRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
           const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
           orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
         }
@@ -1495,7 +1495,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     } else {
       const primary = game.primaryOrientation || primaryOrder;
       orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
-      if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+      if (!lockRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
         const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
         orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
       }
@@ -1581,7 +1581,7 @@ function packGamesIntoCubes(games, priorities, verticalStacking, allowAlternateR
     } else {
       const primary = game.primaryOrientation || primaryOrder;
       orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
-      if (allowAlternateRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
+      if (!lockRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
         const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
         orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
       }
@@ -1800,9 +1800,9 @@ app.post('/api/games/:username', async (req, res) => {
       bodyOptions.verticalStacking ?? queryOptions.verticalStacking,
       true
     );
-    const allowAlternateRotationFlag = parseBoolean(
-      bodyOptions.allowAlternateRotation ?? queryOptions.allowAlternateRotation,
-      true
+    const lockRotationFlag = parseBoolean(
+      bodyOptions.lockRotation ?? queryOptions.lockRotation,
+      false
     );
     const optimizeSpaceFlag = parseBoolean(
       bodyOptions.optimizeSpace ?? queryOptions.optimizeSpace,
@@ -1866,7 +1866,7 @@ app.post('/api/games/:username', async (req, res) => {
     console.log('   Options:', {
       includePreordered: includePreorderedFlag,
       includeExpansions: includeExpansionsFlag,
-      allowAlternateRotation: allowAlternateRotationFlag,
+      lockRotation: lockRotationFlag,
       optimizeSpace: optimizeSpaceFlag,
       fitOversized: fitOversizedFlag,
       groupExpansions: groupExpansionsFlag,
@@ -2751,7 +2751,7 @@ app.post('/api/games/:username', async (req, res) => {
     sendProgress(requestId, `Packing ${gamesToPack.length} games into cubes...`, { step: 'packing', gameCount: gamesToPack.length });
     const parsedPriorities = prioritiesPayload;
     const isVertical = verticalStackingFlag;
-    const allowAltRotation = allowAlternateRotationFlag;
+    const lockRotationOption = lockRotationFlag;
     const shouldOptimizeSpace = optimizeSpaceFlag;
     const strictSortOrder = respectSortOrderFlag;
     const shouldFitOversized = fitOversizedFlag;
@@ -2767,7 +2767,7 @@ app.post('/api/games/:username', async (req, res) => {
       gamesToPack,
       parsedPriorities,
       isVertical,
-      allowAltRotation,
+      lockRotationOption,
       shouldOptimizeSpace,
       strictSortOrder,
       shouldFitOversized,

@@ -842,16 +842,16 @@ function App() {
 
   const activeFilterCount = activeFilterLabels.length;
 
-  const { collapsedBadgeTags, collapsedBadgeOverflow } = useMemo(() => {
-    if (!filtersCollapsed || activeFilterLabels.length === 0 || collapsedBadgeLimit <= 0) {
-      return { collapsedBadgeTags: [], collapsedBadgeOverflow: 0 };
+  const { headerBadgeTags, headerBadgeOverflow } = useMemo(() => {
+    if (activeFilterLabels.length === 0 || collapsedBadgeLimit <= 0) {
+      return { headerBadgeTags: [], headerBadgeOverflow: 0 };
     }
 
     const limited = activeFilterLabels.slice(0, collapsedBadgeLimit);
     const overflow = Math.max(0, activeFilterLabels.length - limited.length);
 
-    return { collapsedBadgeTags: limited, collapsedBadgeOverflow: overflow };
-  }, [filtersCollapsed, activeFilterLabels, collapsedBadgeLimit]);
+    return { headerBadgeTags: limited, headerBadgeOverflow: overflow };
+  }, [activeFilterLabels, collapsedBadgeLimit]);
 
   useEffect(() => {
     if (initialCollapseAppliedRef.current) {
@@ -883,7 +883,7 @@ function App() {
       const target = event?.target;
       if (
         target instanceof Element &&
-        target.closest('.search-panel-submit')
+        (target.closest('.search-panel-submit') || target.closest('.search-panel-actions'))
       ) {
         return;
       }
@@ -905,22 +905,6 @@ function App() {
     },
     [loading, toggleFiltersCollapsed]
   );
-
-  const handleCollapsedSubmit = useCallback(() => {
-    if (loading || !hasIncludeStatuses) {
-      return;
-    }
-    const formElement = formRef.current;
-    if (!formElement) {
-      return;
-    }
-    if (typeof formElement.requestSubmit === 'function') {
-      formElement.requestSubmit();
-      return;
-    }
-    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-    formElement.dispatchEvent(submitEvent);
-  }, [hasIncludeStatuses, loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1182,69 +1166,68 @@ function App() {
       )}
 
       <section className={`card search-panel ${filtersCollapsed ? 'collapsed' : ''}`}>
-        <div
-          className={`search-panel-header ${filtersCollapsed ? 'is-collapsed' : ''} ${
-            loading ? 'is-disabled' : ''
-          }`}
-          role="button"
-          tabIndex={loading ? -1 : 0}
-          aria-expanded={!filtersCollapsed}
-          aria-controls="search-panel-content"
-          onClick={handleHeaderClick}
-          onKeyDown={handleHeaderKeyDown}
-          title={filtersCollapsed ? 'Show search options' : 'Hide search options'}
-        >
-          <div className="search-panel-primary">
-            <div className="search-panel-toggle">
-              <span className="disclosure-arrow search-panel-icon" aria-hidden>
-                {filtersCollapsed ? (
-                  <FaChevronRight className="disclosure-arrow-icon" />
-                ) : (
-                  <FaChevronDown className="disclosure-arrow-icon" />
-                )}
-              </span>
-              <span className="search-panel-label">
-                <strong className="search-panel-title">Options</strong>
-                {activeFilterCount > 0 && (
-                  <span className="search-panel-count" aria-label={`${activeFilterCount} active filters`}>
-                    {activeFilterCount}
+        <form ref={formRef} onSubmit={handleSubmit} className="search-panel-form">
+          <div
+            className={`search-panel-header ${filtersCollapsed ? 'is-collapsed' : ''} ${
+              loading ? 'is-disabled' : ''
+            }`}
+            role="button"
+            tabIndex={loading ? -1 : 0}
+            aria-expanded={!filtersCollapsed}
+            aria-controls="search-panel-content"
+            onClick={handleHeaderClick}
+            onKeyDown={handleHeaderKeyDown}
+            title={filtersCollapsed ? 'Show search options' : 'Hide search options'}
+          >
+            <div className="search-panel-primary">
+              <div className="search-panel-toggle">
+                <span className="disclosure-arrow search-panel-icon" aria-hidden>
+                  {filtersCollapsed ? (
+                    <FaChevronRight className="disclosure-arrow-icon" />
+                  ) : (
+                    <FaChevronDown className="disclosure-arrow-icon" />
+                  )}
+                </span>
+                <span className="search-panel-label">
+                  <strong className="search-panel-title">Options</strong>
+                  {activeFilterCount > 0 && (
+                    <span className="search-panel-count" aria-label={`${activeFilterCount} active filters`}>
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <div className="search-panel-actions">
+                <button
+                  type="submit"
+                  className="search-panel-submit"
+                  disabled={loading || !hasIncludeStatuses}
+                  title={
+                    !hasIncludeStatuses
+                      ? 'Select at least one collection status to organize'
+                      : undefined
+                  }
+                >
+                  {loading ? 'Processing...' : 'Organize Collection'}
+                </button>
+              </div>
+            </div>
+            {activeFilterCount > 0 && collapsedBadgeLimit > 0 && (
+              <div className="search-panel-tags" aria-label="Active filters">
+                {headerBadgeTags.map(({ key, content }) => (
+                  <span key={key} className="search-panel-tag">
+                    {content}
+                  </span>
+                ))}
+                {headerBadgeOverflow > 0 && (
+                  <span key="filter-overflow" className="search-panel-tag">
+                    + {headerBadgeOverflow} more
                   </span>
                 )}
-              </span>
-            </div>
-            {filtersCollapsed && (
-              <button
-                type="button"
-                className="search-panel-submit"
-                onClick={handleCollapsedSubmit}
-                disabled={loading || !hasIncludeStatuses}
-                title={
-                  !hasIncludeStatuses
-                    ? 'Select at least one collection status to organize'
-                    : undefined
-                }
-              >
-                {loading ? 'Processing...' : 'Organize Collection'}
-              </button>
+              </div>
             )}
           </div>
-          {filtersCollapsed && activeFilterCount > 0 && collapsedBadgeLimit > 0 && (
-            <div className="search-panel-tags" aria-label="Active filters">
-              {collapsedBadgeTags.map(({ key, content }) => (
-                <span key={key} className="search-panel-tag">
-                  {content}
-                </span>
-              ))}
-              {collapsedBadgeOverflow > 0 && (
-                <span key="filter-overflow" className="search-panel-tag">
-                  + {collapsedBadgeOverflow} more
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="search-panel-body" id="search-panel-content">
-          <form ref={formRef} onSubmit={handleSubmit} className="search-panel-form">
+          <div className="search-panel-body" id="search-panel-content">
             <div className="options-row">
               <div className="options-field">
                 <label htmlFor="username">BoardGameGeek Username</label>
@@ -1258,17 +1241,6 @@ function App() {
                 />
               </div>
               <div className="options-actions">
-                <button
-                  type="submit"
-                  disabled={loading || !hasIncludeStatuses}
-                  title={
-                    !hasIncludeStatuses
-                      ? 'Select at least one collection status to organize'
-                      : undefined
-                  }
-                >
-                  {loading ? 'Processing...' : 'Organize Collection'}
-                </button>
                 <button
                   type="button"
                   className="reset-settings-button"
@@ -1424,8 +1396,8 @@ function App() {
                 />
               )}
             </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </section>
 
       {loading && (

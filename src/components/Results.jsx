@@ -18,6 +18,7 @@ import CubeVisualization from './CubeVisualization';
 import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
 import OverridesSection from './OverridesSection';
+import CollapsibleCallout from './CollapsibleCallout';
 import './Results.css';
 
 const getScrollableListClassName = (length) =>
@@ -74,6 +75,22 @@ export default function Results({
   const [exceedingCapacityExpanded, setExceedingCapacityExpanded] = useState(false);
   const [guessedVersionsExpanded, setGuessedVersionsExpanded] = useState(false);
   const [selectedVersionFallbackExpanded, setSelectedVersionFallbackExpanded] = useState(false);
+  const toggleGuessedVersionsExpanded = useCallback(
+    () => setGuessedVersionsExpanded((prev) => !prev),
+    []
+  );
+  const toggleSelectedVersionFallbackExpanded = useCallback(
+    () => setSelectedVersionFallbackExpanded((prev) => !prev),
+    []
+  );
+  const toggleMissingDimsExpanded = useCallback(
+    () => setMissingDimsExpanded((prev) => !prev),
+    []
+  );
+  const toggleExceedingCapacityExpanded = useCallback(
+    () => setExceedingCapacityExpanded((prev) => !prev),
+    []
+  );
   const renderDisclosureIcon = useCallback(
     (expanded) => (
       <span className="disclosure-arrow">
@@ -474,165 +491,150 @@ export default function Results({
       {(showGuessedVersionInfo || showSelectedVersionFallback || showMissingDimensions || showOversizedWarning) && (
         <div className={`results-warnings warnings-count-${totalWarningPanels}`}>
           {showGuessedVersionInfo && (
-            <div className="callout callout--info">
-              <button
-                className="callout__header"
-                onClick={() => setGuessedVersionsExpanded(!guessedVersionsExpanded)}
-                aria-expanded={guessedVersionsExpanded}
-              >
-                {renderDisclosureIcon(guessedVersionsExpanded)}
-                <strong>
-                  <FaInfoCircle className="inline-icon" aria-hidden="true" />
-                  Missing Version ({gamesWithGuessedVersions.length})
-                </strong>
-              </button>
-              {guessedVersionsExpanded && (
-                <div className="callout__content">
-                  <div className="callout__description">
-                    No specific BoardGameGeek version was selected for these game{gamesWithGuessedVersions.length !== 1 ? 's' : ''}. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.
-                  </div>
-                  <ul className={getScrollableListClassName(gamesWithGuessedVersions.length)}>
-                    {gamesWithGuessedVersions.map((game) => (
-                      <li key={game.id}>
-                        {game.versionsUrl ? (
-                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                            {game.name}
-                          </a>
-                        ) : (
-                          game.name
-                        )}
-                        {` (Cube #${game.cubeId})`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <CollapsibleCallout
+              variant="info"
+              expanded={guessedVersionsExpanded}
+              onToggle={toggleGuessedVersionsExpanded}
+              renderToggleIcon={renderDisclosureIcon}
+              icon={<FaInfoCircle className="inline-icon" aria-hidden="true" />}
+              title="Missing Version"
+              count={gamesWithGuessedVersions.length}
+            >
+              <div className="callout__description">
+                No specific BoardGameGeek version was selected for these game
+                {gamesWithGuessedVersions.length !== 1 ? 's' : ''}. We guessed an alternate version to estimate dimensions.
+                Selecting the right version keeps future calculations accurate and avoids guesswork.
+              </div>
+              <ul className={getScrollableListClassName(gamesWithGuessedVersions.length)}>
+                {gamesWithGuessedVersions.map((game) => (
+                  <li key={game.id}>
+                    {game.versionsUrl ? (
+                      <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                        {game.name}
+                      </a>
+                    ) : (
+                      game.name
+                    )}
+                    {` (Cube #${game.cubeId})`}
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleCallout>
           )}
           {showSelectedVersionFallback && (
-            <div className="callout callout--success">
-              <button
-                className="callout__header"
-                onClick={() => setSelectedVersionFallbackExpanded(!selectedVersionFallbackExpanded)}
-                aria-expanded={selectedVersionFallbackExpanded}
-              >
-                {renderDisclosureIcon(selectedVersionFallbackExpanded)}
-                <strong>
-                  <FaTools className="inline-icon" aria-hidden="true" />
-                  Version Missing Size ({gamesUsingFallbackForSelectedVersion.length})
-                </strong>
-              </button>
-              {selectedVersionFallbackExpanded && (
-                <div className="callout__content">
-                  <div className="callout__description">
-                    The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact.
-                  </div>
-                  <ul className={getScrollableListClassName(gamesUsingFallbackForSelectedVersion.length)}>
-                    {gamesUsingFallbackForSelectedVersion.map((game) => (
-                      <li key={game.id}>
-                        {game.versionsUrl ? (
-                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                            {game.name}
-                          </a>
-                        ) : (
-                          game.name
-                        )}
-                        {` (Cube #${game.cubeId})`}
-                        {game.correctionUrl && (
-                          <>
-                            {` — `}
-                            <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
-                              Submit dimensions
-                            </a>
-                          </>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <CollapsibleCallout
+              variant="success"
+              expanded={selectedVersionFallbackExpanded}
+              onToggle={toggleSelectedVersionFallbackExpanded}
+              renderToggleIcon={renderDisclosureIcon}
+              icon={<FaTools className="inline-icon" aria-hidden="true" />}
+              title="Version Missing Size"
+              count={gamesUsingFallbackForSelectedVersion.length}
+            >
+              <div className="callout__description">
+                The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different
+                version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact.
+              </div>
+              <ul className={getScrollableListClassName(gamesUsingFallbackForSelectedVersion.length)}>
+                {gamesUsingFallbackForSelectedVersion.map((game) => (
+                  <li key={game.id}>
+                    {game.versionsUrl ? (
+                      <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                        {game.name}
+                      </a>
+                    ) : (
+                      game.name
+                    )}
+                    {` (Cube #${game.cubeId})`}
+                    {game.correctionUrl && (
+                      <>
+                        {` — `}
+                        <a
+                          href={game.correctionUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="callout__link"
+                        >
+                          Submit dimensions
+                        </a>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleCallout>
           )}
           {gamesWithMissingDimensions.length > 0 && (
-            <div className="callout">
-              <button
-                className="callout__header"
-                onClick={() => setMissingDimsExpanded(!missingDimsExpanded)}
-                aria-expanded={missingDimsExpanded}
-              >
-                {renderDisclosureIcon(missingDimsExpanded)}
-                <strong>
-                  <FaExclamationTriangle className="inline-icon" aria-hidden="true" />
-                  No Sizes Found ({gamesWithMissingDimensions.length})
-                </strong>
-              </button>
-              {missingDimsExpanded && (
-                <div className="callout__content">
-                  <div className="callout__description">
-                    {gamesWithMissingDimensions.length} game{gamesWithMissingDimensions.length !== 1 ? 's' : ''} {gamesWithMissingDimensions.length !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. 
-                    Default dimensions of 12.8" × 12.8" × 1.8" were assumed and marked with the warning icon{' '}
-                    <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
-                  </div>
-                  <ul className={getScrollableListClassName(gamesWithMissingDimensions.length)}>
-                    {gamesWithMissingDimensions.map((game) => (
-                      <li key={game.id}>
-                        {game.correctionUrl ? (
-                          <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
-                            {game.name}
-                          </a>
-                        ) : (
-                          game.name
-                        )}
-                        {` (Cube #${game.cubeId})`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <CollapsibleCallout
+              expanded={missingDimsExpanded}
+              onToggle={toggleMissingDimsExpanded}
+              renderToggleIcon={renderDisclosureIcon}
+              icon={<FaExclamationTriangle className="inline-icon" aria-hidden="true" />}
+              title="No Sizes Found"
+              count={gamesWithMissingDimensions.length}
+            >
+              <div className="callout__description">
+                {gamesWithMissingDimensions.length} game
+                {gamesWithMissingDimensions.length !== 1 ? 's' : ''}{' '}
+                {gamesWithMissingDimensions.length !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions.
+                Default dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
+                <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
+              </div>
+              <ul className={getScrollableListClassName(gamesWithMissingDimensions.length)}>
+                {gamesWithMissingDimensions.map((game) => (
+                  <li key={game.id}>
+                    {game.correctionUrl ? (
+                      <a
+                        href={game.correctionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="callout__link"
+                      >
+                        {game.name}
+                      </a>
+                    ) : (
+                      game.name
+                    )}
+                    {` (Cube #${game.cubeId})`}
+                  </li>
+                ))}
+              </ul>
+            </CollapsibleCallout>
           )}
           {showOversizedWarning && (
-            <div className="callout">
-              <button
-                className="callout__header"
-                onClick={() => setExceedingCapacityExpanded(!exceedingCapacityExpanded)}
-                aria-expanded={exceedingCapacityExpanded}
-              >
-                {renderDisclosureIcon(exceedingCapacityExpanded)}
-                <strong>
-                  <FaBoxOpen className="inline-icon" aria-hidden="true" />
-                  Over Capacity ({oversizedWarningGames.length})
-                </strong>
-              </button>
-              {exceedingCapacityExpanded && (
-                <div className="callout__content">
-                  <div className="callout__description">
-                    {fitOversized
-                      ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
-                      : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}
-                    {' '}
-                    If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
-                  </div>
-                  <ul className={getScrollableListClassName(oversizedWarningGames.length)}>
-                    {oversizedWarningGames.map((game) => {
-                      const link = game.correctionUrl || game.versionsUrl;
-                      return (
-                        <li key={game.id}>
-                          {link ? (
-                            <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
-                              {game.name}
-                            </a>
-                          ) : (
-                            game.name
-                          )}
-                          {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-            </div>
+            <CollapsibleCallout
+              expanded={exceedingCapacityExpanded}
+              onToggle={toggleExceedingCapacityExpanded}
+              renderToggleIcon={renderDisclosureIcon}
+              icon={<FaBoxOpen className="inline-icon" aria-hidden="true" />}
+              title="Over Capacity"
+              count={oversizedWarningGames.length}
+            >
+              <div className="callout__description">
+                {fitOversized
+                  ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
+                  : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}
+                {' '}
+                If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
+              </div>
+              <ul className={getScrollableListClassName(oversizedWarningGames.length)}>
+                {oversizedWarningGames.map((game) => {
+                  const link = game.correctionUrl || game.versionsUrl;
+                  return (
+                    <li key={game.id}>
+                      {link ? (
+                        <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
+                          {game.name}
+                        </a>
+                      ) : (
+                        game.name
+                      )}
+                      {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </CollapsibleCallout>
           )}
         </div>
       )}

@@ -19,8 +19,23 @@ import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
 import OverridesSection from './OverridesSection';
 import WarningCallout from './WarningCallout';
+import OverrideList from './OverrideList';
 import { formatGameDimensions, getScrollableListClassName } from '../utils/results';
 import './Results.css';
+
+const formatEditorDimensions = (editor) => {
+  const formatPart = (value) => {
+    const numeric = Number.parseFloat(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return `${numeric.toFixed(2)}"`;
+    }
+    return '—';
+  };
+
+  return `${formatPart(editor.length)} × ${formatPart(editor.width)} × ${formatPart(
+    editor.depth
+  )}`;
+};
 
 export default function Results({
   cubes,
@@ -259,6 +274,86 @@ export default function Results({
     ]
   );
 
+  const renderExcludedActions = useCallback(
+    (game) => (
+      <IconButton
+        className="override-action-button"
+        onClick={() => onRestoreExcludedGame?.(game.id)}
+        disabled={!overridesReady || isLoading}
+        title="Remove from excluded list"
+        icon={<FaTimes aria-hidden="true" className="button-icon" />}
+        srLabel="Remove from excluded list"
+      />
+    ),
+    [isLoading, onRestoreExcludedGame, overridesReady]
+  );
+
+  const renderOrientationActions = useCallback(
+    (game) => {
+      const orientationIcon =
+        game.orientation === 'horizontal' ? (
+          <FaArrowsAltH aria-hidden="true" className="button-icon" />
+        ) : (
+          <FaArrowsAltV aria-hidden="true" className="button-icon" />
+        );
+
+      return (
+        <>
+          <span className="override-pill orientation-pill">{game.orientationLabel}</span>
+          <IconButton
+            className="override-action-button"
+            onClick={() => handleOrientationPanelToggle(game)}
+            disabled={!overridesReady || isLoading}
+            title={`Switch to ${game.nextOrientation} orientation`}
+            icon={orientationIcon}
+            srLabel={`Switch to ${game.nextOrientation} orientation`}
+          />
+          <IconButton
+            className="override-action-button"
+            onClick={() => onClearOrientationOverride?.(game.id)}
+            disabled={!overridesReady || isLoading}
+            title="Remove forced orientation"
+            icon={<FaTimes aria-hidden="true" className="button-icon" />}
+            srLabel="Clear orientation override"
+          />
+        </>
+      );
+    },
+    [handleOrientationPanelToggle, isLoading, onClearOrientationOverride, overridesReady]
+  );
+
+  const renderDimensionActions = useCallback(
+    (game) => (
+      <>
+        <IconButton
+          className="override-action-button"
+          onClick={() =>
+            game.isEditing ? closePanelDimensionEditor() : openPanelDimensionEditor(game)
+          }
+          disabled={!overridesReady || isLoading}
+          title={game.isEditing ? 'Close editor' : 'Edit custom dimensions'}
+          icon={<FaEdit aria-hidden="true" className="button-icon" />}
+          srLabel={game.isEditing ? 'Close editor' : 'Edit custom dimensions'}
+        />
+        <IconButton
+          className="override-action-button"
+          onClick={() => onRemoveDimensionOverride?.(game.id)}
+          disabled={!overridesReady || isLoading}
+          title="Remove custom dimensions"
+          icon={<FaTimes aria-hidden="true" className="button-icon" />}
+          srLabel="Clear custom dimensions"
+        />
+      </>
+    ),
+    [
+      closePanelDimensionEditor,
+      isLoading,
+      onRemoveDimensionOverride,
+      openPanelDimensionEditor,
+      overridesReady,
+    ]
+  );
+
   const hasExcludedGames = sortedExcludedGames.length > 0;
   const hasOrientationOverrides = sortedOrientationOverrides.length > 0;
   const hasDimensionOverrides = sortedDimensionOverrides.length > 0;
@@ -323,7 +418,7 @@ export default function Results({
           <div key={label} className="stat">
             <span className="stat-value">{value}</span>
             <span className="stat-label">{label}</span>
-          </div>
+        </div>
         ))}
       </div>
 
@@ -340,23 +435,7 @@ export default function Results({
               description="Excluded games will not be included the next time you organize your collection."
               listClassName={getScrollableListClassName(sortedExcludedGames.length)}
             >
-              {sortedExcludedGames.map((game) => (
-                <li key={game.id} className="override-list-item">
-                  <div className="override-entry-row">
-                    <span className="override-entry-name">{game.name}</span>
-                    <div className="override-entry-actions">
-                      <IconButton
-                        className="override-action-button"
-                        onClick={() => onRestoreExcludedGame?.(game.id)}
-                        disabled={!overridesReady || isLoading}
-                        title="Remove from excluded list"
-                        icon={<FaTimes aria-hidden="true" className="button-icon" />}
-                        srLabel="Remove from excluded list"
-                      />
-                    </div>
-                  </div>
-                </li>
-              ))}
+              <OverrideList items={sortedExcludedGames} renderActions={renderExcludedActions} />
             </OverridesSection>
           )}
           {hasOrientationOverrides && (
@@ -370,43 +449,14 @@ export default function Results({
               description="These games will ignore rotation settings and be placed exactly as chosen."
               listClassName={getScrollableListClassName(sortedOrientationOverrides.length)}
             >
-              {sortedOrientationOverrides.map((game) => {
-                const orientationLabel = game.orientation === 'horizontal' ? 'Horizontal' : 'Vertical';
-                const nextOrientation = game.orientation === 'vertical' ? 'horizontal' : 'vertical';
-                const orientationIcon =
-                  game.orientation === 'horizontal' ? (
-                    <FaArrowsAltH aria-hidden="true" className="button-icon" />
-                  ) : (
-                    <FaArrowsAltV aria-hidden="true" className="button-icon" />
-                  );
-
-                return (
-                  <li key={game.id} className="override-list-item">
-                    <div className="override-entry-row">
-                      <span className="override-entry-name">{game.name}</span>
-                      <div className="override-entry-actions">
-                        <span className="override-pill orientation-pill">{orientationLabel}</span>
-                        <IconButton
-                          className="override-action-button"
-                          onClick={() => handleOrientationPanelToggle(game)}
-                          disabled={!overridesReady || isLoading}
-                          title={`Switch to ${nextOrientation} orientation`}
-                          icon={orientationIcon}
-                          srLabel={`Switch to ${nextOrientation} orientation`}
+              <OverrideList
+                items={sortedOrientationOverrides.map((game) => ({
+                  ...game,
+                  orientationLabel: game.orientation === 'horizontal' ? 'Horizontal' : 'Vertical',
+                  nextOrientation: game.orientation === 'vertical' ? 'horizontal' : 'vertical',
+                }))}
+                renderActions={renderOrientationActions}
                         />
-                        <IconButton
-                          className="override-action-button"
-                          onClick={() => onClearOrientationOverride?.(game.id)}
-                          disabled={!overridesReady || isLoading}
-                          title="Remove forced orientation"
-                          icon={<FaTimes aria-hidden="true" className="button-icon" />}
-                          srLabel="Clear orientation override"
-                        />
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
             </OverridesSection>
           )}
           {hasDimensionOverrides && (
@@ -420,37 +470,16 @@ export default function Results({
               description="Your overrides will be used instead of the dimensions supplied by BoardGameGeek."
               listClassName={getScrollableListClassName(sortedDimensionOverrides.length)}
             >
-              {sortedDimensionOverrides.map((game) => {
-                const isEditing = panelDimensionEditor.gameId === game.id;
-
-                return (
-                  <li key={game.id} className="override-list-item">
-                    <div className="override-entry-row">
-                      <span className="override-entry-name">{game.name}</span>
-                      <div className="override-entry-actions">
-                        <span className="override-pill">{formatGameDimensions(game)}</span>
-                        <IconButton
-                          className="override-action-button"
-                          onClick={() =>
-                            isEditing ? closePanelDimensionEditor() : openPanelDimensionEditor(game)
-                          }
-                          disabled={!overridesReady || isLoading}
-                          title={isEditing ? 'Close editor' : 'Edit custom dimensions'}
-                          icon={<FaEdit aria-hidden="true" className="button-icon" />}
-                          srLabel={isEditing ? 'Close editor' : 'Edit custom dimensions'}
-                        />
-                        <IconButton
-                          className="override-action-button"
-                          onClick={() => onRemoveDimensionOverride?.(game.id)}
-                          disabled={!overridesReady || isLoading}
-                          title="Remove custom dimensions"
-                          icon={<FaTimes aria-hidden="true" className="button-icon" />}
-                          srLabel="Clear custom dimensions"
-                        />
-                      </div>
-                    </div>
-
-                    {isEditing && (
+              <OverrideList
+                items={sortedDimensionOverrides.map((game) => ({
+                  ...game,
+                  isEditing: panelDimensionEditor.gameId === game.id,
+                  dimensions:
+                    panelDimensionEditor.gameId === game.id
+                      ? formatEditorDimensions(panelDimensionEditor)
+                      : formatGameDimensions(game),
+                  extraContent:
+                    panelDimensionEditor.gameId === game.id ? (
                       <DimensionForm
                         className="override-dimension-form"
                         gridClassName="override-dimension-grid"
@@ -465,10 +494,11 @@ export default function Results({
                         onSubmit={() => handlePanelDimensionSave(game)}
                         onCancel={closePanelDimensionEditor}
                       />
-                    )}
-                  </li>
-                );
-              })}
+                    ) : null,
+                }))}
+                showDimensions
+                renderActions={renderDimensionActions}
+              />
             </OverridesSection>
           )}
         </div>
@@ -490,16 +520,16 @@ export default function Results({
               }. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.`}
               items={buildScrollableList(gamesWithGuessedVersions, (game) => (
                 <>
-                  {game.versionsUrl ? (
-                    <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                      {game.name}
-                    </a>
-                  ) : (
-                    game.name
-                  )}
-                  {` (Cube #${game.cubeId})`}
+                        {game.versionsUrl ? (
+                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                            {game.name}
+                          </a>
+                        ) : (
+                          game.name
+                        )}
+                        {` (Cube #${game.cubeId})`}
                 </>
-              ))}
+                    ))}
             />
           )}
           {showSelectedVersionFallback && (
@@ -514,24 +544,24 @@ export default function Results({
               description="The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact."
               items={buildScrollableList(gamesUsingFallbackForSelectedVersion, (game) => (
                 <>
-                  {game.versionsUrl ? (
-                    <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                      {game.name}
-                    </a>
-                  ) : (
-                    game.name
-                  )}
-                  {` (Cube #${game.cubeId})`}
-                  {game.correctionUrl && (
-                    <>
-                      {` — `}
+                        {game.versionsUrl ? (
+                          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+                            {game.name}
+                          </a>
+                        ) : (
+                          game.name
+                        )}
+                        {` (Cube #${game.cubeId})`}
+                        {game.correctionUrl && (
+                          <>
+                            {` — `}
                       <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
-                        Submit dimensions
-                      </a>
-                    </>
-                  )}
+                              Submit dimensions
+                            </a>
+                          </>
+                        )}
                 </>
-              ))}
+                    ))}
             />
           )}
           {gamesWithMissingDimensions.length > 0 && (
@@ -548,21 +578,21 @@ export default function Results({
                   {gamesWithMissingDimensions.length !== 1 ? 's' : ''}{' '}
                   {gamesWithMissingDimensions.length !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions.
                   Default dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
-                  <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
+                    <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
                 </>
               }
               items={buildScrollableList(gamesWithMissingDimensions, (game) => (
                 <>
-                  {game.correctionUrl ? (
+                        {game.correctionUrl ? (
                     <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
-                      {game.name}
-                    </a>
-                  ) : (
-                    game.name
-                  )}
-                  {` (Cube #${game.cubeId})`}
+                            {game.name}
+                          </a>
+                        ) : (
+                          game.name
+                        )}
+                        {` (Cube #${game.cubeId})`}
                 </>
-              ))}
+                    ))}
             />
           )}
           {showOversizedWarning && (
@@ -575,27 +605,27 @@ export default function Results({
               count={oversizedWarningGames.length}
               description={
                 <>
-                  {fitOversized
-                    ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
+                    {fitOversized
+                      ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
                     : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
-                  If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
+                    If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
                 </>
               }
               items={buildScrollableList(oversizedWarningGames, (game) => {
-                const link = game.correctionUrl || game.versionsUrl;
-                return (
+                      const link = game.correctionUrl || game.versionsUrl;
+                      return (
                   <>
-                    {link ? (
+                          {link ? (
                       <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
-                        {game.name}
-                      </a>
-                    ) : (
-                      game.name
-                    )}
-                    {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
+                              {game.name}
+                            </a>
+                          ) : (
+                            game.name
+                          )}
+                          {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
                   </>
-                );
-              })}
+                      );
+                    })}
             />
           )}
         </div>

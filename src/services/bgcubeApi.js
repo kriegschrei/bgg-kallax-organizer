@@ -5,9 +5,6 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const apiClient = axios.create({
   timeout: 120000, // 2 minutes
-  headers: {
-    'Connection': 'keep-alive',
-  },
 });
 
 const DEFAULT_OPTIONS = {

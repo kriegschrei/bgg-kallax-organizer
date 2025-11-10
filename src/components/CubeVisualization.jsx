@@ -72,39 +72,9 @@ export default function CubeVisualization({
     [priorities]
   );
 
-  const activeBadgeBuilders = useMemo(
-    () =>
-      activePriorityFields
-        .map((field) => ({
-          field,
-          builder: PRIORITY_BADGE_BUILDERS[field],
-        }))
-        .filter(({ builder }) => typeof builder === 'function'),
-    [activePriorityFields]
-  );
   const buildBadgesForGame = useCallback(
-    (game) => {
-      if (activeBadgeBuilders.length === 0) {
-        return [];
-      }
-      const badges = [];
-      activeBadgeBuilders.forEach(({ field, builder }) => {
-        const fieldBadges = builder(game);
-        if (!Array.isArray(fieldBadges) || fieldBadges.length === 0) {
-          return;
-        }
-        fieldBadges.forEach((badge, index) => {
-          const fallbackKey = `${field}-${game.id}-${index}`;
-          badges.push({
-            field,
-            label: badge.label,
-            key: badge.key ?? fallbackKey,
-          });
-        });
-      });
-      return badges;
-    },
-    [activeBadgeBuilders]
+    (game) => computeBadgesForGame(game, activePriorityFields),
+    [activePriorityFields]
   );
 
   const toggleBadgeVisibility = useCallback((gameId) => {

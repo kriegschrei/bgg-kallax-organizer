@@ -315,6 +315,9 @@ export default function Results({
   const hasExcludedGames = sortedExcludedGames.length > 0;
   const hasOrientationOverrides = orientationOverrideItems.length > 0;
   const hasDimensionOverrides = sortedDimensionOverrides.length > 0;
+  const activeOverridePanelCount = [hasExcludedGames, hasOrientationOverrides, hasDimensionOverrides].filter(
+    Boolean
+  ).length;
 
   return (
     <div className="results">
@@ -328,8 +331,8 @@ export default function Results({
         ))}
       </div>
 
-      {(hasExcludedGames || hasOrientationOverrides || hasDimensionOverrides) && (
-        <div className="results-overrides">
+      {activeOverridePanelCount > 0 && (
+        <div className={`results-overrides callout-grid callout-count-${activeOverridePanelCount}`}>
           {hasExcludedGames && (
             <OverridesSection
               expanded={excludedExpanded}
@@ -407,7 +410,7 @@ export default function Results({
       )}
 
       {totalWarningPanels > 0 && (
-        <div className={`results-warnings warnings-count-${totalWarningPanels}`}>
+        <div className={`results-warnings callout-grid callout-count-${totalWarningPanels}`}>
           {warningPanels.map((panel) => (
             <WarningCallout
               key={panel.id}

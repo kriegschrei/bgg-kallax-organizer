@@ -135,8 +135,18 @@ const getCollapsedBadgeLimit = (width) => {
 
 const MOBILE_BREAKPOINT = 768;
 
-function App() {
-  const formRef = useRef(null);
+const createDefaultPriorities = () =>
+  DEFAULT_PRIORITIES.map((priority) => ({ ...priority }));
+
+const createDefaultCollectionFilters = () => ({
+  ...DEFAULT_COLLECTION_FILTERS,
+});
+
+const createDefaultFilterPanelState = () => ({
+  ...DEFAULT_FILTER_PANEL_STATE,
+});
+
+function useInputSettingsState() {
   const [username, setUsername] = useState('');
   const [includeExpansions, setIncludeExpansions] = useState(false);
   const [groupExpansions, setGroupExpansions] = useState(false);
@@ -147,34 +157,220 @@ function App() {
   const [respectSortOrder, setRespectSortOrder] = useState(false);
   const [fitOversized, setFitOversized] = useState(false);
   const [bypassVersionWarning, setBypassVersionWarning] = useState(false);
-  const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
-  const [collectionFilters, setCollectionFilters] = useState(
-    () => ({ ...DEFAULT_COLLECTION_FILTERS })
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
+  const [priorities, setPriorities] = useState(createDefaultPriorities);
+  const [collectionFilters, setCollectionFilters] = useState(createDefaultCollectionFilters);
+  const [filterPanelsCollapsed, setFilterPanelsCollapsed] = useState(
+    createDefaultFilterPanelState
   );
-  const [excludedGamesMap, setExcludedGamesMap] = useState({});
-  const [orientationOverridesMap, setOrientationOverridesMap] = useState({});
-  const [dimensionOverridesMap, setDimensionOverridesMap] = useState({});
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [progress, setProgress] = useState('');
+  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+
+  const resetInputSettings = useCallback(() => {
+    setUsername('');
+    setIncludeExpansions(false);
+    setGroupExpansions(false);
+    setGroupSeries(false);
+    setVerticalStacking(true);
+    setLockRotation(false);
+    setOptimizeSpace(false);
+    setRespectSortOrder(false);
+    setFitOversized(false);
+    setBypassVersionWarning(false);
+    setFiltersCollapsed(false);
+    setPriorities(createDefaultPriorities());
+    setCollectionFilters(createDefaultCollectionFilters());
+    setFilterPanelsCollapsed(createDefaultFilterPanelState());
+    setIsFilterDrawerOpen(false);
+  }, [
+    setUsername,
+    setIncludeExpansions,
+    setGroupExpansions,
+    setGroupSeries,
+    setVerticalStacking,
+    setLockRotation,
+    setOptimizeSpace,
+    setRespectSortOrder,
+    setFitOversized,
+    setBypassVersionWarning,
+    setFiltersCollapsed,
+    setPriorities,
+    setCollectionFilters,
+    setFilterPanelsCollapsed,
+    setIsFilterDrawerOpen,
+  ]);
+
+  return {
+    username,
+    setUsername,
+    includeExpansions,
+    setIncludeExpansions,
+    groupExpansions,
+    setGroupExpansions,
+    groupSeries,
+    setGroupSeries,
+    verticalStacking,
+    setVerticalStacking,
+    lockRotation,
+    setLockRotation,
+    optimizeSpace,
+    setOptimizeSpace,
+    respectSortOrder,
+    setRespectSortOrder,
+    fitOversized,
+    setFitOversized,
+    bypassVersionWarning,
+    setBypassVersionWarning,
+    filtersCollapsed,
+    setFiltersCollapsed,
+    priorities,
+    setPriorities,
+    collectionFilters,
+    setCollectionFilters,
+    filterPanelsCollapsed,
+    setFilterPanelsCollapsed,
+    isFilterDrawerOpen,
+    setIsFilterDrawerOpen,
+    resetInputSettings,
+  };
+}
+
+function useResultsState() {
   const [cubes, setCubes] = useState(null);
   const [stats, setStats] = useState(null);
   const [oversizedGames, setOversizedGames] = useState([]);
   const [missingVersionWarning, setMissingVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
-  const [filterPanelsCollapsed, setFilterPanelsCollapsed] = useState(
-    () => ({ ...DEFAULT_FILTER_PANEL_STATE })
-  );
+  const [error, setError] = useState(null);
+  const [progress, setProgress] = useState('');
+
+  const resetResults = useCallback(() => {
+    setCubes(null);
+    setStats(null);
+    setOversizedGames([]);
+    setMissingVersionWarning(null);
+    setLastRequestConfig(null);
+    setError(null);
+    setProgress('');
+  }, [
+    setCubes,
+    setStats,
+    setOversizedGames,
+    setMissingVersionWarning,
+    setLastRequestConfig,
+    setError,
+    setProgress,
+  ]);
+
+  return {
+    cubes,
+    setCubes,
+    stats,
+    setStats,
+    oversizedGames,
+    setOversizedGames,
+    missingVersionWarning,
+    setMissingVersionWarning,
+    lastRequestConfig,
+    setLastRequestConfig,
+    error,
+    setError,
+    progress,
+    setProgress,
+    resetResults,
+  };
+}
+
+function useHydrationState() {
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [lastResultHydrated, setLastResultHydrated] = useState(false);
+  const [hasStoredData, setHasStoredData] = useState(false);
+
+  const resetHydration = useCallback(() => {
+    setHasStoredData(false);
+    setLastResultHydrated(false);
+  }, [setHasStoredData, setLastResultHydrated]);
+
+  return {
+    settingsHydrated,
+    setSettingsHydrated,
+    lastResultHydrated,
+    setLastResultHydrated,
+    hasStoredData,
+    setHasStoredData,
+    resetHydration,
+  };
+}
+
+function App() {
+  const formRef = useRef(null);
+  const {
+    username,
+    setUsername,
+    includeExpansions,
+    setIncludeExpansions,
+    groupExpansions,
+    setGroupExpansions,
+    groupSeries,
+    setGroupSeries,
+    verticalStacking,
+    setVerticalStacking,
+    lockRotation,
+    setLockRotation,
+    optimizeSpace,
+    setOptimizeSpace,
+    respectSortOrder,
+    setRespectSortOrder,
+    fitOversized,
+    setFitOversized,
+    bypassVersionWarning,
+    setBypassVersionWarning,
+    filtersCollapsed,
+    setFiltersCollapsed,
+    priorities,
+    setPriorities,
+    collectionFilters,
+    setCollectionFilters,
+    filterPanelsCollapsed,
+    setFilterPanelsCollapsed,
+    isFilterDrawerOpen,
+    setIsFilterDrawerOpen,
+    resetInputSettings,
+  } = useInputSettingsState();
+  const [excludedGamesMap, setExcludedGamesMap] = useState({});
+  const [orientationOverridesMap, setOrientationOverridesMap] = useState({});
+  const [dimensionOverridesMap, setDimensionOverridesMap] = useState({});
+  
+  const [loading, setLoading] = useState(false);
+  const {
+    cubes,
+    setCubes,
+    stats,
+    setStats,
+    oversizedGames,
+    setOversizedGames,
+    missingVersionWarning,
+    setMissingVersionWarning,
+    lastRequestConfig,
+    setLastRequestConfig,
+    error,
+    setError,
+    progress,
+    setProgress,
+    resetResults,
+  } = useResultsState();
+  const {
+    settingsHydrated,
+    setSettingsHydrated,
+    lastResultHydrated,
+    setLastResultHydrated,
+    hasStoredData,
+    setHasStoredData,
+    resetHydration,
+  } = useHydrationState();
   const [collapsedBadgeLimit, setCollapsedBadgeLimit] = useState(() =>
     typeof window === 'undefined' ? 4 : getCollapsedBadgeLimit(window.innerWidth)
   );
-  const [hasStoredData, setHasStoredData] = useState(false);
   const initialCollapseAppliedRef = useRef(false);
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(() =>
     typeof window === 'undefined' ? false : window.innerWidth < MOBILE_BREAKPOINT
   );
@@ -701,30 +897,9 @@ function App() {
   }, []);
 
   const handleResetSettings = useCallback(async () => {
-    setUsername('');
-    setIncludeExpansions(false);
-    setGroupExpansions(false);
-    setGroupSeries(false);
-    setVerticalStacking(true);
-    setLockRotation(false);
-    setOptimizeSpace(false);
-    setRespectSortOrder(false);
-    setFitOversized(false);
-    setBypassVersionWarning(false);
-    setFiltersCollapsed(false);
-    setPriorities(DEFAULT_PRIORITIES.map((priority) => ({ ...priority })));
-    setCollectionFilters({ ...DEFAULT_COLLECTION_FILTERS });
-    setFilterPanelsCollapsed({ ...DEFAULT_FILTER_PANEL_STATE });
-    setCubes(null);
-    setStats(null);
-    setStats(null);
-    setOversizedGames([]);
-    setMissingVersionWarning(null);
-    setLastRequestConfig(null);
-    setError(null);
-    setProgress('');
-    setHasStoredData(false);
-    setIsFilterDrawerOpen(false);
+    resetInputSettings();
+    resetResults();
+    resetHydration();
 
     try {
       await clearUserSettings();
@@ -732,7 +907,7 @@ function App() {
     } catch (storageError) {
       console.error('Unable to clear stored user settings', storageError);
     }
-  }, []);
+  }, [resetHydration, resetInputSettings, resetResults]);
 
   const handleOptimizeSpaceChange = useCallback(
     (checked) => {
@@ -822,7 +997,7 @@ function App() {
               <React.Fragment key={`${priority.field}-${priority.order}`}>
                 <span className="priority-entry">
                   {priority.label}{' '}
-                  <priority.Icon aria-hidden className="priority-badge-icon" />
+                  <priority.Icon aria-hidden="true" className="priority-badge-icon" />
                 </span>
                 {index < enabledPriorities.length - 1 && (
                   <span className="priority-separator">, </span>
@@ -992,7 +1167,7 @@ function App() {
 
       {!hasIncludeStatuses && (
         <div className="collection-filters-warning" role="alert">
-          <FaExclamationTriangle aria-hidden className="collection-filters-warning__icon" />
+          <FaExclamationTriangle aria-hidden="true" className="collection-filters-warning__icon" />
           <span>Select at least one collection status to organize.</span>
         </div>
       )}
@@ -1445,7 +1620,7 @@ function App() {
           >
             <div className="search-panel-primary">
               <div className="search-panel-toggle">
-                <span className="disclosure-arrow search-panel-icon" aria-hidden>
+                <span className="disclosure-arrow search-panel-icon" aria-hidden="true">
                   {isPanelCollapsed ? (
                     <FaChevronRight className="disclosure-arrow-icon" />
                   ) : (

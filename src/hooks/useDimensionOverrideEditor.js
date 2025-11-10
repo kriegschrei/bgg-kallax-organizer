@@ -19,6 +19,19 @@ export function useDimensionOverrideEditor({
     if (typeof value === 'number' && Number.isFinite(value)) {
       return String(value);
     }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+
+      if (!trimmed) {
+        return '';
+      }
+
+      if (Number.isFinite(Number(trimmed))) {
+        return trimmed;
+      }
+    }
+
     return '';
   }, []);
 

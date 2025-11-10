@@ -55,7 +55,7 @@ const CollectionStatusToggle = ({
       aria-label={`${label}: ${STATE_CONFIG[safeValue].label}`}
     >
       <span className="collection-status-toggle__icon">
-        <Icon aria-hidden />
+        <Icon aria-hidden="true" />
       </span>
       <span className="collection-status-toggle__label">{label}</span>
     </button>

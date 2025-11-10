@@ -14,7 +14,7 @@ function FilterPanel({ panelKey, title, collapsed = false, onToggle, children })
         aria-expanded={!collapsed}
         aria-controls={panelId}
       >
-        <span className="filter-panel__chevron" aria-hidden>
+        <span className="filter-panel__chevron" aria-hidden="true">
           <FaChevronRight className="filter-panel__chevron-icon" />
         </span>
         <span className="filter-panel__title">{title}</span>

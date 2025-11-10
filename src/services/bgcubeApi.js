@@ -27,7 +27,6 @@ const DEFAULT_OPTIONS = {
 const REQUEST_HEADERS = {
   'Content-Type': 'application/json',
   'Content-Encoding': 'gzip',
-  'Accept-Encoding': 'gzip, deflate, br',
 };
 
 const generateRequestId = (username, providedId) =>

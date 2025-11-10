@@ -23,7 +23,11 @@ import {
   collectWarningGroups,
   createWarningPanelState,
 } from '../utils/resultsWarnings.jsx';
-import './Results.css';
+import {
+  buildOverrideLookups,
+  buildSortedOverrides,
+  mapOrientationOverrideDisplay,
+} from '../utils/resultsOverrides';
 import './Results.css';
 
 export default function Results({
@@ -94,61 +98,31 @@ export default function Results({
     []
   );
 
-  const excludedLookup = useMemo(
+  const { excludedLookup, orientationLookup, dimensionLookup } = useMemo(
     () =>
-      excludedGames.reduce((acc, game) => {
-        if (game?.id) {
-          acc[game.id] = game;
-        }
-        return acc;
-      }, {}),
-    [excludedGames]
+      buildOverrideLookups({
+        excludedGames,
+        orientationOverrides,
+        dimensionOverrides,
+      }),
+    [excludedGames, orientationOverrides, dimensionOverrides]
   );
-
-  const orientationLookup = useMemo(
+  const {
+    excluded: sortedExcludedGames,
+    orientation: rawOrientationOverrides,
+    dimensions: sortedDimensionOverrides,
+  } = useMemo(
     () =>
-      orientationOverrides.reduce((acc, item) => {
-        if (item?.id) {
-          acc[item.id] = item.orientation;
-        }
-        return acc;
-      }, {}),
-    [orientationOverrides]
+      buildSortedOverrides({
+        excludedGames,
+        orientationOverrides,
+        dimensionOverrides,
+      }),
+    [excludedGames, orientationOverrides, dimensionOverrides]
   );
-
-  const dimensionLookup = useMemo(
-    () =>
-      dimensionOverrides.reduce((acc, item) => {
-        if (item?.id) {
-          acc[item.id] = item;
-        }
-        return acc;
-      }, {}),
-    [dimensionOverrides]
-  );
-
-  const sortedExcludedGames = useMemo(
-    () =>
-      [...excludedGames].sort((a, b) =>
-        (a?.name || '').localeCompare(b?.name || '')
-      ),
-    [excludedGames]
-  );
-
-  const sortedOrientationOverrides = useMemo(
-    () =>
-      [...orientationOverrides].sort((a, b) =>
-        (a?.name || '').localeCompare(b?.name || '')
-      ),
-    [orientationOverrides]
-  );
-
-  const sortedDimensionOverrides = useMemo(
-    () =>
-      [...dimensionOverrides].sort((a, b) =>
-        (a?.name || '').localeCompare(b?.name || '')
-      ),
-    [dimensionOverrides]
+  const orientationOverrideItems = useMemo(
+    () => mapOrientationOverrideDisplay(rawOrientationOverrides),
+    [rawOrientationOverrides]
   );
   const warningGroups = useMemo(
     () => collectWarningGroups({ cubes, oversizedGames }),
@@ -339,7 +313,7 @@ export default function Results({
   );
 
   const hasExcludedGames = sortedExcludedGames.length > 0;
-  const hasOrientationOverrides = sortedOrientationOverrides.length > 0;
+  const hasOrientationOverrides = orientationOverrideItems.length > 0;
   const hasDimensionOverrides = sortedDimensionOverrides.length > 0;
 
   return (
@@ -377,16 +351,12 @@ export default function Results({
               renderToggleIcon={renderDisclosureIcon}
               icon={<FaArrowsAlt className="inline-icon" aria-hidden="true" />}
               title="Orientation overrides"
-              count={sortedOrientationOverrides.length}
+              count={orientationOverrideItems.length}
               description="These games will ignore rotation settings and be placed exactly as chosen."
-              listClassName={getScrollableListClassName(sortedOrientationOverrides.length)}
+              listClassName={getScrollableListClassName(orientationOverrideItems.length)}
             >
               <OverrideList
-                items={sortedOrientationOverrides.map((game) => ({
-                  ...game,
-                  orientationLabel: game.orientation === 'horizontal' ? 'Horizontal' : 'Vertical',
-                  nextOrientation: game.orientation === 'vertical' ? 'horizontal' : 'vertical',
-                }))}
+                items={orientationOverrideItems}
                 renderActions={renderOrientationActions}
                         />
             </OverridesSection>

@@ -234,7 +234,7 @@ export default function ResultsOverrides({
           renderToggleIcon={renderDisclosureIcon}
           icon={<FaRulerCombined className="inline-icon" aria-hidden="true" />}
           title="Custom dimensions"
-          count={dimensionOverrides.length}
+          count={dimensionOverrides.length} 
           description="Your overrides will be used instead of the dimensions supplied by BoardGameGeek."
           listClassName={getScrollableListClassName(dimensionOverrides.length)}
         >

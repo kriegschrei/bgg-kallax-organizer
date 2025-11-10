@@ -83,7 +83,6 @@ function SortableItem({ id, priority, onToggle, onToggleOrder, disabled = false 
     </div>
   );
 }
-
 export default function SortablePriorities({ priorities, onChange, disabled = false }) {
   const sensors = useSensors(
     useSensor(MouseSensor, {

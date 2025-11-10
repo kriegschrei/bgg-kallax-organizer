@@ -22,7 +22,131 @@ import WarningCallout from './WarningCallout';
 import OverrideList from './OverrideList';
 import { formatGameDimensions, getScrollableListClassName } from '../utils/results';
 import { formatEditorDimensions } from '../utils/dimensions';
+import { collectWarningGroups } from '../utils/resultsWarnings';
 import './Results.css';
+
+const WARNING_PANEL_DEFINITIONS = [
+  {
+    id: 'guessedVersions',
+    dataKey: 'guessedVersions',
+    variant: 'info',
+    icon: FaInfoCircle,
+    title: 'Missing Version',
+    getDescription: ({ count }) =>
+      `No specific BoardGameGeek version was selected for these game${
+        count !== 1 ? 's' : ''
+      }. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.`,
+    renderItem: (game) => (
+      <>
+        {game.versionsUrl ? (
+          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+            {game.name}
+          </a>
+        ) : (
+          game.name
+        )}
+        {` (Cube #${game.cubeId})`}
+      </>
+    ),
+  },
+  {
+    id: 'selectedVersionFallback',
+    dataKey: 'selectedVersionFallback',
+    variant: 'success',
+    icon: FaTools,
+    title: 'Version Missing Size',
+    getDescription: () =>
+      'The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact.',
+    renderItem: (game) => (
+      <>
+        {game.versionsUrl ? (
+          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
+            {game.name}
+          </a>
+        ) : (
+          game.name
+        )}
+        {` (Cube #${game.cubeId})`}
+        {game.correctionUrl && (
+          <>
+            {` — `}
+            <a
+              href={game.correctionUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="callout__link"
+            >
+              Submit dimensions
+            </a>
+          </>
+        )}
+      </>
+    ),
+  },
+  {
+    id: 'missingDimensions',
+    dataKey: 'missingDimensions',
+    variant: 'warning',
+    icon: FaExclamationTriangle,
+    title: 'No Sizes Found',
+    getDescription: ({ count }) => (
+      <>
+        {count} game{count !== 1 ? 's' : ''}{' '}
+        {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
+        dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
+        <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
+      </>
+    ),
+    renderItem: (game) => (
+      <>
+        {game.correctionUrl ? (
+          <a
+            href={game.correctionUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="callout__link"
+          >
+            {game.name}
+          </a>
+        ) : (
+          game.name
+        )}
+        {` (Cube #${game.cubeId})`}
+      </>
+    ),
+  },
+  {
+    id: 'oversized',
+    dataKey: 'oversized',
+    variant: 'warning',
+    icon: FaBoxOpen,
+    title: 'Over Capacity',
+    getDescription: ({ fitOversized }) => (
+      <>
+        {fitOversized
+          ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
+          : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
+        If you believe the dimensions are incorrect, please click the game name below to submit a
+        dimension correction in BoardGameGeek.
+      </>
+    ),
+    renderItem: (game, { fitOversized }) => {
+      const link = game.correctionUrl || game.versionsUrl;
+      return (
+        <>
+          {link ? (
+            <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
+              {game.name}
+            </a>
+          ) : (
+            game.name
+          )}
+          {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
+        </>
+      );
+    },
+  },
+];
 
 export default function Results({
   cubes,
@@ -71,26 +195,21 @@ export default function Results({
   const [excludedExpanded, setExcludedExpanded] = useState(false);
   const [orientationExpanded, setOrientationExpanded] = useState(false);
   const [dimensionOverridesExpanded, setDimensionOverridesExpanded] = useState(false);
-  const [missingDimsExpanded, setMissingDimsExpanded] = useState(false);
-  const [exceedingCapacityExpanded, setExceedingCapacityExpanded] = useState(false);
-  const [guessedVersionsExpanded, setGuessedVersionsExpanded] = useState(false);
-  const [selectedVersionFallbackExpanded, setSelectedVersionFallbackExpanded] = useState(false);
-  const toggleGuessedVersionsExpanded = useCallback(
-    () => setGuessedVersionsExpanded((prev) => !prev),
-    []
+  const [warningPanelExpanded, setWarningPanelExpanded] = useState(() =>
+    WARNING_PANEL_DEFINITIONS.reduce(
+      (acc, definition) => ({
+        ...acc,
+        [definition.id]: false,
+      }),
+      {}
+    )
   );
-  const toggleSelectedVersionFallbackExpanded = useCallback(
-    () => setSelectedVersionFallbackExpanded((prev) => !prev),
-    []
-  );
-  const toggleMissingDimsExpanded = useCallback(
-    () => setMissingDimsExpanded((prev) => !prev),
-    []
-  );
-  const toggleExceedingCapacityExpanded = useCallback(
-    () => setExceedingCapacityExpanded((prev) => !prev),
-    []
-  );
+  const toggleWarningPanel = useCallback((panelId) => {
+    setWarningPanelExpanded((prev) => ({
+      ...prev,
+      [panelId]: !prev[panelId],
+    }));
+  }, []);
 
   const renderDisclosureIcon = useCallback(
     (expanded) => (
@@ -161,6 +280,48 @@ export default function Results({
       ),
     [dimensionOverrides]
   );
+  const warningGroups = useMemo(
+    () => collectWarningGroups({ cubes, oversizedGames }),
+    [cubes, oversizedGames]
+  );
+  const warningPanels = useMemo(
+    () =>
+      WARNING_PANEL_DEFINITIONS.map((definition) => {
+        const items = warningGroups[definition.dataKey] || [];
+        const count = items.length;
+
+        if (count === 0) {
+          return null;
+        }
+
+        const isExpanded = warningPanelExpanded[definition.id] ?? false;
+        const iconElement = (
+          <definition.icon className="inline-icon" aria-hidden="true" />
+        );
+
+        return {
+          id: definition.id,
+          variant: definition.variant,
+          icon: iconElement,
+          title: definition.title,
+          count,
+          description: definition.getDescription({
+            count,
+            items,
+            fitOversized,
+          }),
+          items,
+          renderItem: (game) =>
+            definition.renderItem(game, {
+              fitOversized,
+            }),
+          expanded: isExpanded,
+          onToggle: () => toggleWarningPanel(definition.id),
+        };
+      }).filter(Boolean),
+    [fitOversized, toggleWarningPanel, warningGroups, warningPanelExpanded]
+  );
+  const totalWarningPanels = warningPanels.length;
 
   const [panelDimensionEditor, setPanelDimensionEditor] = useState({
     gameId: null,
@@ -338,58 +499,6 @@ export default function Results({
   const hasOrientationOverrides = sortedOrientationOverrides.length > 0;
   const hasDimensionOverrides = sortedDimensionOverrides.length > 0;
 
-  // Collect games with missing dimensions, exceeding cube capacity, and those using alternate versions
-  const gamesWithMissingDimensions = [];
-  const gamesWithGuessedVersions = [];
-  const gamesUsingFallbackForSelectedVersion = [];
-  
-  cubes.forEach(cube => {
-    cube.games.forEach(game => {
-      const baseGameData = { ...game, cubeId: cube.id };
-
-      if (game.dimensions?.missingDimensions && !game.missingVersion) {
-        gamesWithMissingDimensions.push(baseGameData);
-      }
-      if (game.missingVersion) {
-        gamesWithGuessedVersions.push({ ...baseGameData, versionsUrl: game.versionsUrl });
-      }
-      if (game.usedAlternateVersionDims) {
-        gamesUsingFallbackForSelectedVersion.push({
-          ...baseGameData,
-          versionsUrl: game.versionsUrl,
-          correctionUrl: game.correctionUrl,
-        });
-      }
-    });
-  });
-
-  // Sort games alphabetically by name
-  const sortByName = (a, b) => a.name.localeCompare(b.name);
-  gamesWithMissingDimensions.sort(sortByName);
-  gamesWithGuessedVersions.sort(sortByName);
-  gamesUsingFallbackForSelectedVersion.sort(sortByName);
-
-  const oversizedWarningGames = oversizedGames
-    ? oversizedGames.map((game) => ({
-        ...game,
-        cubeId: game.cubeId ?? null,
-        correctionUrl: game.correctionUrl ?? null,
-        versionsUrl: game.versionsUrl ?? null,
-      }))
-    : [];
-  oversizedWarningGames.sort(sortByName);
-
-  const showGuessedVersionInfo = gamesWithGuessedVersions.length > 0;
-  const showSelectedVersionFallback = gamesUsingFallbackForSelectedVersion.length > 0;
-  const showMissingDimensions = gamesWithMissingDimensions.length > 0;
-  const showOversizedWarning = oversizedWarningGames.length > 0;
-  const totalWarningPanels = [
-    showGuessedVersionInfo,
-    showSelectedVersionFallback,
-    showMissingDimensions,
-    showOversizedWarning
-  ].filter(Boolean).length;
-
   return (
     <div className="results">
  
@@ -484,144 +593,23 @@ export default function Results({
         </div>
       )}
 
-      {(showGuessedVersionInfo || showSelectedVersionFallback || showMissingDimensions || showOversizedWarning) && (
+      {totalWarningPanels > 0 && (
         <div className={`results-warnings warnings-count-${totalWarningPanels}`}>
-          {showGuessedVersionInfo && (
+          {warningPanels.map((panel) => (
             <WarningCallout
-              variant="info"
-              expanded={guessedVersionsExpanded}
-              onToggle={toggleGuessedVersionsExpanded}
+              key={panel.id}
+              variant={panel.variant}
+              expanded={panel.expanded}
+              onToggle={panel.onToggle}
               renderToggleIcon={renderDisclosureIcon}
-              icon={<FaInfoCircle className="inline-icon" aria-hidden="true" />}
-              title="Missing Version"
-              count={gamesWithGuessedVersions.length}
-              description={`No specific BoardGameGeek version was selected for these game${
-                gamesWithGuessedVersions.length !== 1 ? 's' : ''
-              }. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.`}
-              items={gamesWithGuessedVersions}
-              renderItem={(game) => (
-                <>
-                  {game.versionsUrl ? (
-                    <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                      {game.name}
-                    </a>
-                  ) : (
-                    game.name
-                  )}
-                  {` (Cube #${game.cubeId})`}
-                </>
-              )}
+              icon={panel.icon}
+              title={panel.title}
+              count={panel.count}
+              description={panel.description}
+              items={panel.items}
+              renderItem={panel.renderItem}
             />
-          )}
-          {showSelectedVersionFallback && (
-            <WarningCallout
-              variant="success"
-              expanded={selectedVersionFallbackExpanded}
-              onToggle={toggleSelectedVersionFallbackExpanded}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={<FaTools className="inline-icon" aria-hidden="true" />}
-              title="Version Missing Size"
-              count={gamesUsingFallbackForSelectedVersion.length}
-              description="The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact."
-              items={gamesUsingFallbackForSelectedVersion}
-              renderItem={(game) => (
-                <>
-                  {game.versionsUrl ? (
-                    <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                      {game.name}
-                    </a>
-                  ) : (
-                    game.name
-                  )}
-                  {` (Cube #${game.cubeId})`}
-                  {game.correctionUrl && (
-                    <>
-                      {` — `}
-                      <a
-                        href={game.correctionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="callout__link"
-                      >
-                        Submit dimensions
-                      </a>
-                    </>
-                  )}
-                </>
-              )}
-            />
-          )}
-          {gamesWithMissingDimensions.length > 0 && (
-            <WarningCallout
-              expanded={missingDimsExpanded}
-              onToggle={toggleMissingDimsExpanded}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={<FaExclamationTriangle className="inline-icon" aria-hidden="true" />}
-              title="No Sizes Found"
-              count={gamesWithMissingDimensions.length}
-              description={
-                <>
-                  {gamesWithMissingDimensions.length} game
-                  {gamesWithMissingDimensions.length !== 1 ? 's' : ''}{' '}
-                  {gamesWithMissingDimensions.length !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions.
-                  Default dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
-                  <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
-                </>
-              }
-              items={gamesWithMissingDimensions}
-              renderItem={(game) => (
-                <>
-                  {game.correctionUrl ? (
-                    <a
-                      href={game.correctionUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="callout__link"
-                    >
-                      {game.name}
-                    </a>
-                  ) : (
-                    game.name
-                  )}
-                  {` (Cube #${game.cubeId})`}
-                </>
-              )}
-            />
-          )}
-          {showOversizedWarning && (
-            <WarningCallout
-              expanded={exceedingCapacityExpanded}
-              onToggle={toggleExceedingCapacityExpanded}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={<FaBoxOpen className="inline-icon" aria-hidden="true" />}
-              title="Over Capacity"
-              count={oversizedWarningGames.length}
-              description={
-                <>
-                  {fitOversized
-                    ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
-                    : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
-                  If you believe the dimensions are incorrect, please click the game name below to submit a dimension correction in BoardGameGeek.
-                </>
-              }
-              items={oversizedWarningGames}
-              renderItem={(game) => {
-                const link = game.correctionUrl || game.versionsUrl;
-                return (
-                  <>
-                    {link ? (
-                      <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
-                        {game.name}
-                      </a>
-                    ) : (
-                      game.name
-                    )}
-                    {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
-                  </>
-                );
-              }}
-            />
-          )}
+          ))}
         </div>
       )}
 

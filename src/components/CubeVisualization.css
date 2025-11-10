@@ -223,17 +223,6 @@
   margin-top: 0.5rem;
 }
 
-.override-pill {
-  background: rgba(41, 128, 185, 0.12);
-  color: var(--color-callout-info-text);
-  border-radius: 999px;
-  padding: 0.15rem 0.65rem;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-}
-
 .game-badges-section {
   margin-top: 0.75rem;
 }

@@ -335,33 +335,6 @@
   text-align: center;
 }
 
-.override-action-button {
-  border: none;
-  background: rgba(30, 58, 138, 0.12);
-  color: #1e3a8a;
-  border-radius: 4px;
-  padding: 0.35rem;
-  font-size: 0.78rem;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.override-action-button:hover:not(:disabled) {
-  background: rgba(30, 58, 138, 0.22);
-}
-
-.override-action-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.override-action-button .button-icon {
-  font-size: 0.95rem;
-}
-
 .override-dimension-form {
   margin-top: 0.25rem;
   padding-top: 0.5rem;

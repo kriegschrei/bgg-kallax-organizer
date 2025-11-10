@@ -14,6 +14,51 @@ const sortByName = (a, b) => {
   return nameA.localeCompare(nameB);
 };
 
+const pickFirstUrl = (game, keys = []) =>
+  keys.map((key) => game?.[key]).find((value) => typeof value === 'string' && value.trim());
+
+const renderLinkedName = (game, linkKeys) => {
+  const href = pickFirstUrl(game, linkKeys);
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className="callout__link">
+        {game.name}
+      </a>
+    );
+  }
+  return game.name;
+};
+
+const getCubeLabel = (game) => (game?.cubeId ? ` (Cube #${game.cubeId})` : null);
+
+const renderSubmitDimensionsLink = (game) =>
+  game?.correctionUrl ? (
+    <>
+      {` — `}
+      <a href={game.correctionUrl} target="_blank" rel="noopener noreferrer" className="callout__link">
+        Submit dimensions
+      </a>
+    </>
+  ) : null;
+
+const createGameRenderer = ({
+  linkKeys = ['versionsUrl'],
+  includeCubeId = true,
+  cubeIdPredicate = (game) => Boolean(game?.cubeId),
+  extraContent,
+}) => (game, context = {}) => {
+  const nameContent = renderLinkedName(game, linkKeys);
+  const cubeLabel = includeCubeId && cubeIdPredicate(game, context) ? getCubeLabel(game) : null;
+
+  return (
+    <>
+      {nameContent}
+      {cubeLabel}
+      {extraContent ? extraContent(game, context) : null}
+    </>
+  );
+};
+
 const WARNING_PANEL_CONFIG = [
   {
     id: 'guessedVersions',
@@ -25,18 +70,7 @@ const WARNING_PANEL_CONFIG = [
       `No specific BoardGameGeek version was selected for these game${
         count !== 1 ? 's' : ''
       }. We guessed an alternate version to estimate dimensions. Selecting the right version keeps future calculations accurate and avoids guesswork.`,
-    renderItem: (game) => (
-      <>
-        {game.versionsUrl ? (
-          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-            {game.name}
-          </a>
-        ) : (
-          game.name
-        )}
-        {` (Cube #${game.cubeId})`}
-      </>
-    ),
+    renderItem: createGameRenderer({ linkKeys: ['versionsUrl'] }),
   },
   {
     id: 'selectedVersionFallback',
@@ -46,31 +80,10 @@ const WARNING_PANEL_CONFIG = [
     title: 'Version Missing Size',
     getDescription: () =>
       'The version you selected on BoardGameGeek does not list its measurements. We substituted dimensions from a different version so packing could continue. Updating your chosen version with accurate measurements will make future runs exact.',
-    renderItem: (game) => (
-      <>
-        {game.versionsUrl ? (
-          <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-            {game.name}
-          </a>
-        ) : (
-          game.name
-        )}
-        {` (Cube #${game.cubeId})`}
-        {game.correctionUrl && (
-          <>
-            {` — `}
-            <a
-              href={game.correctionUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="callout__link"
-            >
-              Submit dimensions
-            </a>
-          </>
-        )}
-      </>
-    ),
+    renderItem: createGameRenderer({
+      linkKeys: ['versionsUrl'],
+      extraContent: renderSubmitDimensionsLink,
+    }),
   },
   {
     id: 'missingDimensions',
@@ -86,23 +99,9 @@ const WARNING_PANEL_CONFIG = [
         <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
       </>
     ),
-    renderItem: (game) => (
-      <>
-        {game.correctionUrl ? (
-          <a
-            href={game.correctionUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="callout__link"
-          >
-            {game.name}
-          </a>
-        ) : (
-          game.name
-        )}
-        {` (Cube #${game.cubeId})`}
-      </>
-    ),
+    renderItem: createGameRenderer({
+      linkKeys: ['correctionUrl', 'versionsUrl'],
+    }),
   },
   {
     id: 'oversized',
@@ -119,21 +118,10 @@ const WARNING_PANEL_CONFIG = [
         dimension correction in BoardGameGeek.
       </>
     ),
-    renderItem: (game, { fitOversized }) => {
-      const link = game.correctionUrl || game.versionsUrl;
-      return (
-        <>
-          {link ? (
-            <a href={link} target="_blank" rel="noopener noreferrer" className="callout__link">
-              {game.name}
-            </a>
-          ) : (
-            game.name
-          )}
-          {fitOversized && game.cubeId ? ` (Cube #${game.cubeId})` : null}
-        </>
-      );
-    },
+    renderItem: createGameRenderer({
+      linkKeys: ['correctionUrl', 'versionsUrl'],
+      cubeIdPredicate: (game, { fitOversized }) => Boolean(fitOversized && game?.cubeId),
+    }),
   },
 ];
 

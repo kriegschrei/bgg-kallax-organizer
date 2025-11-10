@@ -21,21 +21,8 @@ import OverridesSection from './OverridesSection';
 import WarningCallout from './WarningCallout';
 import OverrideList from './OverrideList';
 import { formatGameDimensions, getScrollableListClassName } from '../utils/results';
+import { formatEditorDimensions } from '../utils/dimensions';
 import './Results.css';
-
-const formatEditorDimensions = (editor) => {
-  const formatPart = (value) => {
-    const numeric = Number.parseFloat(value);
-    if (Number.isFinite(numeric) && numeric > 0) {
-      return `${numeric.toFixed(2)}"`;
-    }
-    return '—';
-  };
-
-  return `${formatPart(editor.length)} × ${formatPart(editor.width)} × ${formatPart(
-    editor.depth
-  )}`;
-};
 
 export default function Results({
   cubes,

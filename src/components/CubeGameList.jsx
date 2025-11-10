@@ -15,26 +15,7 @@ import {
 import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
 import { getGameColor, splitNameAndVersion } from '../utils/cubeVisualization';
-
-const resolveDisplayDimensions = (overrideEntry, orientedDims, dimensionEditor, gameId) => {
-  const source =
-    dimensionEditor && dimensionEditor.gameId === gameId ? dimensionEditor : overrideEntry;
-
-  if (!source) {
-    return orientedDims;
-  }
-
-  const normalize = (value, fallback) => {
-    const numeric = typeof value === 'string' ? Number.parseFloat(value) : value;
-    return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
-  };
-
-  return {
-    x: normalize(source.length, orientedDims.x),
-    y: normalize(source.width, orientedDims.y),
-    z: normalize(source.depth, orientedDims.z),
-  };
-};
+import { resolveDisplayDimensions } from '../utils/dimensions';
 
 function CubeGameList({
   cube,

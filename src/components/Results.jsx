@@ -1,34 +1,32 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import {
-  FaTrashAlt,
-  FaArrowsAlt,
-  FaArrowsAltH,
-  FaArrowsAltV,
-  FaRulerCombined,
-  FaEdit,
-  FaTimes,
-  FaChevronRight,
-  FaChevronDown,
-} from 'react-icons/fa';
+import React, { useMemo, useCallback } from 'react';
+import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import CubeVisualization from './CubeVisualization';
-import DimensionForm from './DimensionForm';
-import IconButton from './IconButton';
-import OverridesSection from './OverridesSection';
-import WarningCallout from './WarningCallout';
-import OverrideList from './OverrideList';
+import ResultsStats from './ResultsStats';
+import ResultsOverrides from './ResultsOverrides';
+import ResultsWarningPanels from './ResultsWarningPanels';
 import { formatGameDimensions, getScrollableListClassName } from '../utils/results';
 import { formatEditorDimensions } from '../utils/dimensions';
-import {
-  buildWarningPanels,
-  collectWarningGroups,
-  createWarningPanelState,
-} from '../utils/resultsWarnings.jsx';
-import {
-  buildOverrideLookups,
-  buildSortedOverrides,
-  mapOrientationOverrideDisplay,
-} from '../utils/resultsOverrides';
+import { collectWarningGroups } from '../utils/resultsWarnings.jsx';
+import { useOverrideData } from '../hooks/useOverrideData';
+import { useDimensionOverrideEditor } from '../hooks/useDimensionOverrideEditor';
 import './Results.css';
+
+const formatStatValue = (value, fallback, suffix = '') => {
+  const isNumeric = typeof value === 'number' && Number.isFinite(value);
+  const isDefined = value !== null && value !== undefined && value !== '';
+
+  if (!isNumeric && !isDefined) {
+    return fallback;
+  }
+
+  const formatted = isNumeric ? value : value;
+  return suffix ? `${formatted}${suffix}` : formatted;
+};
+
+const createStatItem = (label, value, fallback, suffix) => ({
+  label,
+  value: formatStatValue(value, fallback, suffix),
+});
 
 export default function Results({
   cubes,
@@ -49,42 +47,15 @@ export default function Results({
   isLoading = false,
   priorities = [],
 }) {
-  const totalGamesDisplay =
-    stats && stats.totalGames !== null && stats.totalGames !== undefined
-      ? stats.totalGames
-      : 'Unknown';
-  const totalCubesDisplay =
-    stats && stats.totalCubes !== null && stats.totalCubes !== undefined
-      ? stats.totalCubes
-      : 'Unknown';
-  const avgGamesPerCubeDisplay =
-    stats && stats.avgGamesPerCube !== null && stats.avgGamesPerCube !== undefined
-      ? stats.avgGamesPerCube
-      : 'N/A';
-  const avgUtilizationDisplay =
-    stats && stats.avgUtilization !== null && stats.avgUtilization !== undefined
-      ? `${stats.avgUtilization}%`
-      : 'N/A';
   const statsSummaryItems = useMemo(
     () => [
-      { label: 'Total Games', value: totalGamesDisplay },
-      { label: 'Kallax Cubes Needed', value: totalCubesDisplay },
-      { label: 'Avg Games/Cube', value: avgGamesPerCubeDisplay },
-      { label: 'Avg Space Utilization', value: avgUtilizationDisplay },
+      createStatItem('Total Games', stats?.totalGames, 'Unknown'),
+      createStatItem('Kallax Cubes Needed', stats?.totalCubes, 'Unknown'),
+      createStatItem('Avg Games/Cube', stats?.avgGamesPerCube, 'N/A'),
+      createStatItem('Avg Space Utilization', stats?.avgUtilization, 'N/A', '%'),
     ],
-    [totalGamesDisplay, totalCubesDisplay, avgGamesPerCubeDisplay, avgUtilizationDisplay]
+    [stats?.avgGamesPerCube, stats?.avgUtilization, stats?.totalCubes, stats?.totalGames]
   );
-  const [excludedExpanded, setExcludedExpanded] = useState(false);
-  const [orientationExpanded, setOrientationExpanded] = useState(false);
-  const [dimensionOverridesExpanded, setDimensionOverridesExpanded] = useState(false);
-  const [warningPanelExpanded, setWarningPanelExpanded] = useState(createWarningPanelState);
-  const toggleWarningPanel = useCallback((panelId) => {
-    setWarningPanelExpanded((prev) => ({
-      ...prev,
-      [panelId]: !prev[panelId],
-    }));
-  }, []);
-
   const renderDisclosureIcon = useCallback(
     (expanded) => (
       <span className="disclosure-arrow">
@@ -98,336 +69,67 @@ export default function Results({
     []
   );
 
-  const { excludedLookup, orientationLookup, dimensionLookup } = useMemo(
-    () =>
-      buildOverrideLookups({
-        excludedGames,
-        orientationOverrides,
-        dimensionOverrides,
-      }),
-    [excludedGames, orientationOverrides, dimensionOverrides]
-  );
   const {
-    excluded: sortedExcludedGames,
-    orientation: rawOrientationOverrides,
-    dimensions: sortedDimensionOverrides,
-  } = useMemo(
-    () =>
-      buildSortedOverrides({
-        excludedGames,
-        orientationOverrides,
-        dimensionOverrides,
-      }),
-    [excludedGames, orientationOverrides, dimensionOverrides]
-  );
-  const orientationOverrideItems = useMemo(
-    () => mapOrientationOverrideDisplay(rawOrientationOverrides),
-    [rawOrientationOverrides]
-  );
+    excludedLookup,
+    orientationLookup,
+    dimensionLookup,
+    sortedExcludedGames,
+    orientationOverrideItems,
+    sortedDimensionOverrides,
+  } = useOverrideData({
+    excludedGames,
+    orientationOverrides,
+    dimensionOverrides,
+  });
   const warningGroups = useMemo(
     () => collectWarningGroups({ cubes, oversizedGames }),
     [cubes, oversizedGames]
   );
-  const warningPanels = useMemo(
-    () =>
-      buildWarningPanels({
-        warningGroups,
-        fitOversized,
-        panelState: warningPanelExpanded,
-        onTogglePanel: toggleWarningPanel,
-      }),
-    [fitOversized, toggleWarningPanel, warningGroups, warningPanelExpanded]
-  );
-  const totalWarningPanels = warningPanels.length;
-
-  const [panelDimensionEditor, setPanelDimensionEditor] = useState({
-    gameId: null,
-    length: '',
-    width: '',
-    depth: '',
-    error: '',
+  const {
+    editorState: panelDimensionEditor,
+    openEditor: openPanelDimensionEditor,
+    closeEditor: closePanelDimensionEditor,
+    handleFieldChange: handlePanelDimensionFieldChange,
+    handleSave: handlePanelDimensionSave,
+    isEditingGame: isPanelDimensionEditing,
+  } = useDimensionOverrideEditor({
+    overridesReady,
+    isLoading,
+    onSaveDimensionOverride,
   });
-
-  const handleOrientationPanelToggle = useCallback(
-    (game) => {
-      if (!onSetOrientationOverride || !overridesReady || isLoading) {
-        return;
-      }
-      const nextOrientation = game.orientation === 'vertical' ? 'horizontal' : 'vertical';
-      onSetOrientationOverride(game, nextOrientation);
-    },
-    [onSetOrientationOverride, overridesReady, isLoading]
-  );
-
-  const openPanelDimensionEditor = useCallback((game) => {
-    setPanelDimensionEditor({
-      gameId: game.id,
-      length:
-        typeof game.length === 'number' && Number.isFinite(game.length)
-          ? String(game.length)
-          : '',
-      width:
-        typeof game.width === 'number' && Number.isFinite(game.width)
-          ? String(game.width)
-          : '',
-      depth:
-        typeof game.depth === 'number' && Number.isFinite(game.depth)
-          ? String(game.depth)
-          : '',
-      error: '',
-    });
-  }, []);
-
-  const closePanelDimensionEditor = useCallback(() => {
-    setPanelDimensionEditor({
-      gameId: null,
-      length: '',
-      width: '',
-      depth: '',
-      error: '',
-    });
-  }, []);
-
-  const handlePanelDimensionFieldChange = useCallback((field, value) => {
-    setPanelDimensionEditor((prev) => ({
-      ...prev,
-      [field]: value,
-      error: '',
-    }));
-  }, []);
-
-  const handlePanelDimensionSave = useCallback(
-    async (game) => {
-      if (!onSaveDimensionOverride || !overridesReady || isLoading) {
-        return;
-      }
-
-      if (panelDimensionEditor.gameId !== game.id) {
-        openPanelDimensionEditor(game);
-        return;
-      }
-
-      const success = await onSaveDimensionOverride(game, {
-        length: panelDimensionEditor.length,
-        width: panelDimensionEditor.width,
-        depth: panelDimensionEditor.depth,
-      });
-
-      if (success) {
-        closePanelDimensionEditor();
-      } else {
-        setPanelDimensionEditor((prev) => ({
-          ...prev,
-          error: 'Please enter positive decimal inches for all fields.',
-        }));
-      }
-    },
-    [
-      onSaveDimensionOverride,
-      overridesReady,
-      isLoading,
-      panelDimensionEditor,
-      openPanelDimensionEditor,
-      closePanelDimensionEditor,
-    ]
-  );
-
-  const renderExcludedActions = useCallback(
-    (game) => (
-      <IconButton
-        className="override-action-button"
-        onClick={() => onRestoreExcludedGame?.(game.id)}
-        disabled={!overridesReady || isLoading}
-        title="Remove from excluded list"
-        icon={<FaTimes aria-hidden="true" className="button-icon" />}
-        srLabel="Remove from excluded list"
-      />
-    ),
-    [isLoading, onRestoreExcludedGame, overridesReady]
-  );
-
-  const renderOrientationActions = useCallback(
-    (game) => {
-      const orientationIcon =
-        game.orientation === 'horizontal' ? (
-          <FaArrowsAltH aria-hidden="true" className="button-icon" />
-        ) : (
-          <FaArrowsAltV aria-hidden="true" className="button-icon" />
-        );
-
-      return (
-        <>
-          <span className="override-pill orientation-pill">{game.orientationLabel}</span>
-          <IconButton
-            className="override-action-button"
-            onClick={() => handleOrientationPanelToggle(game)}
-            disabled={!overridesReady || isLoading}
-            title={`Switch to ${game.nextOrientation} orientation`}
-            icon={orientationIcon}
-            srLabel={`Switch to ${game.nextOrientation} orientation`}
-          />
-          <IconButton
-            className="override-action-button"
-            onClick={() => onClearOrientationOverride?.(game.id)}
-            disabled={!overridesReady || isLoading}
-            title="Remove forced orientation"
-            icon={<FaTimes aria-hidden="true" className="button-icon" />}
-            srLabel="Clear orientation override"
-          />
-        </>
-      );
-    },
-    [handleOrientationPanelToggle, isLoading, onClearOrientationOverride, overridesReady]
-  );
-
-  const renderDimensionActions = useCallback(
-    (game) => (
-      <>
-        <IconButton
-          className="override-action-button"
-          onClick={() =>
-            game.isEditing ? closePanelDimensionEditor() : openPanelDimensionEditor(game)
-          }
-          disabled={!overridesReady || isLoading}
-          title={game.isEditing ? 'Close editor' : 'Edit custom dimensions'}
-          icon={<FaEdit aria-hidden="true" className="button-icon" />}
-          srLabel={game.isEditing ? 'Close editor' : 'Edit custom dimensions'}
-        />
-        <IconButton
-          className="override-action-button"
-          onClick={() => onRemoveDimensionOverride?.(game.id)}
-          disabled={!overridesReady || isLoading}
-          title="Remove custom dimensions"
-          icon={<FaTimes aria-hidden="true" className="button-icon" />}
-          srLabel="Clear custom dimensions"
-        />
-      </>
-    ),
-    [
-      closePanelDimensionEditor,
-      isLoading,
-      onRemoveDimensionOverride,
-      openPanelDimensionEditor,
-      overridesReady,
-    ]
-  );
-
-  const hasExcludedGames = sortedExcludedGames.length > 0;
-  const hasOrientationOverrides = orientationOverrideItems.length > 0;
-  const hasDimensionOverrides = sortedDimensionOverrides.length > 0;
-  const activeOverridePanelCount = [hasExcludedGames, hasOrientationOverrides, hasDimensionOverrides].filter(
-    Boolean
-  ).length;
 
   return (
     <div className="results">
  
-      <div className="stats-summary card">
-        {statsSummaryItems.map(({ label, value }) => (
-          <div key={label} className="stat">
-            <span className="stat-value">{value}</span>
-            <span className="stat-label">{label}</span>
-        </div>
-        ))}
-      </div>
+      <ResultsStats items={statsSummaryItems} />
 
-      {activeOverridePanelCount > 0 && (
-        <div className={`results-overrides callout-grid callout-count-${activeOverridePanelCount}`}>
-          {hasExcludedGames && (
-            <OverridesSection
-              expanded={excludedExpanded}
-              onToggle={() => setExcludedExpanded(!excludedExpanded)}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={<FaTrashAlt className="inline-icon" aria-hidden="true" />}
-              title="Manual exclusions"
-              count={sortedExcludedGames.length}
-              description="Excluded games will not be included the next time you organize your collection."
-              listClassName={getScrollableListClassName(sortedExcludedGames.length)}
-            >
-              <OverrideList items={sortedExcludedGames} renderActions={renderExcludedActions} />
-            </OverridesSection>
-          )}
-          {hasOrientationOverrides && (
-            <OverridesSection
-              expanded={orientationExpanded}
-              onToggle={() => setOrientationExpanded(!orientationExpanded)}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={<FaArrowsAlt className="inline-icon" aria-hidden="true" />}
-              title="Orientation overrides"
-              count={orientationOverrideItems.length}
-              description="These games will ignore rotation settings and be placed exactly as chosen."
-              listClassName={getScrollableListClassName(orientationOverrideItems.length)}
-            >
-              <OverrideList
-                items={orientationOverrideItems}
-                renderActions={renderOrientationActions}
-                        />
-            </OverridesSection>
-          )}
-          {hasDimensionOverrides && (
-            <OverridesSection
-              expanded={dimensionOverridesExpanded}
-              onToggle={() => setDimensionOverridesExpanded(!dimensionOverridesExpanded)}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={<FaRulerCombined className="inline-icon" aria-hidden="true" />}
-              title="Custom dimensions"
-              count={sortedDimensionOverrides.length}
-              description="Your overrides will be used instead of the dimensions supplied by BoardGameGeek."
-              listClassName={getScrollableListClassName(sortedDimensionOverrides.length)}
-            >
-              <OverrideList
-                items={sortedDimensionOverrides.map((game) => ({
-                  ...game,
-                  isEditing: panelDimensionEditor.gameId === game.id,
-                  dimensions:
-                    panelDimensionEditor.gameId === game.id
-                      ? formatEditorDimensions(panelDimensionEditor)
-                      : formatGameDimensions(game),
-                  extraContent:
-                    panelDimensionEditor.gameId === game.id ? (
-                      <DimensionForm
-                        className="override-dimension-form"
-                        gridClassName="override-dimension-grid"
-                        errorClassName="override-dimension-error"
-                        actionsClassName="override-dimension-actions"
-                        primaryButtonClassName="override-dimension-primary"
-                        secondaryButtonClassName="override-dimension-secondary"
-                        values={panelDimensionEditor}
-                        error={panelDimensionEditor.error}
-                        disabled={!overridesReady || isLoading}
-                        onChange={handlePanelDimensionFieldChange}
-                        onSubmit={() => handlePanelDimensionSave(game)}
-                        onCancel={closePanelDimensionEditor}
-                      />
-                    ) : null,
-                }))}
-                showDimensions
-                renderActions={renderDimensionActions}
-              />
-            </OverridesSection>
-          )}
-        </div>
-      )}
+      <ResultsOverrides
+        excludedGames={sortedExcludedGames}
+        orientationItems={orientationOverrideItems}
+        dimensionOverrides={sortedDimensionOverrides}
+        overridesReady={overridesReady}
+        isLoading={isLoading}
+        renderDisclosureIcon={renderDisclosureIcon}
+        onRestoreExcludedGame={onRestoreExcludedGame}
+        onSetOrientationOverride={onSetOrientationOverride}
+        onClearOrientationOverride={onClearOrientationOverride}
+        onRemoveDimensionOverride={onRemoveDimensionOverride}
+        onDimensionFieldChange={handlePanelDimensionFieldChange}
+        onDimensionSave={handlePanelDimensionSave}
+        onDimensionOpen={openPanelDimensionEditor}
+        onDimensionClose={closePanelDimensionEditor}
+        isDimensionEditing={isPanelDimensionEditing}
+        dimensionEditorState={panelDimensionEditor}
+        getScrollableListClassName={getScrollableListClassName}
+        formatGameDimensions={formatGameDimensions}
+        formatEditorDimensions={formatEditorDimensions}
+      />
 
-      {totalWarningPanels > 0 && (
-        <div className={`results-warnings callout-grid callout-count-${totalWarningPanels}`}>
-          {warningPanels.map((panel) => (
-            <WarningCallout
-              key={panel.id}
-              variant={panel.variant}
-              expanded={panel.expanded}
-              onToggle={panel.onToggle}
-              renderToggleIcon={renderDisclosureIcon}
-              icon={panel.icon}
-              title={panel.title}
-              count={panel.count}
-              description={panel.description}
-              items={panel.items}
-              renderItem={panel.renderItem}
-            />
-          ))}
-        </div>
-      )}
+      <ResultsWarningPanels
+        warningGroups={warningGroups}
+        fitOversized={fitOversized}
+        renderDisclosureIcon={renderDisclosureIcon}
+      />
 
       <div className="cubes-container">
         {cubes.map((cube) => (

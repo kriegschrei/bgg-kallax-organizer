@@ -1,0 +1,141 @@
+.card {
+  background: var(--color-surface);
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stack-md {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cluster-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.surface-muted {
+  background: var(--color-surface-muted);
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.callout-grid {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  width: 100%;
+}
+
+.callout-grid.callout-count-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.callout-grid.callout-count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.callout-grid.callout-count-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.callout-grid.callout-count-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.override-pill {
+  --override-pill-bg: var(--color-accent-info-tint);
+  --override-pill-text: var(--color-accent-info-contrast);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--override-pill-bg);
+  color: var(--override-pill-text);
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  gap: 0.25rem;
+}
+
+.override-action-button {
+  --override-action-bg: var(--color-accent-info-tint);
+  --override-action-bg-hover: rgba(41, 128, 185, 0.18);
+  --override-action-border: rgba(41, 128, 185, 0.35);
+  --override-action-text: var(--color-accent-info-contrast);
+
+  border: 1px solid var(--override-action-border);
+  background: var(--override-action-bg);
+  color: var(--override-action-text);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition:
+    background var(--transition-base),
+    color var(--transition-base),
+    border-color var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.override-action-button:hover:not(:disabled) {
+  background: var(--override-action-bg-hover);
+}
+
+.override-action-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.override-action-button .button-icon {
+  font-size: 0.95rem;
+}
+

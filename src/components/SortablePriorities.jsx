@@ -83,7 +83,6 @@ function SortableItem({ id, priority, onToggle, onToggleOrder, disabled = false 
     </div>
   );
 }
-
 export default function SortablePriorities({ priorities, onChange, disabled = false }) {
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -105,12 +104,14 @@ export default function SortablePriorities({ priorities, onChange, disabled = fa
   const handleDragEnd = (event) => {
     const { active, over } = event;
 
-    if (active.id !== over.id) {
-      const oldIndex = priorities.findIndex((p) => p.field === active.id);
-      const newIndex = priorities.findIndex((p) => p.field === over.id);
-
-      onChange(arrayMove(priorities, oldIndex, newIndex));
+    if (!over || active.id === over.id) {
+      return;
     }
+
+    const oldIndex = priorities.findIndex((p) => p.field === active.id);
+    const newIndex = priorities.findIndex((p) => p.field === over.id);
+
+    onChange(arrayMove(priorities, oldIndex, newIndex));
   };
 
   const handleToggle = (field) => {

@@ -1,19 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import {
-  FaUndoAlt,
-  FaExclamationTriangle,
-  FaBug,
-  FaArrowUp,
-  FaArrowDown,
-  FaChevronRight,
-  FaChevronDown,
-} from 'react-icons/fa';
-import SortablePriorities from './components/SortablePriorities';
-import ToggleSwitch from './components/ToggleSwitch';
-import CollectionStatusToggle from './components/CollectionStatusToggle';
+import { FaBug } from 'react-icons/fa';
 import Results from './components/Results';
 import MissingVersionsWarning from './components/MissingVersionsWarning';
-import { fetchPackedCubes } from './services/bggApi';
+import SearchPanel from './components/SearchPanel/SearchPanel';
+import useCollectionRequestHandlers from './hooks/useCollectionRequestHandlers';
 import {
   getExcludedGames,
   saveExcludedGame,
@@ -28,155 +18,96 @@ import {
   saveUserSettings,
   clearUserSettings,
   getLastResult,
-  saveLastResult,
   clearLastResult,
 } from './services/storage/indexedDb';
+import useInputSettingsState from './hooks/useInputSettingsState';
+import useResultsState from './hooks/useResultsState';
+import useHydrationState from './hooks/useHydrationState';
+import { arrayToMap } from './utils/collectionHelpers';
+import { parsePositiveNumber } from './utils/dimensions';
+import { getCollapsedBadgeLimit } from './utils/layout';
+import {
+  DEFAULT_PRIORITIES_BY_FIELD,
+  PRIORITY_LABELS,
+  COLLECTION_STATUSES,
+  FILTER_PANEL_KEYS,
+  MOBILE_BREAKPOINT,
+} from './constants/appDefaults';
 import './App.css';
-
-const DEFAULT_PRIORITIES = [
-  { field: 'name', enabled: true, order: 'asc' },
-  { field: 'categories', enabled: false, order: 'asc' },
-  { field: 'families', enabled: false, order: 'asc' },
-  { field: 'bggRank', enabled: false, order: 'asc' }, // Lower rank # is better
-  { field: 'minPlayers', enabled: false, order: 'asc' },
-  { field: 'maxPlayers', enabled: false, order: 'asc' },
-  { field: 'bestPlayerCount', enabled: false, order: 'asc' },
-  { field: 'minPlaytime', enabled: false, order: 'asc' },
-  { field: 'maxPlaytime', enabled: false, order: 'asc' },
-  { field: 'age', enabled: false, order: 'asc' },
-  { field: 'communityAge', enabled: false, order: 'asc' },
-  { field: 'weight', enabled: false, order: 'asc' },
-  { field: 'bggRating', enabled: false, order: 'desc' }, // Higher rating is better
-];
-
-const DEFAULT_ENABLED_PRIORITY_FIELDS = DEFAULT_PRIORITIES
-  .filter((priority) => priority.enabled)
-  .map((priority) => priority.field);
-
-const DEFAULT_PRIORITIES_BY_FIELD = DEFAULT_PRIORITIES.reduce((accumulator, priority) => {
-  accumulator[priority.field] = priority;
-  return accumulator;
-}, {});
-
-const PRIORITY_LABELS = {
-  name: 'Name',
-  categories: 'Categories',
-  families: 'Families',
-  bggRank: 'BGG Rank',
-  minPlayers: 'Min Players',
-  maxPlayers: 'Max Players',
-  bestPlayerCount: 'Best Player Count',
-  minPlaytime: 'Min Playtime',
-  maxPlaytime: 'Max Playtime',
-  age: 'Age',
-  communityAge: 'Community Age',
-  weight: 'Weight',
-  bggRating: 'BGG Rating',
-};
-
-const COLLECTION_STATUSES = [
-  { key: 'own', label: 'Own' },
-  { key: 'preordered', label: 'Pre-Ordered' },
-  { key: 'wanttoplay', label: 'Want To Play' },
-  { key: 'prevowned', label: 'Previously Owned' },
-  { key: 'fortrade', label: 'For Trade' },
-  { key: 'want', label: 'Want' },
-  { key: 'wanttobuy', label: 'Want To Buy' },
-  { key: 'wishlist', label: 'Wishlist' },
-];
-
-const DEFAULT_COLLECTION_FILTERS = COLLECTION_STATUSES.reduce((acc, status) => {
-  acc[status.key] = status.key === 'own' ? 'include' : 'neutral';
-  return acc;
-}, {});
-
-const FILTER_PANEL_KEYS = ['preferences', 'collections', 'priorities'];
-const DEFAULT_FILTER_PANEL_STATE = FILTER_PANEL_KEYS.reduce((acc, key) => {
-  acc[key] = true; // collapsed by default
-  return acc;
-}, {});
-
-const arrayToMap = (items = []) =>
-  Array.isArray(items)
-    ? items.reduce((acc, item) => {
-        if (item?.id) {
-          acc[item.id] = { ...item };
-        }
-        return acc;
-      }, {})
-    : {};
-
-const parseDimensionValue = (value) => {
-  const numeric = typeof value === 'string' ? parseFloat(value) : value;
-  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
-};
-
-const getCollapsedBadgeLimit = (width) => {
-  if (!Number.isFinite(width) || width <= 0) {
-    return 4;
-  }
-
-  if (width >= 1280) {
-    return 4;
-  }
-  if (width >= 1080) {
-    return 3;
-  }
-  if (width >= 900) {
-    return 2;
-  }
-  if (width >= 720) {
-    return 1;
-  }
-  return 0;
-};
-
-const MOBILE_BREAKPOINT = 768;
 
 function App() {
   const formRef = useRef(null);
-  const [username, setUsername] = useState('');
-  const [includeExpansions, setIncludeExpansions] = useState(false);
-  const [groupExpansions, setGroupExpansions] = useState(false);
-  const [groupSeries, setGroupSeries] = useState(false);
-  const [verticalStacking, setVerticalStacking] = useState(true);
-  const [lockRotation, setLockRotation] = useState(false);
-  const [optimizeSpace, setOptimizeSpace] = useState(false);
-  const [respectSortOrder, setRespectSortOrder] = useState(false);
-  const [fitOversized, setFitOversized] = useState(false);
-  const [bypassVersionWarning, setBypassVersionWarning] = useState(false);
-  const [priorities, setPriorities] = useState(DEFAULT_PRIORITIES);
-  const [collectionFilters, setCollectionFilters] = useState(
-    () => ({ ...DEFAULT_COLLECTION_FILTERS })
-  );
+  const {
+    username,
+    setUsername,
+    includeExpansions,
+    setIncludeExpansions,
+    groupExpansions,
+    setGroupExpansions,
+    groupSeries,
+    setGroupSeries,
+    verticalStacking,
+    setVerticalStacking,
+    lockRotation,
+    setLockRotation,
+    optimizeSpace,
+    setOptimizeSpace,
+    respectSortOrder,
+    setRespectSortOrder,
+    fitOversized,
+    setFitOversized,
+    bypassVersionWarning,
+    setBypassVersionWarning,
+    filtersCollapsed,
+    setFiltersCollapsed,
+    priorities,
+    setPriorities,
+    collectionFilters,
+    setCollectionFilters,
+    filterPanelsCollapsed,
+    setFilterPanelsCollapsed,
+    isFilterDrawerOpen,
+    setIsFilterDrawerOpen,
+    resetInputSettings,
+  } = useInputSettingsState();
   const [excludedGamesMap, setExcludedGamesMap] = useState({});
   const [orientationOverridesMap, setOrientationOverridesMap] = useState({});
   const [dimensionOverridesMap, setDimensionOverridesMap] = useState({});
   
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [progress, setProgress] = useState('');
-  const [cubes, setCubes] = useState(null);
-  const [oversizedGames, setOversizedGames] = useState([]);
-  const [missingVersionWarning, setMissingVersionWarning] = useState(null);
-  const [lastRequestConfig, setLastRequestConfig] = useState(null);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
-  const [filterPanelsCollapsed, setFilterPanelsCollapsed] = useState(
-    () => ({ ...DEFAULT_FILTER_PANEL_STATE })
-  );
-  const [settingsHydrated, setSettingsHydrated] = useState(false);
-  const [lastResultHydrated, setLastResultHydrated] = useState(false);
+  const {
+    cubes,
+    setCubes,
+    stats,
+    setStats,
+    oversizedGames,
+    setOversizedGames,
+    missingVersionWarning,
+    setMissingVersionWarning,
+    lastRequestConfig,
+    setLastRequestConfig,
+    error,
+    setError,
+    progress,
+    setProgress,
+    resetResults,
+  } = useResultsState();
+  const {
+    settingsHydrated,
+    setSettingsHydrated,
+    lastResultHydrated,
+    setLastResultHydrated,
+    hasStoredData,
+    setHasStoredData,
+    resetHydration,
+  } = useHydrationState();
   const [collapsedBadgeLimit, setCollapsedBadgeLimit] = useState(() =>
     typeof window === 'undefined' ? 4 : getCollapsedBadgeLimit(window.innerWidth)
   );
-  const [hasStoredData, setHasStoredData] = useState(false);
   const initialCollapseAppliedRef = useRef(false);
-  const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isMobileLayout, setIsMobileLayout] = useState(() =>
     typeof window === 'undefined' ? false : window.innerWidth < MOBILE_BREAKPOINT
   );
-  const filterDrawerCloseRef = useRef(null);
-  const searchPanelHeaderRef = useRef(null);
   const previousBodyOverflowRef = useRef(null);
 
   useEffect(() => {
@@ -403,6 +334,7 @@ function App() {
         }
 
         setCubes(storedResult.response.cubes);
+        setStats(storedResult.response.stats || null);
         setOversizedGames(storedResult.response.oversizedGames || []);
         setHasStoredData(true);
 
@@ -459,31 +391,6 @@ function App() {
     };
   }, [isFilterDrawerOpen, isMobileLayout]);
 
-  useEffect(() => {
-    if (!isFilterDrawerOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        setIsFilterDrawerOpen(false);
-        searchPanelHeaderRef.current?.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isFilterDrawerOpen]);
-
-  useEffect(() => {
-    if (isFilterDrawerOpen) {
-      filterDrawerCloseRef.current?.focus();
-    }
-  }, [isFilterDrawerOpen]);
-
   const excludedGamesList = useMemo(
     () => Object.values(excludedGamesMap),
     [excludedGamesMap]
@@ -511,36 +418,41 @@ function App() {
     [collectionFilters]
   );
   const hasIncludeStatuses = includeStatusList.length > 0;
-  const renderFilterPanel = (panelKey, title, content) => {
-    const isCollapsed = Boolean(filterPanelsCollapsed[panelKey]);
-    return (
-      <section
-        key={panelKey}
-        className={`filter-panel ${isCollapsed ? 'filter-panel--collapsed' : ''}`}
-      >
-        <button
-          type="button"
-          className="filter-panel__header"
-          onClick={() => toggleFilterPanel(panelKey)}
-          aria-expanded={!isCollapsed}
-          aria-controls={`filter-panel-${panelKey}`}
-        >
-          <span className="filter-panel__chevron" aria-hidden>
-            <FaChevronRight className="filter-panel__chevron-icon" />
-          </span>
-          <span className="filter-panel__title">{title}</span>
-        </button>
-        <div
-          className="filter-panel__body"
-          id={`filter-panel-${panelKey}`}
-          hidden={isCollapsed}
-        >
-          {content}
-        </div>
-      </section>
-    );
-  };
 
+  const {
+    handleSubmit,
+    handleWarningCancel,
+    handleWarningContinue,
+  } = useCollectionRequestHandlers({
+    username,
+    hasIncludeStatuses,
+    includeStatusList,
+    excludeStatusList,
+    includeExpansions,
+    priorities,
+    verticalStacking,
+    lockRotation,
+    optimizeSpace,
+    respectSortOrder,
+    fitOversized,
+    groupExpansions,
+    groupSeries,
+    bypassVersionWarning,
+    excludedGamesList,
+    orientationOverridesList,
+    dimensionOverridesList,
+    setError,
+    setLoading,
+    setCubes,
+    setOversizedGames,
+    setProgress,
+    setMissingVersionWarning,
+    setFiltersCollapsed,
+    setIsFilterDrawerOpen,
+    setStats,
+    setLastRequestConfig,
+    lastRequestConfig,
+  });
   const handleExcludeGame = useCallback(async (game) => {
     if (!game?.id) {
       return;
@@ -647,9 +559,9 @@ function App() {
       return false;
     }
 
-    const length = parseDimensionValue(rawDimensions.length);
-    const width = parseDimensionValue(rawDimensions.width);
-    const depth = parseDimensionValue(rawDimensions.depth);
+    const length = parsePositiveNumber(rawDimensions.length);
+    const width = parsePositiveNumber(rawDimensions.width);
+    const depth = parsePositiveNumber(rawDimensions.depth);
 
     if (!length || !width || !depth) {
       return false;
@@ -727,28 +639,9 @@ function App() {
   }, []);
 
   const handleResetSettings = useCallback(async () => {
-    setUsername('');
-    setIncludeExpansions(false);
-    setGroupExpansions(false);
-    setGroupSeries(false);
-    setVerticalStacking(true);
-    setLockRotation(false);
-    setOptimizeSpace(false);
-    setRespectSortOrder(false);
-    setFitOversized(false);
-    setBypassVersionWarning(false);
-    setFiltersCollapsed(false);
-    setPriorities(DEFAULT_PRIORITIES.map((priority) => ({ ...priority })));
-    setCollectionFilters({ ...DEFAULT_COLLECTION_FILTERS });
-    setFilterPanelsCollapsed({ ...DEFAULT_FILTER_PANEL_STATE });
-    setCubes(null);
-    setOversizedGames([]);
-    setMissingVersionWarning(null);
-    setLastRequestConfig(null);
-    setError(null);
-    setProgress('');
-    setHasStoredData(false);
-    setIsFilterDrawerOpen(false);
+    resetInputSettings();
+    resetResults();
+    resetHydration();
 
     try {
       await clearUserSettings();
@@ -756,311 +649,70 @@ function App() {
     } catch (storageError) {
       console.error('Unable to clear stored user settings', storageError);
     }
-  }, []);
+  }, [resetHydration, resetInputSettings, resetResults]);
 
-  const handleOptimizeSpaceChange = (checked) => {
-    setOptimizeSpace(checked);
-    if (checked) {
-      setRespectSortOrder(false);
-    }
-  };
-
-  const activeFilterLabels = useMemo(() => {
-    const labels = [];
-    const pushLabel = (condition, key, content) => {
-      if (condition) {
-        labels.push({ key, content });
+  const handleOptimizeSpaceChange = useCallback(
+    (checked) => {
+      setOptimizeSpace(checked);
+      if (checked) {
+        setRespectSortOrder(false);
       }
-    };
+    },
+    [setOptimizeSpace, setRespectSortOrder]
+  );
 
-    pushLabel(includeExpansions, 'includeExpansions', 'Include expansions');
-    pushLabel(groupExpansions, 'groupExpansions', 'Group expansions');
-    pushLabel(groupSeries, 'groupSeries', 'Group series');
-    pushLabel(respectSortOrder, 'respectSortOrder', 'Respect priority order');
-    pushLabel(optimizeSpace, 'optimizeSpace', 'Optimize for space');
-    pushLabel(fitOversized, 'fitOversized', 'Fit oversized games');
-    pushLabel(bypassVersionWarning, 'bypassVersionWarning', 'Bypass version warning');
-    pushLabel(!verticalStacking, 'horizontalStacking', 'Horizontal stacking');
-    pushLabel(lockRotation, 'lockRotation', 'Lock rotation');
-
-    if (includeStatusList.length > 0) {
-      const includeLabels = includeStatusList
-        .map((statusKey) => COLLECTION_STATUSES.find((status) => status.key === statusKey)?.label)
-        .filter(Boolean);
-      const showIncludeLabel =
-        includeLabels.length > 0 &&
-        !(includeStatusList.length === 1 && includeStatusList[0] === 'own');
-      if (showIncludeLabel) {
-        pushLabel(true, 'collectionInclude', `Include: ${includeLabels.join(', ')}`);
+  const handleIncludeExpansionsChange = useCallback(
+    (next) => {
+      setIncludeExpansions(next);
+      if (!next) {
+        setGroupExpansions(false);
       }
-    }
+    },
+    [setGroupExpansions, setIncludeExpansions]
+  );
 
-    if (excludeStatusList.length > 0) {
-      const excludeLabels = excludeStatusList
-        .map((statusKey) => COLLECTION_STATUSES.find((status) => status.key === statusKey)?.label)
-        .filter(Boolean);
-      if (excludeLabels.length > 0) {
-        pushLabel(true, 'collectionExclude', `Exclude: ${excludeLabels.join(', ')}`);
-      }
-    }
-
-    if (!optimizeSpace) {
-      const enabledPriorities = [];
-      const disabledDefaultLabels = [];
-
-      priorities.forEach((priority) => {
-        const defaultConfig = DEFAULT_PRIORITIES_BY_FIELD[priority.field];
-        const baseLabel = PRIORITY_LABELS[priority.field] || priority.field;
-        const ArrowIcon = priority.order === 'desc' ? FaArrowDown : FaArrowUp;
-
-        if (priority.enabled) {
-          enabledPriorities.push({
-            field: priority.field,
-            label: baseLabel,
-            Icon: ArrowIcon,
-            order: priority.order,
-          });
-        } else if (defaultConfig?.enabled) {
-          disabledDefaultLabels.push(baseLabel);
-        }
-      });
-
-      if (enabledPriorities.length > 0) {
-        pushLabel(true, 'priority:enabled', (
-          <span className="priority-badge-content">
-            Priority:{' '}
-            {enabledPriorities.map((priority, index) => (
-              <React.Fragment key={`${priority.field}-${priority.order}`}>
-                <span className="priority-entry">
-                  {priority.label}{' '}
-                  <priority.Icon aria-hidden className="priority-badge-icon" />
-                </span>
-                {index < enabledPriorities.length - 1 && (
-                  <span className="priority-separator">, </span>
-                )}
-              </React.Fragment>
-            ))}
-          </span>
-        ));
-      }
-
-      if (disabledDefaultLabels.length > 0) {
-        pushLabel(
-          true,
-          'priority:disabled-defaults',
-          `Priority disabled: ${disabledDefaultLabels.join(', ')}`
-        );
-      }
-    }
-
-    return labels;
-  }, [
-    lockRotation,
-    fitOversized,
-    bypassVersionWarning,
-    groupExpansions,
-    groupSeries,
-    includeExpansions,
-    optimizeSpace,
-    priorities,
-    respectSortOrder,
-    verticalStacking,
-    includeStatusList,
-    excludeStatusList,
-  ]);
-
-  const activeFilterCount = activeFilterLabels.length;
-
-  const { headerBadgeTags, headerBadgeOverflow } = useMemo(() => {
-    if (activeFilterLabels.length === 0 || collapsedBadgeLimit <= 0) {
-      return { headerBadgeTags: [], headerBadgeOverflow: 0 };
-    }
-
-    const limited = activeFilterLabels.slice(0, collapsedBadgeLimit);
-    const overflow = Math.max(0, activeFilterLabels.length - limited.length);
-
-    return { headerBadgeTags: limited, headerBadgeOverflow: overflow };
-  }, [activeFilterLabels, collapsedBadgeLimit]);
-
-  const filterControls = (
-    <>
-      <div className="options-row">
-        <div className="username-field">
-          <label htmlFor="username">BoardGameGeek Username</label>
-          <input
-            type="text"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your BGG username"
-            disabled={loading}
-          />
-        </div>
-        <div className="options-actions">
-          <button
-            type="button"
-            className="reset-settings-button"
-            onClick={handleResetSettings}
-            disabled={loading}
-            title="Restore all search options to their default values"
-          >
-            <FaUndoAlt aria-hidden="true" className="button-icon" />
-            <span>Reset settings</span>
-          </button>
-        </div>
-      </div>
-
-      {!hasIncludeStatuses && (
-        <div className="collection-filters-warning" role="alert">
-          <FaExclamationTriangle aria-hidden className="collection-filters-warning__icon" />
-          <span>Select at least one collection status to organize.</span>
-        </div>
-      )}
-
-      <div className="filter-panels-grid">
-        {renderFilterPanel(
-          'preferences',
-          'Preferences',
-          <div className="preferences-panel">
-            <div className="stacking-row">
-              <span className="stacking-label">Stacking</span>
-              <div className="toggle-button-group toggle-button-group--compact">
-                <button
-                  type="button"
-                  className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
-                  onClick={() => setVerticalStacking(false)}
-                  disabled={loading}
-                >
-                  Horizontal
-                </button>
-                <button
-                  type="button"
-                  className={`toggle-button ${verticalStacking ? 'active' : ''}`}
-                  onClick={() => setVerticalStacking(true)}
-                  disabled={loading}
-                >
-                  Vertical
-                </button>
-              </div>
-            </div>
-
-            <div className="preferences-toggle-grid">
-              <ToggleSwitch
-                id="optimizeSpace"
-                label="Optimize for space"
-                checked={optimizeSpace}
-                onChange={handleOptimizeSpaceChange}
-                disabled={loading}
-                tooltip="Ignore all sorting preferences and pack games in as few cubes as possible"
-              />
-              <ToggleSwitch
-                id="includeExpansions"
-                label="Include expansions"
-                checked={includeExpansions}
-                onChange={(next) => {
-                  setIncludeExpansions(next);
-                  if (!next) {
-                    setGroupExpansions(false);
-                  }
-                }}
-                disabled={loading}
-              />
-              <ToggleSwitch
-                id="groupExpansions"
-                label="Group expansions with base game"
-                checked={groupExpansions}
-                onChange={setGroupExpansions}
-                disabled={loading || !includeExpansions || optimizeSpace}
-                tooltip="Keep expansions with their base game in the same cube when possible"
-              />
-              <ToggleSwitch
-                id="groupSeries"
-                label="Group series"
-                checked={groupSeries}
-                onChange={setGroupSeries}
-                disabled={loading || optimizeSpace}
-                tooltip="Keep games from the same series/family together in the same cube when possible"
-              />
-              <ToggleSwitch
-                id="fitOversized"
-                label="Fit oversized games"
-                checked={fitOversized}
-                onChange={setFitOversized}
-                disabled={loading}
-                tooltip="Set oversized games dimension to 13 inches to fit in cubes"
-              />
-              <ToggleSwitch
-                id="lockRotation"
-                label="Lock rotation"
-                checked={lockRotation}
-                onChange={setLockRotation}
-                disabled={loading}
-                tooltip={`Disabled: Prefer stacking preference, may rotate some games to fit.\nEnabled: Force games to follow stacking preference`}
-              />
-              <ToggleSwitch
-                id="respectSortOrder"
-                label="Respect sorting priority"
-                checked={respectSortOrder}
-                onChange={setRespectSortOrder}
-                disabled={loading || optimizeSpace}
-                tooltip="Games will not be backfilled to earlier cubes for better fit to match sorting preferences. May use more space."
-              />
-              <ToggleSwitch
-                id="bypassVersionWarning"
-                label="Bypass version warning"
-                checked={bypassVersionWarning}
-                onChange={setBypassVersionWarning}
-                disabled={loading}
-                tooltip="You will not be warned about missing versions or dimensions. This may result in incorrect data and longer processing times."
-                tooltipIcon={FaExclamationTriangle}
-                tooltipIconClassName="warning-icon"
-              />
-            </div>
-          </div>
-        )}
-
-        {renderFilterPanel(
-          'collections',
-          'Collections',
-          <div className="collection-status-content">
-            {(includeStatusList.length > 1 || excludeStatusList.length > 0) && (
-              <div className="collection-status-helper" role="note">
-                Include matches any selected category. Exclude removes games with those categories.
-              </div>
-            )}
-            <div className="collection-status-grid">
-              {COLLECTION_STATUSES.map((status) => (
-                <CollectionStatusToggle
-                  key={status.key}
-                  label={status.label}
-                  value={collectionFilters[status.key]}
-                  onChange={(nextState) => handleCollectionFilterChange(status.key, nextState)}
-                  disabled={loading}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {renderFilterPanel(
-          'priorities',
-          'Sorting',
-          <SortablePriorities
-            priorities={priorities}
-            onChange={setPriorities}
-            disabled={optimizeSpace}
-          />
-        )}
-      </div>
-    </>
+  const preferenceState = useMemo(
+    () => ({
+      optimizeSpace,
+      onOptimizeSpaceChange: handleOptimizeSpaceChange,
+      includeExpansions,
+      onIncludeExpansionsChange: handleIncludeExpansionsChange,
+      groupExpansions,
+      onGroupExpansionsChange: setGroupExpansions,
+      groupSeries,
+      onGroupSeriesChange: setGroupSeries,
+      fitOversized,
+      onFitOversizedChange: setFitOversized,
+      lockRotation,
+      onLockRotationChange: setLockRotation,
+      respectSortOrder,
+      onRespectSortOrderChange: setRespectSortOrder,
+      bypassVersionWarning,
+      onBypassVersionWarningChange: setBypassVersionWarning,
+    }),
+    [
+      optimizeSpace,
+      handleOptimizeSpaceChange,
+      includeExpansions,
+      handleIncludeExpansionsChange,
+      groupExpansions,
+      setGroupExpansions,
+      groupSeries,
+      setGroupSeries,
+      fitOversized,
+      setFitOversized,
+      lockRotation,
+      setLockRotation,
+      respectSortOrder,
+      setRespectSortOrder,
+      bypassVersionWarning,
+      setBypassVersionWarning,
+    ]
   );
 
   const hydrationComplete = settingsHydrated && lastResultHydrated;
   const isFirstRun = hydrationComplete && !hasStoredData && cubes === null;
-  const searchPanelBodyId = isMobileLayout ? 'filter-drawer' : 'search-panel-content';
-  const isPanelCollapsed = isMobileLayout ? !isFilterDrawerOpen : filtersCollapsed;
-  const shouldShowInlineUsername =
-    isMobileLayout && (!hydrationComplete || isFirstRun);
+  const shouldShowInlineUsername = isMobileLayout && (!hydrationComplete || isFirstRun);
 
   useEffect(() => {
     if (initialCollapseAppliedRef.current) {
@@ -1077,12 +729,7 @@ function App() {
     initialCollapseAppliedRef.current = true;
   }, [hydrationComplete, hasStoredData, cubes, isFirstRun]);
 
-  const closeFilterDrawer = useCallback(() => {
-    setIsFilterDrawerOpen(false);
-    searchPanelHeaderRef.current?.focus();
-  }, []);
-
-  const toggleFiltersCollapsed = useCallback(() => {
+  const handleToggleFiltersCollapsed = useCallback(() => {
     if (loading) {
       return;
     }
@@ -1095,283 +742,9 @@ function App() {
     setFiltersCollapsed((prev) => !prev);
   }, [isMobileLayout, loading]);
 
-  const handleHeaderClick = useCallback(
-    (event) => {
-      if (loading) {
-        return;
-      }
-
-      const target = event?.target;
-      if (
-        target instanceof Element &&
-        (target.closest('.search-panel-submit') ||
-          target.closest('.search-panel-actions') ||
-          target.closest('.username-field'))
-      ) {
-        return;
-      }
-
-      toggleFiltersCollapsed();
-    },
-    [loading, toggleFiltersCollapsed]
-  );
-
-  const handleHeaderKeyDown = useCallback(
-    (event) => {
-      if (loading) {
-        return;
-      }
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        toggleFiltersCollapsed();
-      }
-    },
-    [loading, toggleFiltersCollapsed]
-  );
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!username.trim()) {
-      setError('Please enter a BoardGameGeek username');
-      return;
-    }
-
-    if (!hasIncludeStatuses) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setCubes(null);
-    setOversizedGames([]);
-    setProgress('Fetching your collection from BoardGameGeek...');
-    setMissingVersionWarning(null);
-    setFiltersCollapsed(true);
+  const handleCloseFilterDrawer = useCallback(() => {
     setIsFilterDrawerOpen(false);
-
-    try {
-      const trimmedUsername = username.trim();
-      const effectiveGroupExpansions = groupExpansions && !optimizeSpace;
-      const effectiveGroupSeries = groupSeries && !optimizeSpace;
-      const overridesPayload = {
-        excludedGames: excludedGamesList.map((game) => ({ ...game })),
-        orientationOverrides: orientationOverridesList.map((entry) => ({ ...entry })),
-        dimensionOverrides: dimensionOverridesList.map((entry) => ({ ...entry })),
-      };
-      const requestConfig = {
-        username: trimmedUsername,
-        includeStatuses: includeStatusList,
-        excludeStatuses: excludeStatusList,
-        includeExpansions,
-        priorities,
-        verticalStacking,
-        lockRotation,
-        optimizeSpace,
-        respectSortOrder,
-        fitOversized,
-        groupExpansions: effectiveGroupExpansions,
-        groupSeries: effectiveGroupSeries,
-        bypassVersionWarning,
-        skipVersionCheck: bypassVersionWarning,
-        overrides: overridesPayload,
-      };
-
-      setLastRequestConfig(requestConfig);
-
-      // Get fully processed and packed cubes from server with progress updates
-      const response = await fetchPackedCubes(
-        trimmedUsername,
-        {
-          includeStatuses: includeStatusList,
-          excludeStatuses: excludeStatusList,
-          includeExpansions,
-          priorities,
-          verticalStacking,
-          lockRotation,
-          optimizeSpace,
-          respectSortOrder,
-          fitOversized,
-          groupExpansions: effectiveGroupExpansions,
-          groupSeries: effectiveGroupSeries,
-        },
-        (progress) => {
-          // Update progress message from SSE updates
-          if (progress && progress.message) {
-            setProgress(progress.message);
-          }
-        },
-        {
-          overrides: overridesPayload,
-          skipVersionCheck: bypassVersionWarning,
-          bypassVersionWarning,
-        }
-      );
-      
-      if (response?.status === 'missing_versions') {
-        setLoading(false);
-        setProgress('');
-        setMissingVersionWarning({ ...response, username: trimmedUsername });
-        return;
-      }
-      
-      if (!response || !response.cubes || response.cubes.length === 0) {
-        setError(
-          response?.message || 'No games matched your selected collections.'
-        );
-        setLoading(false);
-        return;
-      }
-
-      setProgress('Rendering results...');
-
-      setCubes(response.cubes);
-      setOversizedGames(response.oversizedGames || []);
-      setProgress('');
-      setLoading(false);
-
-      saveLastResult({
-        requestConfig,
-        response: {
-          cubes: response.cubes,
-          oversizedGames: response.oversizedGames || [],
-          fitOversized,
-          verticalStacking,
-          lockRotation,
-        },
-      }).catch((storageError) => {
-        console.error('Unable to persist last result', storageError);
-      });
-
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
-      setLoading(false);
-      setProgress('');
-    }
-  };
-
-  const handleWarningCancel = () => {
-    setMissingVersionWarning(null);
-    setProgress('');
-    setError('Processing cancelled. Please select versions for the highlighted games on BoardGameGeek and try again.');
-  };
-
-  const handleWarningContinue = async () => {
-    if (!lastRequestConfig) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setProgress('Attempting fallback dimension lookup. This may take a little while...');
-    setMissingVersionWarning(null);
-    setOversizedGames([]);
-    setFiltersCollapsed(true);
-    setIsFilterDrawerOpen(false);
-
-    try {
-      const effectiveBypassVersionWarning =
-        lastRequestConfig?.bypassVersionWarning ?? bypassVersionWarning;
-      const overridesPayload = lastRequestConfig.overrides
-        ? {
-            excludedGames: (lastRequestConfig.overrides.excludedGames || []).map((item) => ({
-              ...item,
-            })),
-            orientationOverrides: (lastRequestConfig.overrides.orientationOverrides || []).map(
-              (item) => ({ ...item })
-            ),
-            dimensionOverrides: (lastRequestConfig.overrides.dimensionOverrides || []).map(
-              (item) => ({ ...item })
-            ),
-          }
-        : {
-            excludedGames: excludedGamesList.map((item) => ({ ...item })),
-            orientationOverrides: orientationOverridesList.map((item) => ({ ...item })),
-            dimensionOverrides: dimensionOverridesList.map((item) => ({ ...item })),
-          };
-
-      const fallbackLockRotation =
-        typeof lastRequestConfig.lockRotation === 'boolean'
-          ? lastRequestConfig.lockRotation
-          : lockRotation;
-
-      const fallbackIncludeStatuses = Array.isArray(lastRequestConfig.includeStatuses)
-        ? lastRequestConfig.includeStatuses
-        : includeStatusList;
-      const fallbackExcludeStatuses = Array.isArray(lastRequestConfig.excludeStatuses)
-        ? lastRequestConfig.excludeStatuses
-        : excludeStatusList;
-
-      const response = await fetchPackedCubes(
-        lastRequestConfig.username,
-        {
-          includeStatuses: fallbackIncludeStatuses,
-          excludeStatuses: fallbackExcludeStatuses,
-          includeExpansions: lastRequestConfig.includeExpansions,
-          priorities: lastRequestConfig.priorities,
-          verticalStacking: lastRequestConfig.verticalStacking,
-          lockRotation: fallbackLockRotation,
-          optimizeSpace: lastRequestConfig.optimizeSpace,
-          respectSortOrder: lastRequestConfig.respectSortOrder,
-          fitOversized: lastRequestConfig.fitOversized,
-          groupExpansions: lastRequestConfig.groupExpansions,
-          groupSeries: lastRequestConfig.groupSeries,
-        },
-        (progress) => {
-          if (progress && progress.message) {
-            setProgress(progress.message);
-          }
-        },
-        {
-          skipVersionCheck: true,
-          overrides: overridesPayload,
-          bypassVersionWarning: effectiveBypassVersionWarning,
-        }
-      );
-
-      if (!response || !response.cubes || response.cubes.length === 0) {
-        setError(
-          response?.message || 'No games matched your selected collections.'
-        );
-        setLoading(false);
-        return;
-      }
-
-      setProgress('Rendering results...');
-      setCubes(response.cubes);
-      setOversizedGames(response.oversizedGames || []);
-      setProgress('');
-      setLoading(false);
-
-      const normalizedRequestConfig = {
-        ...lastRequestConfig,
-        lockRotation: fallbackLockRotation,
-        includeStatuses: fallbackIncludeStatuses,
-        excludeStatuses: fallbackExcludeStatuses,
-      };
-
-      setLastRequestConfig(normalizedRequestConfig);
-
-      saveLastResult({
-        requestConfig: normalizedRequestConfig,
-        response: {
-          cubes: response.cubes,
-          oversizedGames: response.oversizedGames || [],
-          fitOversized: normalizedRequestConfig.fitOversized,
-          verticalStacking: normalizedRequestConfig.verticalStacking,
-          lockRotation: fallbackLockRotation,
-        },
-      }).catch((storageError) => {
-        console.error('Unable to persist last result', storageError);
-      });
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err.message || 'An error occurred while fetching data from BoardGameGeek. Please try again.');
-      setLoading(false);
-      setProgress('');
-    }
-  };
+  }, []);
 
   return (
     <div className="app">
@@ -1403,138 +776,41 @@ function App() {
         </div>
       )}
 
-      <section className={`card search-panel ${isPanelCollapsed ? 'collapsed' : ''}`}>
-        <form ref={formRef} onSubmit={handleSubmit} className="search-panel-form">
-          <div
-            className={`search-panel-header ${isPanelCollapsed ? 'is-collapsed' : ''} ${
-              loading ? 'is-disabled' : ''
-            }`}
-            role="button"
-            tabIndex={loading ? -1 : 0}
-            aria-expanded={!isPanelCollapsed}
-            aria-controls={searchPanelBodyId}
-            onClick={handleHeaderClick}
-            onKeyDown={handleHeaderKeyDown}
-            title={
-              isPanelCollapsed ? 'Show search options' : 'Hide search options'
-            }
-            ref={searchPanelHeaderRef}
-          >
-            <div className="search-panel-primary">
-              <div className="search-panel-toggle">
-                <span className="disclosure-arrow search-panel-icon" aria-hidden>
-                  {isPanelCollapsed ? (
-                    <FaChevronRight className="disclosure-arrow-icon" />
-                  ) : (
-                    <FaChevronDown className="disclosure-arrow-icon" />
-                  )}
-                </span>
-                <span className="search-panel-label">
-                  <strong className="search-panel-title">Options</strong>
-                  {activeFilterCount > 0 && (
-                    <span className="search-panel-count" aria-label={`${activeFilterCount} active filters`}>
-                      {activeFilterCount}
-                    </span>
-                  )}
-                </span>
-              </div>
-              {shouldShowInlineUsername && (
-                <div className="username-field username-field--inline">
-                  <label htmlFor="username-inline">BoardGameGeek Username</label>
-                  <input
-                    type="text"
-                    id="username-inline"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your BGG username"
-                    disabled={loading}
-                  />
-                </div>
-              )}
-              <div className="search-panel-actions">
-                <button
-                  type="submit"
-                  className="search-panel-submit"
-                  disabled={loading || !hasIncludeStatuses}
-                  title={
-                    !hasIncludeStatuses
-                      ? 'Select at least one collection status to organize'
-                      : undefined
-                  }
-                >
-                  {loading ? 'Processing...' : 'Organize Collection'}
-                </button>
-              </div>
-            </div>
-            {activeFilterCount > 0 && collapsedBadgeLimit > 0 && (
-              <div className="search-panel-tags" aria-label="Active filters">
-                {headerBadgeTags.map(({ key, content }) => (
-                  <span key={key} className="search-panel-tag">
-                    {content}
-                  </span>
-                ))}
-                {headerBadgeOverflow > 0 && (
-                  <span key="filter-overflow" className="search-panel-tag">
-                    + {headerBadgeOverflow} more
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-          {!isMobileLayout && (
-            <div className="search-panel-body" id="search-panel-content">
-              {filterControls}
-            </div>
-          )}
-
-          {isMobileLayout && (
-            <>
-              <div
-                className={`filter-drawer-backdrop ${isFilterDrawerOpen ? 'is-visible' : ''}`}
-                onClick={closeFilterDrawer}
-                aria-hidden="true"
-              />
-              <div
-                className={`filter-drawer ${isFilterDrawerOpen ? 'is-open' : ''}`}
-                role="dialog"
-                aria-modal={isFilterDrawerOpen}
-                aria-hidden={!isFilterDrawerOpen}
-                aria-labelledby="filter-drawer-title"
-                id="filter-drawer"
-              >
-                <div className="filter-drawer__header">
-                  <h2 id="filter-drawer-title">Options</h2>
-                  <button
-                    type="button"
-                    className="filter-drawer__close"
-                    onClick={closeFilterDrawer}
-                    ref={filterDrawerCloseRef}
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="filter-drawer__body">
-                  {filterControls}
-                </div>
-                <div className="filter-drawer__footer">
-                  <button
-                    type="submit"
-                    className="filter-drawer__submit search-panel-submit"
-                    disabled={loading || !hasIncludeStatuses}
-                    title={
-                      !hasIncludeStatuses
-                        ? 'Select at least one collection status to organize'
-                        : undefined
-                    }
-                  >
-                    {loading ? 'Processing...' : 'Organize Collection'}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </form>
-      </section>
+      <SearchPanel
+        formRef={formRef}
+        loading={loading}
+        onSubmit={handleSubmit}
+        username={username}
+        onUsernameChange={setUsername}
+        onResetSettings={handleResetSettings}
+        hasIncludeStatuses={hasIncludeStatuses}
+        filterPanelsCollapsed={filterPanelsCollapsed}
+        onTogglePanel={toggleFilterPanel}
+        verticalStacking={verticalStacking}
+        onVerticalStackingChange={setVerticalStacking}
+        preferenceState={preferenceState}
+        collectionFilters={collectionFilters}
+        onCollectionFilterChange={handleCollectionFilterChange}
+        includeStatusList={includeStatusList}
+        excludeStatusList={excludeStatusList}
+        priorities={priorities}
+        onPrioritiesChange={setPriorities}
+        optimizeSpace={optimizeSpace}
+        filtersCollapsed={filtersCollapsed}
+        onToggleFiltersCollapsed={handleToggleFiltersCollapsed}
+        isFilterDrawerOpen={isFilterDrawerOpen}
+        onRequestCloseDrawer={handleCloseFilterDrawer}
+        isMobileLayout={isMobileLayout}
+        collapsedBadgeLimit={collapsedBadgeLimit}
+        includeExpansions={includeExpansions}
+        groupExpansions={groupExpansions}
+        groupSeries={groupSeries}
+        respectSortOrder={respectSortOrder}
+        fitOversized={fitOversized}
+        bypassVersionWarning={bypassVersionWarning}
+        lockRotation={lockRotation}
+        shouldShowInlineUsername={shouldShowInlineUsername}
+      />
 
       {loading && (
         <div className="loading">
@@ -1556,6 +832,7 @@ function App() {
         <Results
           cubes={cubes}
           verticalStacking={verticalStacking}
+          stats={stats}
           oversizedGames={oversizedGames}
           fitOversized={fitOversized}
           priorities={priorities}

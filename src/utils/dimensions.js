@@ -1,4 +1,4 @@
-const parsePositiveNumber = (value) => {
+export const parsePositiveNumber = (value) => {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value > 0 ? value : null;
   }

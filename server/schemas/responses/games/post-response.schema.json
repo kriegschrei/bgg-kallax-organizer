@@ -22,7 +22,9 @@
                   "gameId": { "type": "integer" },
                   "versionId": { "type": "integer" },
                   "gameName": { "type": "string" },
+                  "gamePublishedYear": { "type": "integer" },
                   "versionName": { "type": "string" },
+                  "versionPublishedYear": { "type": "integer" },
                   "dimensions": {
                     "type": "array",
                     "items": { "$ref": "../../$defs/types.schema.json#/$defs/dimension" }
@@ -42,6 +44,7 @@
                   "communityAge": { "type": "integer" },
                   "weight": { "type": "number" },
                   "bggRating": { "type": "number" },
+                  "numplays": { "type": "integer", "default": 0 },
                   "missingVersion": { "type": "boolean" },
                   "versionsUrl": { "type": "string", "format": "uri" },
                   "usedAlternateVersionDims": { "type": "boolean" },
@@ -52,8 +55,9 @@
                 "required": [
                   "gameId","versionId","gameName","versionName","dimensions","startPosition",
                   "oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
-                  "bestPlayerCount","minPlaytime","maxPlaytime","age","communityAge","weight","bggRating",
-                  "missingVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","type"
+                  "bestPlayerCount","minPlaytime","maxPlaytime","age","communityAge","weight","bggRating","numplays",
+                  "missingVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","type",
+                  "gamePublishedYear","versionPublishedYear"
                 ]
               }
             }

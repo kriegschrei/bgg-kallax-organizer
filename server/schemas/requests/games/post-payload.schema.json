@@ -153,7 +153,9 @@
             "age",
             "communityAge",
             "weight",
-            "bggRating"
+            "bggRating",
+            "gamePublishedYear",
+            "versionPublishedYear"
           ],
           "errorMessage": { "enum": "Sort field must be one of the supported keys." }
         },

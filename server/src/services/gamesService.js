@@ -1,23 +1,17 @@
-import { getGame } from './cache/index.js';
-import { COLLECTION_STATUS_KEYS } from '../utils/gameUtils.js';
+import { fetchUserCollectionWithDetails } from './bggService.js';
 import { packGamesIntoCubes } from './packingService.js';
 import { BGG_API_TOKEN } from './configService.js';
-import { fetchCollection, filterCollectionItems, removeDuplicateVersions, detectMissingVersions } from './collectionService.js';
-import {
-  buildVersionMap,
-  buildGameDetailsMap,
-  fetchAndProcessGames,
-  processCachedGames,
-  filterExpansionsFromGames,
-  removeDuplicateGames,
-} from './gameProcessingService.js';
-import {
-  findGamesNeedingDimensions,
-  fetchDimensionsForGames,
-  applyDefaultDimensions,
-} from './dimensionService.js';
 import { buildOverrideMaps, applyOverridesToGames } from './overrideService.js';
 import { serializeCubesResponse } from './responseSerializer.js';
+import {
+  DEFAULT_DIMENSIONS,
+  getFallbackVersionLabel,
+  hasMissingDimensions,
+  removeInternalProperties,
+  setupGameVersionMetadata,
+  updateGameCorrectionUrl,
+} from '../utils/gameProcessingHelpers.js';
+import { buildVersionsUrl, COLLECTION_STATUS_KEYS } from '../utils/gameUtils.js';
 
 const getPrioritiesFromSort = (sort = []) =>
   Array.isArray(sort)
@@ -31,6 +25,225 @@ const getPrioritiesFromSort = (sort = []) =>
 
 const normalizeBooleanFlag = (value, defaultValue = false) =>
   typeof value === 'boolean' ? value : defaultValue;
+
+const matchesIncludeStatuses = (entry, includeStatuses) =>
+  includeStatuses.some((status) => Boolean(entry.statuses?.[status]));
+
+const matchesExcludeStatuses = (entry, excludeStatuses) =>
+  excludeStatuses.some((status) => Boolean(entry.statuses?.[status]));
+
+const filterVersionEntries = (entries, includeStatuses, excludeStatuses, includeExpansions) =>
+  entries
+    .filter((entry) => matchesIncludeStatuses(entry, includeStatuses))
+    .filter((entry) => !matchesExcludeStatuses(entry, excludeStatuses))
+    .filter((entry) => includeExpansions || !entry.isExpansion);
+
+const dedupeVersionEntries = (entries) => {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    const key = entry.versionKey || `${entry.gameId}-${entry.versionId ?? 'default'}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+const detectMissingVersionSelections = (entries) => {
+  const missing = new Map();
+
+  entries.forEach((entry) => {
+    const gameId = entry.gameId;
+    if (!gameId || gameId === -1) {
+      return;
+    }
+
+    if ((entry.versionId === -1 || entry.versionId === null) && !missing.has(gameId)) {
+      const name = entry.name || `ID:${gameId}`;
+      missing.set(gameId, {
+        id: gameId,
+        name,
+        versionsUrl: buildVersionsUrl(gameId, name),
+      });
+    }
+  });
+
+  return missing;
+};
+
+const computeVolume = (length, width, depth) => {
+  if (![length, width, depth].every((value) => Number.isFinite(value) && value > 0)) {
+    return -1;
+  }
+  return length * width * depth;
+};
+
+const computeFootprintArea = (length, width, depth) => {
+  if (![length, width, depth].every((value) => Number.isFinite(value) && value > 0)) {
+    return -1;
+  }
+  const dims = [length, width, depth].sort((a, b) => a - b);
+  return dims[0] * dims[1];
+};
+
+const toDimensionsObject = (length, width, depth, missingDimensions) => ({
+  length,
+  width,
+  depth,
+  missingDimensions,
+});
+
+const resolveDimensionsForEntry = (entry) => {
+  const dims = entry.dimensions || {};
+  const hasValidDimensions =
+    Number.isFinite(dims.length) &&
+    dims.length > 0 &&
+    Number.isFinite(dims.width) &&
+    dims.width > 0 &&
+    Number.isFinite(dims.depth) &&
+    dims.depth > 0;
+
+  if (!entry.missingDimensions && hasValidDimensions) {
+    return {
+      dimensions: toDimensionsObject(dims.length, dims.width, dims.depth, false),
+      volume: Number.isFinite(entry.volume) && entry.volume > 0 ? entry.volume : computeVolume(dims.length, dims.width, dims.depth),
+      area: Number.isFinite(entry.area) && entry.area > 0 ? entry.area : computeFootprintArea(dims.length, dims.width, dims.depth),
+      usedAlternate: false,
+      alternateVersion: null,
+    };
+  }
+
+  const alternate = (entry.alternateVersions || []).find((version) => !version.missingDimensions);
+  if (alternate) {
+    return {
+      dimensions: toDimensionsObject(alternate.length, alternate.width, alternate.depth, false),
+      volume: Number.isFinite(alternate.volume) && alternate.volume > 0
+        ? alternate.volume
+        : computeVolume(alternate.length, alternate.width, alternate.depth),
+      area: Number.isFinite(alternate.area) && alternate.area > 0
+        ? alternate.area
+        : computeFootprintArea(alternate.length, alternate.width, alternate.depth),
+      usedAlternate: true,
+      alternateVersion: alternate,
+    };
+  }
+
+  return {
+    dimensions: toDimensionsObject(DEFAULT_DIMENSIONS.length, DEFAULT_DIMENSIONS.width, DEFAULT_DIMENSIONS.depth, true),
+    volume: -1,
+    area: -1,
+    usedAlternate: false,
+    alternateVersion: null,
+  };
+};
+
+const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
+  const {
+    dimensions,
+    volume,
+    area,
+    usedAlternate,
+    alternateVersion,
+  } = resolveDimensionsForEntry(entry);
+
+  const versionKey = entry.versionKey || `${entry.gameId}-${entry.versionId !== -1 ? entry.versionId : 'default'}`;
+  const bgg = entry.bgg || {};
+
+  const game = {
+    id: versionKey,
+    versionKey,
+    gameKey: versionKey,
+    gameId: entry.gameId,
+    collectionId: entry.collectionId,
+    name: entry.name || `ID:${entry.gameId}`,
+    thumbnail: entry.thumbnail || null,
+    image: entry.image || null,
+    categories: bgg.categories || [],
+    mechanics: bgg.mechanics || [],
+    families: bgg.families || [],
+    familyIds: bgg.familyIds || [],
+    bggRank: bgg.bggRank ?? -1,
+    minPlayers: bgg.minPlayers ?? -1,
+    maxPlayers: bgg.maxPlayers ?? -1,
+    bestPlayerCount: bgg.bestPlayerCount ?? -1,
+    minPlaytime: bgg.minPlaytime ?? -1,
+    maxPlaytime: bgg.maxPlaytime ?? -1,
+    age: bgg.minAge ?? -1,
+    communityAge: bgg.communityAge ?? -1,
+    languageDependence: bgg.languageDependence ?? -1,
+    weight: bgg.bggWeight ?? -1,
+    bggRating: bgg.bggRating ?? -1,
+    baseGameId: entry.baseGameId ?? entry.gameId,
+    isExpansion: Boolean(entry.isExpansion),
+    numplays: entry.numplays ?? 0,
+    statuses: entry.statuses || {},
+    versionId: entry.versionId,
+    preferred: Boolean(entry.preferred),
+    versionName: entry.versionName || entry.name,
+    dimensions,
+    volume,
+    area,
+    missingDimensions: dimensions.missingDimensions,
+    alternateVersions: entry.alternateVersions || [],
+    lastModified: entry.lastModified || null,
+  };
+
+  const statusFlags = entry.statuses || {};
+  game.own = Boolean(statusFlags.own);
+  game.prevowned = Boolean(statusFlags.prevowned);
+  game.fortrade = Boolean(statusFlags.fortrade);
+  game.want = Boolean(statusFlags.want);
+  game.wanttoplay = Boolean(statusFlags.wanttoplay);
+  game.wanttobuy = Boolean(statusFlags.wanttobuy);
+  game.wishlist = Boolean(statusFlags.wishlist);
+  game.preordered = Boolean(statusFlags.preordered);
+
+  setupGameVersionMetadata(
+    game,
+    entry.gameId,
+    entry.versionId !== -1 ? entry.versionId : 'default',
+    missingVersionInfo,
+  );
+
+  game.usedAlternateVersionDims = usedAlternate;
+  if (usedAlternate && alternateVersion) {
+    game.alternateVersionId = alternateVersion.versionId;
+    game.alternateVersionName = alternateVersion.name || null;
+  }
+
+  if (hasMissingDimensions(game.dimensions)) {
+    updateGameCorrectionUrl(game, entry.versionId !== -1 ? entry.versionId : 'default');
+  }
+
+  removeInternalProperties(game);
+
+  if (!game.versionName) {
+    game.versionName = getFallbackVersionLabel(game);
+  }
+
+  return game;
+};
+
+const buildGamesFromVersionEntries = (entries, missingVersionMap) =>
+  entries.map((entry) => {
+    const missingInfo = missingVersionMap.get(entry.gameId);
+    return buildGameFromVersionEntry(entry, missingInfo);
+  });
+
+const removeDuplicateGames = (games) => {
+  const seen = new Set();
+  return games.filter((game) => {
+    if (seen.has(game.id)) {
+      return false;
+    }
+    seen.add(game.id);
+    return true;
+  });
+};
+
+const filterExpansionsFromGames = (games, includeExpansions) =>
+  includeExpansions ? games : games.filter((game) => !game.isExpansion);
 
 export const mapStatusesToIncludeExclude = (statuses = {}) => {
   const includeStatuses = [];
@@ -96,16 +309,15 @@ export const processGamesRequest = async ({
 
   progress(requestId, 'Starting to process your collection...', { step: 'init' });
 
-  // Fetch and parse collection
-  const { collection } = await fetchCollection(
+  const collectionResult = await fetchUserCollectionWithDetails({
     username,
     includeStatuses,
-    includeExpansionsFlag,
-    requestId,
-    progress,
-  );
+    includeExpansions: includeExpansionsFlag,
+  });
 
-  if (!collection.items || !collection.items.item) {
+  const versionEntries = Array.isArray(collectionResult.items) ? collectionResult.items : [];
+
+  if (versionEntries.length === 0) {
     console.warn('⚠️  No items in collection');
     return {
       cubes: [],
@@ -114,20 +326,27 @@ export const processGamesRequest = async ({
     };
   }
 
-  let items = Array.isArray(collection.items.item)
-    ? collection.items.item
-    : [collection.items.item];
-
-  console.log(`   Found ${items.length} items in collection`);
-  progress(requestId, `Found ${items.length} games in your collection`, {
+  console.log(`   Found ${versionEntries.length} items in collection`);
+  progress(requestId, `Found ${versionEntries.length} games in your collection`, {
     step: 'collection',
-    count: items.length,
+    count: versionEntries.length,
   });
 
-  // Filter collection items
-  items = filterCollectionItems(items, includeStatuses, excludeStatuses, includeExpansionsFlag);
+  if (Array.isArray(collectionResult.missingThingIds) && collectionResult.missingThingIds.length > 0) {
+    console.warn(
+      `   ⚠️  BGG did not return data for ${collectionResult.missingThingIds.length} item(s):`,
+      collectionResult.missingThingIds.join(', '),
+    );
+  }
 
-  if (items.length === 0) {
+  const filteredEntries = filterVersionEntries(
+    versionEntries,
+    includeStatuses,
+    excludeStatuses,
+    includeExpansionsFlag,
+  );
+
+  if (filteredEntries.length === 0) {
     progress(requestId, 'No games matched the selected collection filters.', {
       step: 'collection',
       count: 0,
@@ -139,10 +358,9 @@ export const processGamesRequest = async ({
     };
   }
 
-  // Remove duplicate versions
-  items = removeDuplicateVersions(items);
+  const uniqueEntries = dedupeVersionEntries(filteredEntries);
 
-  if (items.length === 0) {
+  if (uniqueEntries.length === 0) {
     return {
       cubes: [],
       totalGames: 0,
@@ -150,8 +368,7 @@ export const processGamesRequest = async ({
     };
   }
 
-  // Detect missing versions
-  const missingVersionGames = detectMissingVersions(items);
+  const missingVersionGames = detectMissingVersionSelections(uniqueEntries);
 
   if (!bypassVersionWarning && missingVersionGames.size > 0) {
     const warningGames = Array.from(missingVersionGames.values()).sort((a, b) =>
@@ -177,60 +394,7 @@ export const processGamesRequest = async ({
     };
   }
 
-  // Build version map and game details map
-  const versionMap = buildVersionMap(items, missingVersionGames);
-  const gameDetailsNeeded = buildGameDetailsMap(items);
-
-  const gameIds = Array.from(gameDetailsNeeded.keys());
-
-  // Check cache for games
-  const gamesToFetch = [];
-  const cachedGames = new Map();
-
-  console.log(`🔍 Checking cache for ${gameIds.length} games...`);
-  progress(requestId, `Checking cache for ${gameIds.length} games...`, {
-    step: 'games',
-    total: gameIds.length,
-  });
-  
-  for (const gameId of gameIds) {
-    const cached = getGame(gameId);
-    if (cached) {
-      cachedGames.set(gameId, cached);
-    } else {
-      gamesToFetch.push(gameId);
-    }
-  }
-
-  console.log(
-    `   ✅ ${cachedGames.size} games from cache, ${gamesToFetch.length} need fetching`,
-  );
-  progress(
-    requestId,
-    `Found ${cachedGames.size} games in cache, fetching ${gamesToFetch.length}...`,
-    { step: 'games', cached: cachedGames.size, fetching: gamesToFetch.length },
-  );
-
-  // Fetch and process games
-  const { allGames: fetchedGames, cachedGames: updatedCachedGames } =
-    await fetchAndProcessGames(
-      gamesToFetch,
-      gameDetailsNeeded,
-      versionMap,
-      missingVersionGames,
-      requestId,
-      progress,
-    );
-
-  // Process cached games
-  const cachedProcessedGames = processCachedGames(
-    updatedCachedGames.size > 0 ? updatedCachedGames : cachedGames,
-    gameDetailsNeeded,
-    versionMap,
-    missingVersionGames,
-  );
-
-  const allGames = [...fetchedGames, ...cachedProcessedGames];
+  const allGames = buildGamesFromVersionEntries(uniqueEntries, missingVersionGames);
 
   console.log(`✅ Processed ${allGames.length} games`);
   progress(requestId, `Processed ${allGames.length} games`, {
@@ -238,38 +402,23 @@ export const processGamesRequest = async ({
     total: allGames.length,
   });
 
-  // Fetch dimensions for games that need them
-  const gamesNeedingFetch = findGamesNeedingDimensions(allGames);
-  await fetchDimensionsForGames(gamesNeedingFetch, requestId, progress);
-
-  // Apply default dimensions where needed
-  applyDefaultDimensions(allGames);
-
-  // Filter expansions if needed
   const filteredGames = filterExpansionsFromGames(allGames, includeExpansionsFlag);
-
-  // Remove duplicates
   const uniqueGames = removeDuplicateGames(filteredGames);
 
-  console.log(
-    `   ℹ️  Total items to pack: ${uniqueGames.length} (includes multiple versions of same games)`,
-  );
+  uniqueGames.forEach((game) => {
+    if (hasMissingDimensions(game.dimensions)) {
+      game.dimensions = { ...DEFAULT_DIMENSIONS };
+      game.usedAlternateVersionDims = true;
+      updateGameCorrectionUrl(game, game.selectedVersionId || null);
+    }
+  });
 
-  // Apply overrides
+  console.log(`   ℹ️  Total items to pack: ${uniqueGames.length} (includes multiple versions of same games)`);
+
   const overrideMaps = buildOverrideMaps(overridesPayload);
   const preparedGames = applyOverridesToGames(uniqueGames, overrideMaps);
 
   const gamesToPack = preparedGames;
-
-  // Clean up memory
-  versionMap.clear();
-  items.length = 0;
-  allGames.length = 0;
-
-  if (global.gc) {
-    console.log('   🗑️  Running garbage collection...');
-    global.gc();
-  }
 
   progress(requestId, `Packing ${gamesToPack.length} games into cubes...`, {
     step: 'packing',
@@ -302,6 +451,7 @@ export const processGamesRequest = async ({
     games: gamesToPack.length,
   });
 
-  // Serialize response
-  return serializeCubesResponse(packedCubes, gamesToPack, stacking, oversizedExcludedGames);
+  const responsePayload = serializeCubesResponse(packedCubes, gamesToPack, stacking, oversizedExcludedGames);
+
+  return responsePayload;
 };

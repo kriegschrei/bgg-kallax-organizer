@@ -39,6 +39,14 @@
       "dimensionType": {
         "type": "string",
         "enum": ["user", "version", "guessed", "default"]
+      },
+      "gameType": {
+        "type": "string",
+        "enum": [
+          "boardgame",
+          "boardgameexpansion",
+          "boardgameaccessory"
+        ]
       }
     }
   }

@@ -63,7 +63,7 @@ const startProgressPolling = (requestId, onProgress) => {
 
     pending = true;
     try {
-      const { data } = await apiClient.post(`${API_BASE}/games/progress`, { requestId });
+      const { data } = await apiClient.get(`${API_BASE}/progress/${requestId}`);
       if (isPolling) {
         onProgress(data);
       }

@@ -46,14 +46,14 @@
                   "versionsUrl": { "type": "string", "format": "uri" },
                   "usedAlternateVersionDims": { "type": "boolean" },
                   "correctionUrl": { "type": "string", "format": "uri" },
-                  "orientation": { "$ref": "../../$defs/types.schema.json#/$defs/orientation" }
+                  "orientation": { "$ref": "../../$defs/types.schema.json#/$defs/orientation" },
+                  "type": { "$ref": "../../$defs/enums.schema.json#/definitions/gameType" }
                 },
                 "required": [
                   "gameId","versionId","gameName","versionName","dimensions","startPosition",
                   "oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
-                  "bestPlayerCount","minPlaytime","maxPlaytime","age","communityAge","weight",
-                  "bggRating","missingVersion","versionsUrl","usedAlternateVersionDims",
-                  "correctionUrl","orientation"
+                  "bestPlayerCount","minPlaytime","maxPlaytime","age","communityAge","weight","bggRating",
+                  "missingVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","type"
                 ]
               }
             }

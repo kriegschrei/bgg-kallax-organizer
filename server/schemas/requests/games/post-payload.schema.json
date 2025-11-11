@@ -65,7 +65,9 @@
       "description": "Optional sorting configuration.",
       "errorMessage": {
         "type": "Sort must be an array of sort items.",
-        "items": "Each sort entry must include a valid field and order."
+        "items": [
+          "Each sort entry must include a valid field and order."
+        ]
       }
     },
 
@@ -79,7 +81,9 @@
           "description": "Array of game/version pairs to exclude.",
           "errorMessage": {
             "type": "excludedVersions must be an array.",
-            "items": "Each excludedVersion must contain 'game' and 'version' integers."
+            "items": [
+              "Each excludedVersion must contain 'game' and 'version' integers."
+            ]
           }
         },
         "stackingOverrides": {
@@ -88,7 +92,9 @@
           "description": "Array specifying per-version stacking orientations.",
           "errorMessage": {
             "type": "stackingOverrides must be an array.",
-            "items": "Each stackingOverride must contain 'game', 'version', and a valid 'orientation'."
+            "items": [
+              "Each stackingOverride must contain 'game', 'version', and a valid 'orientation'."
+            ]
           }
         },
         "dimensionOverrides": {
@@ -97,7 +103,9 @@
           "description": "Array specifying custom dimensions for game versions.",
           "errorMessage": {
             "type": "dimensionOverrides must be an array.",
-            "items": "Each dimensionOverride must contain 'game', 'version', 'length', 'width', and 'height' numbers."
+            "items": [
+              "Each dimensionOverride must contain 'game', 'version', 'length', 'width', and 'height' numbers."
+            ]
           }
         }
       },

@@ -1,4 +1,4 @@
-import { clearCache, cleanup, getStats } from '../../cache.js';
+import { clearCache, cleanup, getStats } from '../services/cache/index.js';
 
 export const getCacheStatsHandler = (req, res) => {
   try {

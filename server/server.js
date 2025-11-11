@@ -1,6 +1,6 @@
 import { createApp } from './src/app.js';
 import { PORT, BGG_API_TOKEN } from './src/services/configService.js';
-import { cleanup } from './cache.js';
+import { cleanup } from './src/services/cache/index.js';
 
 const app = createApp();
 

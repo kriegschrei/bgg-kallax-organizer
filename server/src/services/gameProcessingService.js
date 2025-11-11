@@ -1,4 +1,5 @@
-import { getGame, setGame, getVersion, setVersion, extractGameData } from '../../cache.js';
+import { getGame, setGame, getVersion, setVersion } from './cache/index.js';
+import { extractGameData } from '../utils/cacheExtractors.js';
 import { bggApiRequest, parseBggXml, processGameItem } from './bggService.js';
 import { buildVersionsUrl, buildCorrectionUrl, extractVersionId } from '../utils/gameUtils.js';
 import {

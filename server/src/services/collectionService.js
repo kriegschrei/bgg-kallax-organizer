@@ -1,5 +1,5 @@
 import { bggApiRequest, parseBggXml } from './bggService.js';
-import { getCollection, setCollection, hashData, extractCollectionData } from '../../cache.js';
+import { getCollection, setCollection, hashData } from './cache/index.js';
 import { BGG_API_BASE, BGG_API_TOKEN } from './configService.js';
 import { isStatusActive, buildVersionsUrl } from '../utils/gameUtils.js';
 
@@ -69,16 +69,17 @@ export const fetchCollection = async (username, includeStatuses, includeExpansio
       step: 'collection',
       cached: true,
     });
-    collection = await parseBggXml(collectionResponse.data);
+    // Return cached parsed collection directly - no need to re-parse XML
+    collection = cachedCollection;
   } else {
     console.log('   📥 Collection not in cache or changed, parsing and caching...');
     progress(requestId, 'Processing collection data...', {
       step: 'collection',
       cached: false,
     });
+    // Parse XML and cache the full parsed collection
     collection = await parseBggXml(collectionResponse.data);
-    const collectionData = extractCollectionData(collection);
-    setCollection(collectionKey, collectionHash, collectionData);
+    setCollection(collectionKey, collectionHash, collection);
   }
 
   return { collection, collectionKey };

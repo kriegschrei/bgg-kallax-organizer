@@ -1,4 +1,4 @@
-import { getGame } from '../../cache.js';
+import { getGame } from './cache/index.js';
 import { COLLECTION_STATUS_KEYS } from '../utils/gameUtils.js';
 import { packGamesIntoCubes } from './packingService.js';
 import { BGG_API_TOKEN } from './configService.js';

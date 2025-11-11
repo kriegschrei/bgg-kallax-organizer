@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/requests/games/post-payload.schema.json",
+  "title": "Game Organizer Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["username"],
+  "properties": {
+    "username": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "integer" }
+      ],
+      "description": "Required username, string or integer.",
+      "errorMessage": {
+        "oneOf": "Username must be either a string or an integer."
+      }
+    },
+
+    "statuses": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "own": { "$ref": "#/$defs/includeExclude" },
+        "preordered": { "$ref": "#/$defs/includeExclude" },
+        "wanttoplay": { "$ref": "#/$defs/includeExclude" },
+        "prevowned": { "$ref": "#/$defs/includeExclude" },
+        "fortrade": { "$ref": "#/$defs/includeExclude" },
+        "want": { "$ref": "#/$defs/includeExclude" },
+        "wanttobuy": { "$ref": "#/$defs/includeExclude" },
+        "wishlist": { "$ref": "#/$defs/includeExclude" }
+      },
+      "default": { "own": "include" },
+      "description": "Optional status filters. If omitted, defaults to { own: 'include' }.",
+      "errorMessage": {
+        "type": "Statuses must be an object.",
+        "additionalProperties": "Invalid status key provided — valid keys are: own, preordered, wanttoplay, prevowned, fortrade, want, wanttobuy, wishlist."
+      }
+    },
+
+    "stacking": {
+      "type": "string",
+      "enum": ["vertical", "horizontal"],
+      "default": "horizontal",
+      "description": "Optional stacking mode.",
+      "errorMessage": {
+        "type": "Stacking must be a string.",
+        "enum": "Stacking must be either 'vertical' or 'horizontal'."
+      }
+    },
+
+    "lockRotation": { "type": "boolean", "default": false, "errorMessage": { "type": "lockRotation must be true or false." } },
+    "optimizeSpace": { "type": "boolean", "default": false, "errorMessage": { "type": "optimizeSpace must be true or false." } },
+    "respectSortOrder": { "type": "boolean", "default": false, "errorMessage": { "type": "respectSortOrder must be true or false." } },
+    "fitOversized": { "type": "boolean", "default": false, "errorMessage": { "type": "fitOversized must be true or false." } },
+    "groupExpansions": { "type": "boolean", "default": false, "errorMessage": { "type": "groupExpansions must be true or false." } },
+    "groupSeries": { "type": "boolean", "default": false, "errorMessage": { "type": "groupSeries must be true or false." } },
+    "includeExpansions": { "type": "boolean", "default": false, "errorMessage": { "type": "includeExpansions must be true or false." } },
+    "bypassVersionWarning": { "type": "boolean", "default": false, "errorMessage": { "type": "bypassVersionWarning must be true or false." } },
+
+    "sort": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sortItem" },
+      "default": [{ "field": "gameName", "order": "asc" }],
+      "description": "Optional sorting configuration.",
+      "errorMessage": {
+        "type": "Sort must be an array of sort items.",
+        "items": "Each sort entry must include a valid field and order."
+      }
+    },
+
+    "overrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "excludedVersions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/excludedVersion" },
+          "description": "Array of game/version pairs to exclude.",
+          "errorMessage": {
+            "type": "excludedVersions must be an array.",
+            "items": "Each excludedVersion must contain 'game' and 'version' integers."
+          }
+        },
+        "stackingOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stackingOverride" },
+          "description": "Array specifying per-version stacking orientations.",
+          "errorMessage": {
+            "type": "stackingOverrides must be an array.",
+            "items": "Each stackingOverride must contain 'game', 'version', and a valid 'orientation'."
+          }
+        },
+        "dimensionOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dimensionOverride" },
+          "description": "Array specifying custom dimensions for game versions.",
+          "errorMessage": {
+            "type": "dimensionOverrides must be an array.",
+            "items": "Each dimensionOverride must contain 'game', 'version', 'length', 'width', and 'height' numbers."
+          }
+        }
+      },
+      "description": "Optional object for override configurations.",
+      "errorMessage": {
+        "type": "Overrides must be an object.",
+        "additionalProperties": "Invalid property in overrides. Allowed keys are: excludedVersions, stackingOverrides, dimensionOverrides."
+      }
+    }
+  },
+
+  "errorMessage": {
+    "required": {
+      "username": "Username is required."
+    },
+    "additionalProperties": "Invalid property in request. Allowed keys: username, statuses, stacking, lockRotation, optimizeSpace, respectSortOrder, fitOversized, groupExpansions, groupSeries, includeExpansions, bypassVersionWarning, sort, overrides."
+  },
+
+  "$defs": {
+    "includeExclude": {
+      "type": "string",
+      "enum": ["include", "exclude"],
+      "description": "Indicates whether to include or exclude a given status.",
+      "errorMessage": { "enum": "Value must be either 'include' or 'exclude'." }
+    },
+
+    "sortItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "order"],
+      "properties": {
+        "field": {
+          "type": "string",
+          "enum": [
+            "gameId",
+            "versionId",
+            "gameName",
+            "versionName",
+            "bggRank",
+            "minPlayers",
+            "maxPlayers",
+            "bestPlayerCount",
+            "minPlaytime",
+            "maxPlaytime",
+            "age",
+            "communityAge",
+            "weight",
+            "bggRating"
+          ],
+          "errorMessage": { "enum": "Sort field must be one of the supported keys." }
+        },
+        "order": {
+          "type": "string",
+          "enum": ["asc", "desc"],
+          "errorMessage": { "enum": "Sort order must be either 'asc' or 'desc'." }
+        }
+      },
+      "description": "Defines a single sort rule.",
+      "errorMessage": { "required": "Sort item must contain both 'field' and 'order'." }
+    },
+
+    "excludedVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["game", "version"],
+      "properties": {
+        "game": { "type": "integer" },
+        "version": { "type": "integer" }
+      },
+      "description": "Represents a game/version pair to exclude.",
+      "errorMessage": { "required": "excludedVersion must include 'game' and 'version'." }
+    },
+
+    "stackingOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["game", "version", "orientation"],
+      "properties": {
+        "game": { "type": "integer" },
+        "version": { "type": "integer" },
+        "orientation": {
+          "type": "string",
+          "enum": ["horizontal", "vertical"],
+          "errorMessage": { "enum": "Orientation must be 'horizontal' or 'vertical'." }
+        }
+      },
+      "description": "Specifies a stacking orientation override for a version.",
+      "errorMessage": { "required": "stackingOverride must include 'game', 'version', and 'orientation'." }
+    },
+
+    "dimensionOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["game", "version", "length", "width", "height"],
+      "properties": {
+        "game": { "type": "integer" },
+        "version": { "type": "integer" },
+        "length": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "description": "Specifies dimension overrides for a version.",
+      "errorMessage": { "required": "dimensionOverride must include 'game', 'version', 'length', 'width', and 'height'." }
+    }
+  }
+}

@@ -25,10 +25,10 @@ export const resolveDisplayDimensions = (
   overrideEntry,
   orientedDims = { x: 0, y: 0, z: 0 },
   dimensionEditor,
-  gameId
+  overrideKey
 ) => {
   const source =
-    dimensionEditor && dimensionEditor.gameId === gameId ? dimensionEditor : overrideEntry;
+    dimensionEditor && dimensionEditor.overrideKey === overrideKey ? dimensionEditor : overrideEntry;
 
   if (!source) {
     return orientedDims;
@@ -37,7 +37,7 @@ export const resolveDisplayDimensions = (
   return {
     x: normalizeDimensionValue(source.length, orientedDims.x),
     y: normalizeDimensionValue(source.width, orientedDims.y),
-    z: normalizeDimensionValue(source.depth, orientedDims.z),
+    z: normalizeDimensionValue(source.depth ?? source.height, orientedDims.z),
   };
 };
 

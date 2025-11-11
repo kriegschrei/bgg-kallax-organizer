@@ -30,7 +30,6 @@ const createStatItem = (label, value, fallback, suffix) => ({
 
 export default function Results({
   cubes,
-  verticalStacking,
   stats,
   oversizedGames = [],
   fitOversized = false,
@@ -45,7 +44,7 @@ export default function Results({
   onRemoveDimensionOverride,
   overridesReady = true,
   isLoading = false,
-  priorities = [],
+  sorting = [],
 }) {
   const statsSummaryItems = useMemo(
     () => [
@@ -136,8 +135,7 @@ export default function Results({
           <CubeVisualization
             key={cube.id}
             cube={cube}
-            verticalStacking={verticalStacking}
-            priorities={priorities}
+            sorting={sorting}
             excludedLookup={excludedLookup}
             orientationLookup={orientationLookup}
             dimensionLookup={dimensionLookup}

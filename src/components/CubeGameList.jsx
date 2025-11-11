@@ -16,6 +16,7 @@ import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
 import { getGameColor, splitNameAndVersion } from '../utils/cubeVisualization';
 import { resolveDisplayDimensions } from '../utils/dimensions';
+import { resolveGameIdentity } from '../utils/overrideIdentity';
 
 function CubeGameList({
   cube,
@@ -44,11 +45,13 @@ function CubeGameList({
           const backgroundColor = getGameColor(index, games.length);
           const borderColor = backgroundColor.replace('80%', '60%');
           const orientedDims = game.actualOrientedDims || game.orientedDims || { x: 0, y: 0, z: 0 };
-          const isExcluded = Boolean(excludedLookup[game.id]);
-          const forcedOrientation = orientationLookup[game.id] || null;
-          const userDims = dimensionLookup[game.id] || null;
-          const displayDims = resolveDisplayDimensions(userDims, orientedDims, dimensionEditor, game.id);
-          const editingThisGame = dimensionEditor.gameId === game.id;
+          const identity = resolveGameIdentity(game);
+          const overrideKey = identity?.key ?? null;
+          const isExcluded = overrideKey ? Boolean(excludedLookup[overrideKey]) : false;
+          const forcedOrientation = overrideKey ? orientationLookup[overrideKey] || null : null;
+          const userDims = overrideKey ? dimensionLookup[overrideKey] || null : null;
+          const displayDims = resolveDisplayDimensions(userDims, orientedDims, dimensionEditor, overrideKey);
+          const editingThisGame = dimensionEditor.overrideKey === overrideKey;
           const dimensionWarning = game.dimensions?.missingDimensions;
           const oversizedWarning = game.oversizedX || game.oversizedY;
           const rawName = typeof game.name === 'string' ? game.name.trim() : '';
@@ -88,11 +91,11 @@ function CubeGameList({
             : 'Cycle orientation override (vertical → horizontal → none)';
           const badges = buildBadgesForGame(game);
           const hasBadges = badges.length > 0;
-          const isBadgesExpanded = badgeVisibility[game.id] ?? false;
+          const isBadgesExpanded = overrideKey ? badgeVisibility[overrideKey] ?? false : false;
 
           return (
             <li
-              key={game.id}
+              key={overrideKey ?? `game-${index}`}
               className={`game-list-item${isExcluded ? ' is-excluded' : ''}${
                 userDims ? ' has-dimension-override' : ''
               }${isBadgesExpanded ? ' badges-expanded' : ''}`}
@@ -213,8 +216,9 @@ function CubeGameList({
                   <button
                     type="button"
                     className="badge-toggle"
-                    onClick={() => onToggleBadgeVisibility(game.id)}
+                    onClick={() => overrideKey && onToggleBadgeVisibility(overrideKey)}
                     aria-expanded={isBadgesExpanded}
+                    disabled={!overrideKey}
                   >
                     {isBadgesExpanded ? (
                       <FaChevronDown aria-hidden="true" className="badge-toggle-icon" />

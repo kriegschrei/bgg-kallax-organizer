@@ -2,106 +2,64 @@ import { useCallback } from 'react';
 
 import { fetchPackedCubes } from '../services/bgcubeApi';
 import { saveLastResult } from '../services/storage/indexedDb';
+import { buildRequestPayload } from '../utils/requestPayload';
 
-const buildOverridesPayload = ({
-  excludedGamesList,
-  orientationOverridesList,
-  dimensionOverridesList,
-}) => ({
-  excludedGames: excludedGamesList.map((game) => ({ ...game })),
-  orientationOverrides: orientationOverridesList.map((entry) => ({ ...entry })),
-  dimensionOverrides: dimensionOverridesList.map((entry) => ({ ...entry })),
-});
+const cloneList = (items = []) => (Array.isArray(items) ? items.map((item) => ({ ...item })) : []);
 
-const buildRequestBase = ({
+const wasSuccessful = (response) => response && Array.isArray(response.cubes);
+
+const createSubmissionState = ({
   username,
-  includeStatusList,
-  excludeStatusList,
-  includeExpansions,
-  priorities,
-  verticalStacking,
+  statusSelections,
+  sorting,
+  stacking,
   lockRotation,
   optimizeSpace,
   respectSortOrder,
   fitOversized,
   groupExpansions,
   groupSeries,
+  includeExpansions,
   bypassVersionWarning,
-  overridesPayload,
+  excludedGamesList,
+  orientationOverridesList,
+  dimensionOverridesList,
 }) => {
-  const effectiveGroupExpansions = groupExpansions && !optimizeSpace;
-  const effectiveGroupSeries = groupSeries && !optimizeSpace;
-
-  const requestConfig = {
-    username,
-    includeStatuses: includeStatusList,
-    excludeStatuses: excludeStatusList,
-    includeExpansions,
-    priorities,
-    verticalStacking,
-    lockRotation,
-    optimizeSpace,
-    respectSortOrder,
-    fitOversized,
-    groupExpansions: effectiveGroupExpansions,
-    groupSeries: effectiveGroupSeries,
-    bypassVersionWarning,
-    skipVersionCheck: bypassVersionWarning,
-    overrides: overridesPayload,
-  };
-
-  const fetchParams = {
-    includeStatuses: includeStatusList,
-    excludeStatuses: excludeStatusList,
-    includeExpansions,
-    priorities,
-    verticalStacking,
-    lockRotation,
-    optimizeSpace,
-    respectSortOrder,
-    fitOversized,
-    groupExpansions: effectiveGroupExpansions,
-    groupSeries: effectiveGroupSeries,
-  };
-
-  const fetchOptions = {
-    overrides: overridesPayload,
-    skipVersionCheck: bypassVersionWarning,
-    bypassVersionWarning,
-  };
-
-  return { requestConfig, fetchParams, fetchOptions };
-};
-
-const createSubmitContext = (state) => {
-  const trimmedUsername = state.username.trim();
-  const overridesPayload = buildOverridesPayload(state);
-  const { requestConfig, fetchParams, fetchOptions } = buildRequestBase({
-    ...state,
-    username: trimmedUsername,
-    overridesPayload,
-  });
+  const trimmedUsername = username.trim();
+  const effectiveGroupExpansions = Boolean(groupExpansions) && !optimizeSpace;
+  const effectiveGroupSeries = Boolean(groupSeries) && !optimizeSpace;
 
   return {
-    trimmedUsername,
-    overridesPayload,
-    requestConfig,
-    fetchParams,
-    fetchOptions,
+    username: trimmedUsername,
+    stacking,
+    statusSelections: { ...statusSelections },
+    sorting: cloneList(sorting),
+    overrides: {
+      excludedVersions: cloneList(excludedGamesList),
+      stackingOverrides: cloneList(orientationOverridesList),
+      dimensionOverrides: cloneList(dimensionOverridesList),
+    },
+    flags: {
+      lockRotation: Boolean(lockRotation),
+      optimizeSpace: Boolean(optimizeSpace),
+      respectSortOrder: Boolean(respectSortOrder),
+      fitOversized: Boolean(fitOversized),
+      groupExpansions: effectiveGroupExpansions,
+      groupSeries: effectiveGroupSeries,
+      includeExpansions: Boolean(includeExpansions),
+      bypassVersionWarning: Boolean(bypassVersionWarning),
+    },
   };
 };
-
-const wasSuccessful = (response) => response && Array.isArray(response.cubes);
 
 const useCollectionRequestHandlers = (options) => {
   const {
     username,
     hasIncludeStatuses,
-    includeStatusList,
-    excludeStatusList,
+    statusSelections,
     includeExpansions,
-    priorities,
-    verticalStacking,
+    sorting,
+    stacking,
     lockRotation,
     optimizeSpace,
     respectSortOrder,
@@ -146,7 +104,7 @@ const useCollectionRequestHandlers = (options) => {
   ]);
 
   const applyResponse = useCallback(
-    (response, requestConfig) => {
+    (response, submissionState) => {
       setProgress('Rendering results...');
       setCubes(response.cubes);
       setStats(response.stats || null);
@@ -155,29 +113,20 @@ const useCollectionRequestHandlers = (options) => {
       setLoading(false);
 
       saveLastResult({
-        requestConfig,
+        requestConfig: submissionState,
         response: {
           cubes: response.cubes,
           stats: response.stats || null,
           oversizedGames: response.oversizedGames || [],
-          fitOversized,
-          verticalStacking,
-          lockRotation,
+          fitOversized: submissionState.flags.fitOversized,
+          stacking: submissionState.stacking,
+          lockRotation: submissionState.flags.lockRotation,
         },
       }).catch((storageError) => {
         console.error('Unable to persist last result', storageError);
       });
     },
-    [
-      setProgress,
-      setCubes,
-      setStats,
-      setOversizedGames,
-      setLoading,
-      fitOversized,
-      verticalStacking,
-      lockRotation,
-    ]
+    [setProgress, setCubes, setStats, setOversizedGames, setLoading],
   );
 
   const validateSubmission = useCallback(() => {
@@ -204,7 +153,7 @@ const useCollectionRequestHandlers = (options) => {
       setMissingVersionWarning({ ...response, username: trimmedUsername });
       return true;
     },
-    [setLoading, setProgress, setMissingVersionWarning]
+    [setLoading, setProgress, setMissingVersionWarning],
   );
 
   const handleNoResultsResponse = useCallback(
@@ -217,7 +166,7 @@ const useCollectionRequestHandlers = (options) => {
       setLoading(false);
       return true;
     },
-    [setError, setLoading]
+    [setError, setLoading],
   );
 
   const handleError = useCallback(
@@ -225,12 +174,12 @@ const useCollectionRequestHandlers = (options) => {
       console.error('Error:', error);
       setError(
         error?.message ||
-          'An error occurred while fetching data from BoardGameGeek. Please try again.'
+          'An error occurred while fetching data from BoardGameGeek. Please try again.',
       );
       setLoading(false);
       setProgress('');
     },
-    [setError, setLoading, setProgress]
+    [setError, setLoading, setProgress],
   );
 
   const handleSubmit = useCallback(
@@ -244,39 +193,36 @@ const useCollectionRequestHandlers = (options) => {
       beginSubmission();
 
       try {
-        const context = createSubmitContext({
+        const submissionState = createSubmissionState({
           username,
-          includeStatusList,
-          excludeStatusList,
-          includeExpansions,
-          priorities,
-          verticalStacking,
+          statusSelections,
+          sorting,
+          stacking,
           lockRotation,
           optimizeSpace,
           respectSortOrder,
           fitOversized,
           groupExpansions,
           groupSeries,
+          includeExpansions,
           bypassVersionWarning,
           excludedGamesList,
           orientationOverridesList,
           dimensionOverridesList,
         });
 
-        setLastRequestConfig(context.requestConfig);
+        const requestPayload = buildRequestPayload(submissionState);
+        setLastRequestConfig(submissionState);
 
-        const response = await fetchPackedCubes(
-          context.trimmedUsername,
-          context.fetchParams,
-          (progress) => {
+        const { data: response } = await fetchPackedCubes(requestPayload, {
+          onProgress: (progress) => {
             if (progress?.message) {
               setProgress(progress.message);
             }
           },
-          context.fetchOptions
-        );
+        });
 
-        if (handleMissingVersionsResponse(response, context.trimmedUsername)) {
+        if (handleMissingVersionsResponse(response, submissionState.username)) {
           return;
         }
 
@@ -284,7 +230,7 @@ const useCollectionRequestHandlers = (options) => {
           return;
         }
 
-        applyResponse(response, context.requestConfig);
+        applyResponse(response, submissionState);
       } catch (error) {
         handleError(error);
       }
@@ -292,17 +238,17 @@ const useCollectionRequestHandlers = (options) => {
     [
       validateSubmission,
       beginSubmission,
-      includeStatusList,
-      excludeStatusList,
-      includeExpansions,
-      priorities,
-      verticalStacking,
+      username,
+      statusSelections,
+      sorting,
+      stacking,
       lockRotation,
       optimizeSpace,
       respectSortOrder,
       fitOversized,
       groupExpansions,
       groupSeries,
+      includeExpansions,
       bypassVersionWarning,
       excludedGamesList,
       orientationOverridesList,
@@ -313,15 +259,14 @@ const useCollectionRequestHandlers = (options) => {
       handleNoResultsResponse,
       applyResponse,
       handleError,
-      username,
-    ]
+    ],
   );
 
   const handleWarningCancel = useCallback(() => {
     setMissingVersionWarning(null);
     setProgress('');
     setError(
-      'Processing cancelled. Please select versions for the highlighted games on BoardGameGeek and try again.'
+      'Processing cancelled. Please select versions for the highlighted games on BoardGameGeek and try again.',
     );
   }, [setError, setMissingVersionWarning, setProgress]);
 
@@ -340,101 +285,30 @@ const useCollectionRequestHandlers = (options) => {
     setIsFilterDrawerOpen(false);
 
     try {
-      const effectiveBypassVersionWarning =
-        lastRequestConfig.bypassVersionWarning ?? bypassVersionWarning;
-
-      const overridesPayload = lastRequestConfig.overrides
-        ? {
-            excludedGames: (lastRequestConfig.overrides.excludedGames || []).map((item) => ({
-              ...item,
-            })),
-            orientationOverrides: (lastRequestConfig.overrides.orientationOverrides || []).map(
-              (item) => ({ ...item })
-            ),
-            dimensionOverrides: (lastRequestConfig.overrides.dimensionOverrides || []).map(
-              (item) => ({ ...item })
-            ),
-          }
-        : buildOverridesPayload({
-            excludedGamesList,
-            orientationOverridesList,
-            dimensionOverridesList,
-          });
-
-      const fallbackLockRotation =
-        typeof lastRequestConfig.lockRotation === 'boolean'
-          ? lastRequestConfig.lockRotation
-          : lockRotation;
-
-      const fallbackIncludeStatuses = Array.isArray(lastRequestConfig.includeStatuses)
-        ? lastRequestConfig.includeStatuses
-        : includeStatusList;
-      const fallbackExcludeStatuses = Array.isArray(lastRequestConfig.excludeStatuses)
-        ? lastRequestConfig.excludeStatuses
-        : excludeStatusList;
-
-      const fetchParams = {
-        includeStatuses: fallbackIncludeStatuses,
-        excludeStatuses: fallbackExcludeStatuses,
-        includeExpansions: lastRequestConfig.includeExpansions,
-        priorities: lastRequestConfig.priorities,
-        verticalStacking: lastRequestConfig.verticalStacking,
-        lockRotation: fallbackLockRotation,
-        optimizeSpace: lastRequestConfig.optimizeSpace,
-        respectSortOrder: lastRequestConfig.respectSortOrder,
-        fitOversized: lastRequestConfig.fitOversized,
-        groupExpansions: lastRequestConfig.groupExpansions,
-        groupSeries: lastRequestConfig.groupSeries,
+      const fallbackState = {
+        ...lastRequestConfig,
+        flags: {
+          ...lastRequestConfig.flags,
+          bypassVersionWarning: true,
+        },
       };
 
-      const response = await fetchPackedCubes(
-        lastRequestConfig.username,
-        fetchParams,
-        (progress) => {
+      const requestPayload = buildRequestPayload(fallbackState);
+
+      const { data: response } = await fetchPackedCubes(requestPayload, {
+        onProgress: (progress) => {
           if (progress?.message) {
             setProgress(progress.message);
           }
         },
-        {
-          skipVersionCheck: true,
-          overrides: overridesPayload,
-          bypassVersionWarning: effectiveBypassVersionWarning,
-        }
-      );
+      });
 
       if (handleNoResultsResponse(response)) {
         return;
       }
 
-      const normalizedRequestConfig = {
-        ...lastRequestConfig,
-        lockRotation: fallbackLockRotation,
-        includeStatuses: fallbackIncludeStatuses,
-        excludeStatuses: fallbackExcludeStatuses,
-      };
-
-      setLastRequestConfig(normalizedRequestConfig);
-
-      setProgress('Rendering results...');
-      setCubes(response.cubes);
-      setStats(response.stats || null);
-      setOversizedGames(response.oversizedGames || []);
-      setProgress('');
-      setLoading(false);
-
-      saveLastResult({
-        requestConfig: normalizedRequestConfig,
-        response: {
-          cubes: response.cubes,
-          stats: response.stats || null,
-          oversizedGames: response.oversizedGames || [],
-          fitOversized: normalizedRequestConfig.fitOversized,
-          verticalStacking: normalizedRequestConfig.verticalStacking,
-          lockRotation: fallbackLockRotation,
-        },
-      }).catch((storageError) => {
-        console.error('Unable to persist last result', storageError);
-      });
+      setLastRequestConfig(fallbackState);
+      applyResponse(response, fallbackState);
     } catch (error) {
       handleError(error);
     }
@@ -448,17 +322,9 @@ const useCollectionRequestHandlers = (options) => {
     setStats,
     setFiltersCollapsed,
     setIsFilterDrawerOpen,
-    bypassVersionWarning,
-    excludedGamesList,
-    orientationOverridesList,
-    dimensionOverridesList,
-    lockRotation,
-    includeStatusList,
-    excludeStatusList,
-    handleError,
-    setLastRequestConfig,
-    setCubes,
     handleNoResultsResponse,
+    applyResponse,
+    handleError,
   ]);
 
   return {

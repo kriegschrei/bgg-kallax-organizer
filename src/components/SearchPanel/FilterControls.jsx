@@ -5,7 +5,7 @@ import FilterPanel from '../FilterPanel';
 import IconButton from '../IconButton';
 import SettingsToggleGroup from '../SettingsToggleGroup';
 import CollectionStatusToggle from '../CollectionStatusToggle';
-import SortablePriorities from '../SortablePriorities';
+import Sorting from '../Sorting';
 import { COLLECTION_STATUSES } from '../../constants/appDefaults';
 
 const UserSettingsRow = ({ username, onUsernameChange, loading, onResetSettings }) => (
@@ -43,22 +43,22 @@ const CollectionFiltersWarning = ({ isVisible }) =>
     </div>
   ) : null;
 
-const StackingToggle = ({ verticalStacking, onVerticalStackingChange, disabled }) => (
+const StackingToggle = ({ stacking, onStackingChange, disabled }) => (
   <div className="stacking-row">
     <span className="stacking-label">Stacking</span>
     <div className="toggle-button-group toggle-button-group--compact">
       <button
         type="button"
-        className={`toggle-button ${!verticalStacking ? 'active' : ''}`}
-        onClick={() => onVerticalStackingChange(false)}
+        className={`toggle-button ${stacking === 'horizontal' ? 'active' : ''}`}
+        onClick={() => onStackingChange('horizontal')}
         disabled={disabled}
       >
         Horizontal
       </button>
       <button
         type="button"
-        className={`toggle-button ${verticalStacking ? 'active' : ''}`}
-        onClick={() => onVerticalStackingChange(true)}
+        className={`toggle-button ${stacking === 'vertical' ? 'active' : ''}`}
+        onClick={() => onStackingChange('vertical')}
         disabled={disabled}
       >
         Vertical
@@ -70,8 +70,8 @@ const StackingToggle = ({ verticalStacking, onVerticalStackingChange, disabled }
 const PreferencesPanel = ({
   collapsed,
   onToggle,
-  verticalStacking,
-  onVerticalStackingChange,
+  stacking,
+  onStackingChange,
   loading,
   preferenceState,
 }) => {
@@ -127,7 +127,7 @@ const PreferencesPanel = ({
       },
       {
         id: 'respectSortOrder',
-        label: 'Respect sorting priority',
+        label: 'Respect sorting order',
         checked: preferenceState.respectSortOrder,
         onChange: preferenceState.onRespectSortOrderChange,
         disabled: loading || preferenceState.optimizeSpace,
@@ -158,8 +158,8 @@ const PreferencesPanel = ({
     >
       <div className="preferences-panel">
         <StackingToggle
-          verticalStacking={verticalStacking}
-          onVerticalStackingChange={onVerticalStackingChange}
+          stacking={stacking}
+          onStackingChange={onStackingChange}
           disabled={loading}
         />
         <SettingsToggleGroup toggles={toggles} />
@@ -208,16 +208,16 @@ const CollectionsPanel = ({
   );
 };
 
-const SortingPanel = ({ collapsed, onToggle, priorities, onPrioritiesChange, optimizeSpace }) => (
+const SortingPanel = ({ collapsed, onToggle, sorting, onSortingChange, optimizeSpace }) => (
   <FilterPanel
-    panelKey="priorities"
+    panelKey="sorting"
     title="Sorting"
     collapsed={Boolean(collapsed)}
     onToggle={onToggle}
   >
-    <SortablePriorities
-      priorities={priorities}
-      onChange={onPrioritiesChange}
+    <Sorting
+      sorting={sorting}
+      onChange={onSortingChange}
       disabled={optimizeSpace}
     />
   </FilterPanel>
@@ -238,15 +238,15 @@ const FilterControls = ({
   hasIncludeStatuses,
   filterPanelsCollapsed,
   onTogglePanel,
-  verticalStacking,
-  onVerticalStackingChange,
+  stacking,
+  onStackingChange,
   preferenceState,
   collectionFilters,
   onCollectionFilterChange,
   includeStatusList,
   excludeStatusList,
-  priorities,
-  onPrioritiesChange,
+  sorting,
+  onSortingChange,
   optimizeSpace,
 }) => {
   const normalizedCollectionFilters = useMemo(
@@ -269,8 +269,8 @@ const FilterControls = ({
         <PreferencesPanel
           collapsed={filterPanelsCollapsed.preferences}
           onToggle={() => onTogglePanel('preferences')}
-          verticalStacking={verticalStacking}
-          onVerticalStackingChange={onVerticalStackingChange}
+          stacking={stacking}
+          onStackingChange={onStackingChange}
           loading={loading}
           preferenceState={preferenceState}
         />
@@ -286,10 +286,10 @@ const FilterControls = ({
         />
 
         <SortingPanel
-          collapsed={filterPanelsCollapsed.priorities}
-          onToggle={() => onTogglePanel('priorities')}
-          priorities={priorities}
-          onPrioritiesChange={onPrioritiesChange}
+        collapsed={filterPanelsCollapsed.sorting}
+        onToggle={() => onTogglePanel('sorting')}
+        sorting={sorting}
+        onSortingChange={onSortingChange}
           optimizeSpace={optimizeSpace}
         />
       </div>

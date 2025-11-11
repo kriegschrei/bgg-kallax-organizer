@@ -16,20 +16,20 @@ export const buildOverrideLookups = ({
   const dimensionLookup = {};
 
   toArray(excludedGames).forEach((game) => {
-    if (game?.id) {
-      excludedLookup[game.id] = game;
+    if (game?.key) {
+      excludedLookup[game.key] = game;
     }
   });
 
   toArray(orientationOverrides).forEach((override) => {
-    if (override?.id) {
-      orientationLookup[override.id] = override.orientation;
+    if (override?.key) {
+      orientationLookup[override.key] = override.orientation;
     }
   });
 
   toArray(dimensionOverrides).forEach((override) => {
-    if (override?.id) {
-      dimensionLookup[override.id] = override;
+    if (override?.key) {
+      dimensionLookup[override.key] = override;
     }
   });
 

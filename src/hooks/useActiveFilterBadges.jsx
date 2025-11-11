@@ -3,8 +3,8 @@ import { FaArrowDown, FaArrowUp } from 'react-icons/fa';
 
 import {
   COLLECTION_STATUSES,
-  DEFAULT_PRIORITIES_BY_FIELD,
-  PRIORITY_LABELS,
+  DEFAULT_SORTING_BY_FIELD,
+  SORTING_LABELS,
 } from '../constants/appDefaults';
 
 const buildActiveFilterLabels = ({
@@ -15,9 +15,9 @@ const buildActiveFilterLabels = ({
   optimizeSpace,
   fitOversized,
   bypassVersionWarning,
-  verticalStacking,
+  stacking,
   lockRotation,
-  priorities,
+  sorting,
   includeStatusList,
   excludeStatusList,
 }) => {
@@ -32,11 +32,11 @@ const buildActiveFilterLabels = ({
   pushLabel(includeExpansions, 'includeExpansions', 'Include expansions');
   pushLabel(groupExpansions, 'groupExpansions', 'Group expansions');
   pushLabel(groupSeries, 'groupSeries', 'Group series');
-  pushLabel(respectSortOrder, 'respectSortOrder', 'Respect priority order');
+  pushLabel(respectSortOrder, 'respectSortOrder', 'Respect sorting order');
   pushLabel(optimizeSpace, 'optimizeSpace', 'Optimize for space');
   pushLabel(fitOversized, 'fitOversized', 'Fit oversized games');
   pushLabel(bypassVersionWarning, 'bypassVersionWarning', 'Bypass version warning');
-  pushLabel(!verticalStacking, 'horizontalStacking', 'Horizontal stacking');
+  pushLabel(stacking === 'horizontal', 'horizontalStacking', 'Horizontal stacking');
   pushLabel(lockRotation, 'lockRotation', 'Lock rotation');
 
   if (includeStatusList.length > 0) {
@@ -61,38 +61,38 @@ const buildActiveFilterLabels = ({
   }
 
   if (!optimizeSpace) {
-    const enabledPriorities = [];
+    const enabledSortingRules = [];
     const disabledDefaultLabels = [];
 
-    priorities.forEach((priority) => {
-      const defaultConfig = DEFAULT_PRIORITIES_BY_FIELD[priority.field];
-      const baseLabel = PRIORITY_LABELS[priority.field] || priority.field;
-      const ArrowIcon = priority.order === 'desc' ? FaArrowDown : FaArrowUp;
+    sorting.forEach((rule) => {
+      const defaultConfig = DEFAULT_SORTING_BY_FIELD[rule.field];
+      const baseLabel = SORTING_LABELS[rule.field] || rule.field;
+      const ArrowIcon = rule.order === 'desc' ? FaArrowDown : FaArrowUp;
 
-      if (priority.enabled) {
-        enabledPriorities.push({
-          field: priority.field,
+      if (rule.enabled) {
+        enabledSortingRules.push({
+          field: rule.field,
           label: baseLabel,
           Icon: ArrowIcon,
-          order: priority.order,
+          order: rule.order,
         });
       } else if (defaultConfig?.enabled) {
         disabledDefaultLabels.push(baseLabel);
       }
     });
 
-    if (enabledPriorities.length > 0) {
-      pushLabel(true, 'priority:enabled', (
-        <span className="priority-badge-content">
-          Priority:{' '}
-          {enabledPriorities.map((priority, index) => (
-            <React.Fragment key={`${priority.field}-${priority.order}`}>
-              <span className="priority-entry">
-                {priority.label}{' '}
-                <priority.Icon aria-hidden="true" className="priority-badge-icon" />
+    if (enabledSortingRules.length > 0) {
+      pushLabel(true, 'sorting:enabled', (
+        <span className="sorting-badge-content">
+          Sorting:{' '}
+          {enabledSortingRules.map((rule, index) => (
+            <React.Fragment key={`${rule.field}-${rule.order}`}>
+              <span className="sorting-entry">
+                {rule.label}{' '}
+                <rule.Icon aria-hidden="true" className="sorting-badge-icon" />
               </span>
-              {index < enabledPriorities.length - 1 && (
-                <span className="priority-separator">, </span>
+              {index < enabledSortingRules.length - 1 && (
+                <span className="sorting-separator">, </span>
               )}
             </React.Fragment>
           ))}
@@ -103,8 +103,8 @@ const buildActiveFilterLabels = ({
     if (disabledDefaultLabels.length > 0) {
       pushLabel(
         true,
-        'priority:disabled-defaults',
-        `Priority disabled: ${disabledDefaultLabels.join(', ')}`
+        'sorting:disabled-defaults',
+        `Sorting rule disabled: ${disabledDefaultLabels.join(', ')}`
       );
     }
   }

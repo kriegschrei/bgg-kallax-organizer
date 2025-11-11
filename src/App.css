@@ -692,23 +692,23 @@ header {
   pointer-events: none;
 }
 
-.search-panel-tag .priority-badge-content {
+.search-panel-tag .sorting-badge-content {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.priority-badge-icon {
+.sorting-badge-icon {
   font-size: 0.9em;
 }
 
-.priority-entry {
+.sorting-entry {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 
-.priority-separator {
+.sorting-separator {
   margin: 0 0.2rem;
 }
 

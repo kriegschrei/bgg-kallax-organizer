@@ -14,15 +14,15 @@ const SearchPanel = ({
   hasIncludeStatuses,
   filterPanelsCollapsed,
   onTogglePanel,
-  verticalStacking,
-  onVerticalStackingChange,
+  stacking,
+  onStackingChange,
   preferenceState,
   collectionFilters,
   onCollectionFilterChange,
   includeStatusList,
   excludeStatusList,
-  priorities,
-  onPrioritiesChange,
+  sorting,
+  onSortingChange,
   optimizeSpace,
   filtersCollapsed,
   onToggleFiltersCollapsed,
@@ -51,9 +51,9 @@ const SearchPanel = ({
       optimizeSpace,
       fitOversized,
       bypassVersionWarning,
-      verticalStacking,
+      stacking,
       lockRotation,
-      priorities,
+      sorting,
       includeStatusList,
       excludeStatusList,
       collapsedBadgeLimit,
@@ -66,9 +66,9 @@ const SearchPanel = ({
       optimizeSpace,
       fitOversized,
       bypassVersionWarning,
-      verticalStacking,
+      stacking,
       lockRotation,
-      priorities,
+      sorting,
       includeStatusList,
       excludeStatusList,
       collapsedBadgeLimit,
@@ -230,15 +230,15 @@ const SearchPanel = ({
               hasIncludeStatuses={hasIncludeStatuses}
               filterPanelsCollapsed={filterPanelsCollapsed}
               onTogglePanel={onTogglePanel}
-              verticalStacking={verticalStacking}
-              onVerticalStackingChange={onVerticalStackingChange}
+              stacking={stacking}
+              onStackingChange={onStackingChange}
               preferenceState={preferenceState}
               collectionFilters={collectionFilters}
               onCollectionFilterChange={onCollectionFilterChange}
-              includeStatusList={includeStatusList}
-              excludeStatusList={excludeStatusList}
-              priorities={priorities}
-              onPrioritiesChange={onPrioritiesChange}
+        includeStatusList={includeStatusList}
+        excludeStatusList={excludeStatusList}
+        sorting={sorting}
+        onSortingChange={onSortingChange}
               optimizeSpace={optimizeSpace}
             />
           </div>
@@ -279,15 +279,15 @@ const SearchPanel = ({
                   hasIncludeStatuses={hasIncludeStatuses}
                   filterPanelsCollapsed={filterPanelsCollapsed}
                   onTogglePanel={onTogglePanel}
-                  verticalStacking={verticalStacking}
-                  onVerticalStackingChange={onVerticalStackingChange}
+                  stacking={stacking}
+                  onStackingChange={onStackingChange}
                   preferenceState={preferenceState}
                   collectionFilters={collectionFilters}
                   onCollectionFilterChange={onCollectionFilterChange}
                   includeStatusList={includeStatusList}
                   excludeStatusList={excludeStatusList}
-                  priorities={priorities}
-                  onPrioritiesChange={onPrioritiesChange}
+                  sorting={sorting}
+                  onSortingChange={onSortingChange}
                   optimizeSpace={optimizeSpace}
                 />
               </div>

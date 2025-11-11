@@ -3,9 +3,10 @@ import CubeFrontView from './CubeFrontView';
 import CubeGameList from './CubeGameList';
 import './CubeVisualization.css';
 import {
-  PRIORITY_BADGE_BUILDERS,
+  SORTING_BADGE_BUILDERS,
   buildBadgesForGame as computeBadgesForGame,
 } from '../utils/cubeVisualization';
+import { resolveGameIdentity } from '../utils/overrideIdentity';
 
 const KALLAX_WIDTH = 13;
 const KALLAX_HEIGHT = 13;
@@ -13,7 +14,7 @@ const SCALE = 20; // pixels per inch for visualization
 
 export default function CubeVisualization({
   cube,
-  priorities = [],
+  sorting = [],
   excludedLookup = {},
   orientationLookup = {},
   dimensionLookup = {},
@@ -28,7 +29,7 @@ export default function CubeVisualization({
   const canvasWidth = KALLAX_WIDTH * SCALE;
   const canvasHeight = KALLAX_HEIGHT * SCALE;
   const [dimensionEditor, setDimensionEditor] = useState({
-    gameId: null,
+    overrideKey: null,
     length: '',
     width: '',
     depth: '',
@@ -37,10 +38,17 @@ export default function CubeVisualization({
   const interactionsDisabled = !overridesReady || isLoading;
   const [badgeVisibility, setBadgeVisibility] = useState({});
 
-  const gameIdsKey = useMemo(
-    () => (Array.isArray(cube.games) ? cube.games.map((game) => game.id).join('|') : ''),
-    [cube.games]
-  );
+  const getOverrideKey = useCallback((game) => {
+    const identity = resolveGameIdentity(game);
+    return identity?.key ?? null;
+  }, []);
+
+  const gameIdsKey = useMemo(() => {
+    if (!Array.isArray(cube.games)) {
+      return '';
+    }
+    return cube.games.map((game) => getOverrideKey(game) ?? '').join('|');
+  }, [cube.games, getOverrideKey]);
 
   useEffect(() => {
     if (!Array.isArray(cube.games)) {
@@ -49,44 +57,44 @@ export default function CubeVisualization({
     setBadgeVisibility((prev) => {
       const next = {};
       cube.games.forEach((game) => {
-        if (game?.id == null) {
+        const overrideKey = getOverrideKey(game);
+        if (!overrideKey) {
           return;
         }
-        next[game.id] = prev[game.id] ?? false;
+        next[overrideKey] = prev[overrideKey] ?? false;
       });
       return next;
     });
-  }, [gameIdsKey, cube.games]);
+  }, [cube.games, gameIdsKey, getOverrideKey]);
 
-  const activePriorityFields = useMemo(
+  const activeSortingFields = useMemo(
     () =>
-      priorities
+      sorting
         .filter(
-          (priority) =>
-            priority?.enabled &&
-            typeof priority.field === 'string' &&
-            priority.field !== 'name' &&
-            PRIORITY_BADGE_BUILDERS[priority.field]
+          (rule) =>
+            rule?.enabled &&
+            typeof rule.field === 'string' &&
+            SORTING_BADGE_BUILDERS[rule.field]
         )
-        .map((priority) => priority.field),
-    [priorities]
+        .map((rule) => rule.field),
+    [sorting]
   );
 
   const buildBadgesForGame = useCallback(
-    (game) => computeBadgesForGame(game, activePriorityFields),
-    [activePriorityFields]
+    (game) => computeBadgesForGame(game, activeSortingFields),
+    [activeSortingFields]
   );
 
-  const toggleBadgeVisibility = useCallback((gameId) => {
+  const toggleBadgeVisibility = useCallback((overrideKey) => {
     setBadgeVisibility((prev) => ({
       ...prev,
-      [gameId]: !prev[gameId],
+      [overrideKey]: !prev[overrideKey],
     }));
   }, []);
 
   const closeDimensionEditor = () => {
     setDimensionEditor({
-      gameId: null,
+      overrideKey: null,
       length: '',
       width: '',
       depth: '',
@@ -99,7 +107,12 @@ export default function CubeVisualization({
       return;
     }
 
-    const customDims = dimensionLookup[game.id];
+    const overrideKey = getOverrideKey(game);
+    if (!overrideKey) {
+      return;
+    }
+
+    const customDims = dimensionLookup[overrideKey];
     const source =
       customDims ||
       game.userDimensions ||
@@ -108,7 +121,7 @@ export default function CubeVisualization({
       {};
 
     setDimensionEditor({
-      gameId: game.id,
+      overrideKey,
       length:
         typeof source.length === 'number' && Number.isFinite(source.length)
           ? String(source.length)
@@ -120,6 +133,8 @@ export default function CubeVisualization({
       depth:
         typeof source.depth === 'number' && Number.isFinite(source.depth)
           ? String(source.depth)
+          : typeof source.height === 'number' && Number.isFinite(source.height)
+          ? String(source.height)
           : '',
       error: '',
     });
@@ -134,10 +149,12 @@ export default function CubeVisualization({
   };
 
   const handleDimensionSave = async (game) => {
+    const overrideKey = getOverrideKey(game);
     if (
       interactionsDisabled ||
       !onSaveDimensionOverride ||
-      dimensionEditor.gameId !== game.id
+      !overrideKey ||
+      dimensionEditor.overrideKey !== overrideKey
     ) {
       return;
     }
@@ -162,8 +179,12 @@ export default function CubeVisualization({
     if (interactionsDisabled || !onRemoveDimensionOverride) {
       return;
     }
-    onRemoveDimensionOverride(game.id);
-    if (dimensionEditor.gameId === game.id) {
+    const overrideKey = getOverrideKey(game);
+    if (!overrideKey) {
+      return;
+    }
+    onRemoveDimensionOverride(overrideKey);
+    if (dimensionEditor.overrideKey === overrideKey) {
       closeDimensionEditor();
     }
   };
@@ -188,7 +209,10 @@ export default function CubeVisualization({
     } else if (currentOrientation === 'vertical') {
       onSetOrientationOverride(game, 'horizontal');
     } else {
-      onClearOrientationOverride(game.id);
+      const overrideKey = getOverrideKey(game);
+      if (overrideKey) {
+        onClearOrientationOverride(overrideKey);
+      }
     }
   };
 

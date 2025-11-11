@@ -1,0 +1,70 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/defs/types.schema.json",
+    "$defs": {
+      "dimension": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "$ref": "enums.schema.json#/definitions/dimensionType" },
+          "length": { "type": ["number", "null"] },
+          "width": { "type": ["number", "null"] },
+          "depth": { "type": ["number", "null"] },
+          "weight": { "type": ["number", "null"] },
+          "missingDimensions": { "type": "boolean" }
+        },
+        "required": ["type", "length", "width", "depth", "weight"]
+      },
+      "position": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" }
+        },
+        "required": ["x", "y"]
+      },
+      "orientation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "forced": { "type": ["string", "null"], "enum": ["horizontal", "vertical", null] },
+          "applied": { "type": "string", "enum": ["horizontal", "vertical"] }
+        },
+        "required": ["forced", "applied"]
+      },
+      "oversized": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "boolean" },
+          "y": { "type": "boolean" },
+          "isOversized": { "type": "boolean" }
+        },
+        "required": ["x", "y", "isOversized"]
+      },
+      "cubeStats": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "currentHeight": { "type": "number" },
+          "currentWidth": { "type": "number" },
+          "totalGames": { "type": "integer" },
+          "utilization": { "type": "number" }
+        },
+        "required": ["currentHeight", "currentWidth", "totalGames", "utilization"]
+      },
+      "statsSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "totalGames": { "type": "integer" },
+          "totalCubes": { "type": "integer" },
+          "avgGamesPerCube": { "type": "number" },
+          "avgUtilization": { "type": "number" }
+        },
+        "required": ["totalGames", "totalCubes", "avgGamesPerCube", "avgUtilization"]
+      }
+    }
+  }
+  

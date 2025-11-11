@@ -176,6 +176,29 @@ function parseBoolean(value, defaultValue = false) {
   return defaultValue;
 }
 
+function normalizeStacking(value) {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'vertical' || normalized === 'horizontal') {
+      return normalized;
+    }
+    return null;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'vertical' : 'horizontal';
+  }
+  if (typeof value === 'number') {
+    if (value === 1) {
+      return 'vertical';
+    }
+    if (value === 0) {
+      return 'horizontal';
+    }
+    return null;
+  }
+  return null;
+}
+
 const COLLECTION_STATUS_KEYS = [
   'own',
   'preordered',
@@ -328,7 +351,8 @@ const GRID_PRECISION = 0.1; // 0.1 inch precision
 const CUBE_SIZE = 12.8; // Kallax cube is 12.8" x 12.8"
 const OVERSIZED_THRESHOLD = 13;
 
-function calculateStatsSummary(cubes, verticalStacking) {
+function calculateStatsSummary(cubes, stacking) {
+  const isVertical = stacking === 'vertical';
   const safeTotals = {
     totalGames: 0,
     totalCubes: 0,
@@ -347,10 +371,10 @@ function calculateStatsSummary(cubes, verticalStacking) {
   const avgGamesPerCube = totalGames / cubes.length || 0;
 
   const utilizations = cubes.map((cube) => {
-    const numerator = verticalStacking
+    const numerator = isVertical
       ? cube.currentHeight ?? 0
       : cube.currentWidth ?? 0;
-    const denominator = verticalStacking ? DISPLAY_KALLAX_HEIGHT : DISPLAY_KALLAX_WIDTH;
+    const denominator = isVertical ? DISPLAY_KALLAX_HEIGHT : DISPLAY_KALLAX_WIDTH;
 
     if (!denominator) {
       return 0;
@@ -1190,12 +1214,24 @@ function splitOversizedGroup(group, maxArea, primaryOrder) {
 }
 
 // Main packing function
-function packGamesIntoCubes(games, priorities, verticalStacking, lockRotation, optimizeSpace, respectSortOrder, fitOversized = false, groupExpansions = false, groupSeries = false) {
+function packGamesIntoCubes(
+  games,
+  priorities,
+  stacking,
+  lockRotation,
+  optimizeSpace,
+  respectSortOrder,
+  fitOversized = false,
+  groupExpansions = false,
+  groupSeries = false
+) {
   console.log(`📦 Starting to pack ${games.length} games`);
-  console.log(`   Options: vertical=${verticalStacking}, lockRotation=${lockRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, fitOversized=${fitOversized}`);
+  console.log(
+    `   Options: stacking=${stacking}, lockRotation=${lockRotation}, optimize=${optimizeSpace}, strict=${respectSortOrder}, fitOversized=${fitOversized}`
+  );
   
   // Determine primary order
-  const primaryOrder = verticalStacking ? 'vertical' : 'horizontal';
+  const primaryOrder = stacking === 'horizontal' ? 'horizontal' : 'vertical';
   // Always enforce full support to prevent floating games
   const oversizedExcludedGames = [];
   
@@ -1892,8 +1928,6 @@ app.post('/api/games/:username', async (req, res) => {
   const bodyOptions = req.body || {};
   const queryOptions = req.query || {};
   const requestId =
-    bodyOptions.requestId ||
-    queryOptions.requestId ||
     `${username}-${Date.now()}`;
   
   try {
@@ -1954,10 +1988,14 @@ app.post('/api/games/:username', async (req, res) => {
       bodyOptions.includeExpansions ?? queryOptions.includeExpansions,
       false
     );
-    const verticalStackingFlag = parseBoolean(
-      bodyOptions.verticalStacking ?? queryOptions.verticalStacking,
-      true
-    );
+    const stackingInput = bodyOptions.stacking ?? queryOptions.stacking;
+    const stacking = normalizeStacking(stackingInput);
+    if (!stacking) {
+      const errorMessage = 'Invalid stacking value. Expected "vertical" or "horizontal".';
+      console.error(`❌ ${errorMessage}`, { stacking: stackingInput });
+      sendProgress(requestId, `Error: ${errorMessage}`, { error: true });
+      return res.status(400).json({ error: errorMessage });
+    }
     const lockRotationFlag = parseBoolean(
       bodyOptions.lockRotation ?? queryOptions.lockRotation,
       false
@@ -2025,6 +2063,7 @@ app.post('/api/games/:username', async (req, res) => {
       includeStatuses,
       excludeStatuses,
       includeExpansions: includeExpansionsFlag,
+      stacking,
       lockRotation: lockRotationFlag,
       optimizeSpace: optimizeSpaceFlag,
       fitOversized: fitOversizedFlag,
@@ -2991,7 +3030,7 @@ app.post('/api/games/:username', async (req, res) => {
     // Step 3: Pack games into cubes
     sendProgress(requestId, `Packing ${gamesToPack.length} games into cubes...`, { step: 'packing', gameCount: gamesToPack.length });
     const parsedPriorities = prioritiesPayload;
-    const isVertical = verticalStackingFlag;
+    const stackingOption = stacking;
     const lockRotationOption = lockRotationFlag;
     const shouldOptimizeSpace = optimizeSpaceFlag;
     const strictSortOrder = respectSortOrderFlag;
@@ -3007,7 +3046,7 @@ app.post('/api/games/:username', async (req, res) => {
     const { cubes: packedCubes, oversizedExcludedGames } = packGamesIntoCubes(
       gamesToPack,
       parsedPriorities,
-      isVertical,
+      stackingOption,
       lockRotationOption,
       shouldOptimizeSpace,
       strictSortOrder,
@@ -3304,7 +3343,7 @@ app.post('/api/games/:username', async (req, res) => {
       console.log(`   ✅ Clean copies created for ${gameCount} games in ${cleanCubes.length} cubes`);
       console.log('   📤 Attempting JSON serialization...');
 
-      const stats = calculateStatsSummary(cleanCubes, isVertical);
+      const stats = calculateStatsSummary(cleanCubes, stackingOption);
 
       const dimensionSummary = {
         guessedVersionCount: 0,

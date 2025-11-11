@@ -24,15 +24,21 @@ import useInputSettingsState from './hooks/useInputSettingsState';
 import useResultsState from './hooks/useResultsState';
 import useHydrationState from './hooks/useHydrationState';
 import { arrayToMap } from './utils/collectionHelpers';
-import { parsePositiveNumber } from './utils/dimensions';
 import { getCollapsedBadgeLimit } from './utils/layout';
 import {
-  DEFAULT_PRIORITIES_BY_FIELD,
-  PRIORITY_LABELS,
   COLLECTION_STATUSES,
   FILTER_PANEL_KEYS,
   MOBILE_BREAKPOINT,
 } from './constants/appDefaults';
+import {
+  deriveStatusSelections,
+  hasIncludeSelection,
+} from './utils/requestPayload';
+import {
+  createDimensionOverrideEntry,
+  createExcludedOverrideEntry,
+  createOrientationOverrideEntry,
+} from './utils/overrideIdentity';
 import './App.css';
 
 function App() {
@@ -46,8 +52,8 @@ function App() {
     setGroupExpansions,
     groupSeries,
     setGroupSeries,
-    verticalStacking,
-    setVerticalStacking,
+    stacking,
+    setStacking,
     lockRotation,
     setLockRotation,
     optimizeSpace,
@@ -60,8 +66,8 @@ function App() {
     setBypassVersionWarning,
     filtersCollapsed,
     setFiltersCollapsed,
-    priorities,
-    setPriorities,
+    sorting,
+    setSorting,
     collectionFilters,
     setCollectionFilters,
     filterPanelsCollapsed,
@@ -170,7 +176,7 @@ function App() {
             includeExpansions: storedIncludeExpansions,
             groupExpansions: storedGroupExpansions,
             groupSeries: storedGroupSeries,
-            verticalStacking: storedVerticalStacking,
+            stacking: storedStacking,
             lockRotation: storedLockRotation,
             optimizeSpace: storedOptimizeSpace,
             respectSortOrder: storedRespectSortOrder,
@@ -178,7 +184,7 @@ function App() {
             filtersCollapsed: storedFiltersCollapsed,
             filterPanelsCollapsed: storedFilterPanelsCollapsed,
             bypassVersionWarning: storedBypassVersionWarning,
-            priorities: storedPriorities,
+            sorting: storedSorting,
             collectionFilters: storedCollectionFilters,
           } = storedSettings;
 
@@ -198,8 +204,10 @@ function App() {
           if (typeof storedGroupSeries === 'boolean') {
             setGroupSeries(storedGroupSeries);
           }
-          if (typeof storedVerticalStacking === 'boolean') {
-            setVerticalStacking(storedVerticalStacking);
+          if (typeof storedStacking === 'string') {
+            const normalizedStacking =
+              storedStacking === 'horizontal' ? 'horizontal' : 'vertical';
+            setStacking(normalizedStacking);
           }
           if (typeof storedLockRotation === 'boolean') {
             setLockRotation(storedLockRotation);
@@ -233,8 +241,8 @@ function App() {
               }, {}),
             }));
           }
-          if (Array.isArray(storedPriorities) && storedPriorities.length > 0) {
-            setPriorities(storedPriorities);
+          if (Array.isArray(storedSorting) && storedSorting.length > 0) {
+            setSorting(storedSorting);
           }
           if (
             storedCollectionFilters &&
@@ -280,13 +288,13 @@ function App() {
       includeExpansions,
       groupExpansions,
       groupSeries,
-      verticalStacking,
+      stacking,
       lockRotation,
       optimizeSpace,
       respectSortOrder,
       fitOversized,
       filtersCollapsed,
-      priorities,
+      sorting,
       bypassVersionWarning,
       collectionFilters,
       filterPanelsCollapsed,
@@ -301,13 +309,13 @@ function App() {
     includeExpansions,
     groupExpansions,
     groupSeries,
-    verticalStacking,
+    stacking,
     lockRotation,
     optimizeSpace,
     respectSortOrder,
     fitOversized,
     filtersCollapsed,
-    priorities,
+    sorting,
     bypassVersionWarning,
     collectionFilters,
     filterPanelsCollapsed,
@@ -341,11 +349,13 @@ function App() {
         if (typeof storedResult.response.fitOversized === 'boolean') {
           setFitOversized(storedResult.response.fitOversized);
         }
-        if (typeof storedResult.response.verticalStacking === 'boolean') {
-          setVerticalStacking(storedResult.response.verticalStacking);
-        }
         if (typeof storedResult.response.lockRotation === 'boolean') {
           setLockRotation(storedResult.response.lockRotation);
+        }
+        if (typeof storedResult.response.stacking === 'string') {
+          const normalizedStoredStacking =
+            storedResult.response.stacking === 'horizontal' ? 'horizontal' : 'vertical';
+          setStacking(normalizedStoredStacking);
         }
         if (storedResult.requestConfig) {
           setLastRequestConfig(storedResult.requestConfig);
@@ -403,21 +413,25 @@ function App() {
     () => Object.values(dimensionOverridesMap),
     [dimensionOverridesMap]
   );
+  const statusSelections = useMemo(
+    () => deriveStatusSelections(collectionFilters),
+    [collectionFilters]
+  );
   const includeStatusList = useMemo(
     () =>
-      COLLECTION_STATUSES.filter((status) => collectionFilters[status.key] === 'include').map(
-        (status) => status.key
-      ),
-    [collectionFilters]
+      Object.entries(statusSelections)
+        .filter(([, value]) => value === 'include')
+        .map(([key]) => key),
+    [statusSelections]
   );
   const excludeStatusList = useMemo(
     () =>
-      COLLECTION_STATUSES.filter((status) => collectionFilters[status.key] === 'exclude').map(
-        (status) => status.key
-      ),
-    [collectionFilters]
+      Object.entries(statusSelections)
+        .filter(([, value]) => value === 'exclude')
+        .map(([key]) => key),
+    [statusSelections]
   );
-  const hasIncludeStatuses = includeStatusList.length > 0;
+  const hasIncludeStatuses = hasIncludeSelection(statusSelections);
 
   const {
     handleSubmit,
@@ -426,11 +440,10 @@ function App() {
   } = useCollectionRequestHandlers({
     username,
     hasIncludeStatuses,
-    includeStatusList,
-    excludeStatusList,
+    statusSelections,
     includeExpansions,
-    priorities,
-    verticalStacking,
+    sorting,
+    stacking,
     lockRotation,
     optimizeSpace,
     respectSortOrder,
@@ -454,22 +467,19 @@ function App() {
     lastRequestConfig,
   });
   const handleExcludeGame = useCallback(async (game) => {
-    if (!game?.id) {
+    const entry = createExcludedOverrideEntry(game);
+    if (!entry) {
+      console.warn('Unable to exclude game – missing gameId/versionId metadata', game);
       return;
     }
 
-    const entry = {
-      id: game.id,
-      name: game.name || game.id,
-    };
-
     setExcludedGamesMap((prev) => {
-      if (prev[entry.id]) {
+      if (prev[entry.key]) {
         return prev;
       }
       return {
         ...prev,
-        [entry.id]: entry,
+        [entry.key]: entry,
       };
     });
 
@@ -480,50 +490,40 @@ function App() {
     }
   }, []);
 
-  const handleReincludeGame = useCallback(async (gameId) => {
-    if (!gameId) {
+  const handleReincludeGame = useCallback(async (overrideKey) => {
+    if (!overrideKey) {
       return;
     }
 
     setExcludedGamesMap((prev) => {
-      if (!prev[gameId]) {
+      if (!prev[overrideKey]) {
         return prev;
       }
       const next = { ...prev };
-      delete next[gameId];
+      delete next[overrideKey];
       return next;
     });
 
     try {
-      await removeExcludedGame(gameId);
+      await removeExcludedGame(overrideKey);
     } catch (storageError) {
       console.error('Unable to remove excluded game', storageError);
     }
   }, []);
 
   const handleSetOrientationOverride = useCallback(async (game, orientation) => {
-    if (!game?.id || !orientation) {
+    const entry = createOrientationOverrideEntry(game, orientation);
+    if (!entry) {
+      console.warn('Unable to set orientation override – missing metadata or orientation', {
+        game,
+        orientation,
+      });
       return;
     }
-
-    const normalizedOrientation =
-      orientation === 'vertical' || orientation === 'horizontal'
-        ? orientation
-        : null;
-
-    if (!normalizedOrientation) {
-      return;
-    }
-
-    const entry = {
-      id: game.id,
-      name: game.name || game.id,
-      orientation: normalizedOrientation,
-    };
 
     setOrientationOverridesMap((prev) => ({
       ...prev,
-      [entry.id]: entry,
+      [entry.key]: entry,
     }));
 
     try {
@@ -533,51 +533,40 @@ function App() {
     }
   }, []);
 
-  const handleClearOrientationOverride = useCallback(async (gameId) => {
-    if (!gameId) {
+  const handleClearOrientationOverride = useCallback(async (overrideKey) => {
+    if (!overrideKey) {
       return;
     }
 
     setOrientationOverridesMap((prev) => {
-      if (!prev[gameId]) {
+      if (!prev[overrideKey]) {
         return prev;
       }
       const next = { ...prev };
-      delete next[gameId];
+      delete next[overrideKey];
       return next;
     });
 
     try {
-      await removeOrientationOverride(gameId);
+      await removeOrientationOverride(overrideKey);
     } catch (storageError) {
       console.error('Unable to remove orientation override', storageError);
     }
   }, []);
 
   const handleSaveDimensionOverride = useCallback(async (game, rawDimensions) => {
-    if (!game?.id || !rawDimensions) {
+    if (!rawDimensions) {
       return false;
     }
 
-    const length = parsePositiveNumber(rawDimensions.length);
-    const width = parsePositiveNumber(rawDimensions.width);
-    const depth = parsePositiveNumber(rawDimensions.depth);
-
-    if (!length || !width || !depth) {
+    const entry = createDimensionOverrideEntry(game, rawDimensions);
+    if (!entry) {
       return false;
     }
-
-    const entry = {
-      id: game.id,
-      name: game.name || game.id,
-      length,
-      width,
-      depth,
-    };
 
     setDimensionOverridesMap((prev) => ({
       ...prev,
-      [entry.id]: entry,
+      [entry.key]: entry,
     }));
 
     try {
@@ -589,22 +578,22 @@ function App() {
     }
   }, []);
 
-  const handleRemoveDimensionOverride = useCallback(async (gameId) => {
-    if (!gameId) {
+  const handleRemoveDimensionOverride = useCallback(async (overrideKey) => {
+    if (!overrideKey) {
       return;
     }
 
     setDimensionOverridesMap((prev) => {
-      if (!prev[gameId]) {
+      if (!prev[overrideKey]) {
         return prev;
       }
       const next = { ...prev };
-      delete next[gameId];
+      delete next[overrideKey];
       return next;
     });
 
     try {
-      await removeDimensionOverride(gameId);
+      await removeDimensionOverride(overrideKey);
     } catch (storageError) {
       console.error('Unable to remove dimension override', storageError);
     }
@@ -786,15 +775,15 @@ function App() {
         hasIncludeStatuses={hasIncludeStatuses}
         filterPanelsCollapsed={filterPanelsCollapsed}
         onTogglePanel={toggleFilterPanel}
-        verticalStacking={verticalStacking}
-        onVerticalStackingChange={setVerticalStacking}
+        stacking={stacking}
+        onStackingChange={setStacking}
         preferenceState={preferenceState}
         collectionFilters={collectionFilters}
         onCollectionFilterChange={handleCollectionFilterChange}
         includeStatusList={includeStatusList}
         excludeStatusList={excludeStatusList}
-        priorities={priorities}
-        onPrioritiesChange={setPriorities}
+        sorting={sorting}
+        onSortingChange={setSorting}
         optimizeSpace={optimizeSpace}
         filtersCollapsed={filtersCollapsed}
         onToggleFiltersCollapsed={handleToggleFiltersCollapsed}
@@ -831,11 +820,10 @@ function App() {
       {cubes && (
         <Results
           cubes={cubes}
-          verticalStacking={verticalStacking}
           stats={stats}
           oversizedGames={oversizedGames}
           fitOversized={fitOversized}
-          priorities={priorities}
+          sorting={sorting}
           excludedGames={excludedGamesList}
           onExcludeGame={handleExcludeGame}
           onRestoreExcludedGame={handleReincludeGame}

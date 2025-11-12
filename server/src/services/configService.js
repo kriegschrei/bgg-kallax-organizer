@@ -12,4 +12,5 @@ export const PORT = process.env.PORT || 3001;
 export const BGG_API_BASE = 'https://boardgamegeek.com/xmlapi2';
 export const BGG_API_TOKEN = process.env.BGG_API_TOKEN || '';
 export const CACHE_ADMIN_PASSWORD = process.env.CACHE_ADMIN_PASSWORD || '';
+export const GAMES_RESPONSE_JSON = process.env.GAMES_RESPONSE_JSON || '';
 

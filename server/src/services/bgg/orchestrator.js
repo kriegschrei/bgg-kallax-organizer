@@ -13,7 +13,7 @@ import { bggApiRequest } from './apiClient.js';
 import { xmlToJson } from './xmlParser.js';
 import { mapCollectionItems, generateCollectionHash } from './collectionMapper.js';
 import { mapThingItem, mapVersionItems } from './thingMapper.js';
-import { buildCorrectionUrl, buildVersionsUrl } from '../../utils/gameUtils.js';
+import { buildCorrectionUrl, buildVersionsUrl, buildGameCorrectionUrl } from '../../utils/gameUtils.js';
 
 const COLLECTION_MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
@@ -249,6 +249,39 @@ const collectAvailableVersions = (versionLookup, gameId) => {
     .map(([, version]) => version);
 };
 
+const compareAlternateVersions = (a, b) => {
+  const normalizeYear = (value) =>
+    Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+  const normalizeLanguage = (value) => {
+    if (!value || typeof value !== 'string') {
+      return 'zzzzzz';
+    }
+    return value.trim().toLowerCase();
+  };
+
+  const yearDelta =
+    normalizeYear(b.versionYearPublished) - normalizeYear(a.versionYearPublished);
+  if (yearDelta !== 0) {
+    return yearDelta;
+  }
+
+  const langA = normalizeLanguage(a.language);
+  const langB = normalizeLanguage(b.language);
+  const isEnglishA = langA === 'english';
+  const isEnglishB = langB === 'english';
+
+  if (isEnglishA !== isEnglishB) {
+    return isEnglishA ? -1 : 1;
+  }
+
+  const languageDelta = langA.localeCompare(langB);
+  if (languageDelta !== 0) {
+    return languageDelta;
+  }
+
+  return (b.versionId ?? 0) - (a.versionId ?? 0);
+};
+
 const DEFAULT_DIMENSIONS = {
   length: -1,
   width: -1,
@@ -270,15 +303,23 @@ const buildVersionEntry = ({
 }) => {
   const normalizedVersionId = Number.isInteger(versionId) ? versionId : -1;
   const missingDimensions = versionData ? versionData.missingDimensions : true;
+  const normalizedWeight =
+    versionData && Number.isFinite(versionData.weight) && versionData.weight > 0
+      ? versionData.weight
+      : null;
   const derivedDimensions = versionData
     ? {
         length: versionData.length,
         width: versionData.width,
         depth: versionData.depth,
+        weight: normalizedWeight,
         missingDimensions,
       }
     : {
-        ...DEFAULT_DIMENSIONS,
+        length: DEFAULT_DIMENSIONS.length,
+        width: DEFAULT_DIMENSIONS.width,
+        depth: DEFAULT_DIMENSIONS.depth,
+        weight: null,
         missingDimensions: true,
       };
   const volume =
@@ -292,52 +333,115 @@ const buildVersionEntry = ({
   const versionKey =
     versionData?.versionKey ||
     `${gameId}-${normalizedVersionId !== -1 ? normalizedVersionId : 'default'}`;
-  const versionNameRaw = versionData?.name || item.versionName || item.name || game?.name || null;
-  const versionName = unescapeName(versionNameRaw);
-  const gameName = unescapeName(item.name || game?.name || versionNameRaw || `Game ${gameId}`);
+  const versionNameRaw =
+    versionData?.name ||
+    item.versionName ||
+    item.name ||
+    game?.name ||
+    null;
+  const versionNameCandidate = unescapeName(versionNameRaw);
+  const gameName = unescapeName(
+    item.name || game?.name || versionNameRaw || `Game ${gameId}`,
+  );
   const versionsUrl = buildVersionsUrl(gameId, gameName);
   const correctionUrl =
-    normalizedVersionId > 0 ? buildCorrectionUrl(normalizedVersionId) : null;
+    normalizedVersionId > 0
+      ? buildCorrectionUrl(normalizedVersionId)
+      : buildGameCorrectionUrl(gameId);
+
+  const versionLanguage = versionData?.language || item.language || null;
+  const versionYear =
+    Number.isInteger(versionData?.versionYearPublished) &&
+    versionData.versionYearPublished > 0
+      ? versionData.versionYearPublished
+      : null;
+
+  const trimmedGameName = (gameName || '').trim();
+  let resolvedVersionName = (versionNameCandidate || '').trim();
+  const normalizedGameName = trimmedGameName.toLocaleLowerCase();
+  const normalizedVersionName = resolvedVersionName.toLocaleLowerCase();
+  const namesMatch =
+    resolvedVersionName.length === 0 ||
+    (normalizedGameName.length > 0 &&
+      normalizedGameName === normalizedVersionName);
+
+  if (namesMatch) {
+    const segments = [];
+    segments.push(trimmedGameName || `Game ${gameId}`);
+    if (versionLanguage) {
+      segments.push(versionLanguage);
+    }
+    if (versionYear) {
+      segments.push(String(versionYear));
+    }
+    if (normalizedVersionId > 0) {
+      segments.push(`#${normalizedVersionId}`);
+    }
+    resolvedVersionName = segments.filter(Boolean).join(' - ');
+  }
+
+  const alternateCandidates = collectAvailableVersions(versionLookup, gameId).filter(
+    (candidate) =>
+      candidate.versionId !== normalizedVersionId && !candidate.missingDimensions,
+  );
+  alternateCandidates.sort(compareAlternateVersions);
 
   const alternateVersions =
     missingDimensions || normalizedVersionId === -1
-      ? collectAvailableVersions(versionLookup, gameId)
-          .filter(
-            (candidate) =>
-              candidate.versionId !== normalizedVersionId && !candidate.missingDimensions,
-          )
-          .map((version) => {
-            const cleanedName = unescapeName(version.name);
-            const volumeValue =
-              Number.isFinite(version.volume) && version.volume > 0
-                ? version.volume
-                : version.length * version.width * version.depth;
-            const areaValue =
-              Number.isFinite(version.area) && version.area > 0
-                ? version.area
-                : (() => {
-                    const dims = [version.length, version.width, version.depth]
-                      .filter((value) => Number.isFinite(value) && value > 0)
-                      .sort((a, b) => a - b);
-                    return dims.length >= 2 ? dims[0] * dims[1] : -1;
-                  })();
+      ? alternateCandidates.map((version) => {
+          const cleanedName = unescapeName(version.name);
+          const volumeValue =
+            Number.isFinite(version.volume) && version.volume > 0
+              ? version.volume
+              : version.length * version.width * version.depth;
+          const areaValue =
+            Number.isFinite(version.area) && version.area > 0
+              ? version.area
+              : (() => {
+                  const dims = [version.length, version.width, version.depth]
+                    .filter((value) => Number.isFinite(value) && value > 0)
+                    .sort((a, b) => a - b);
+                  return dims.length >= 2 ? dims[0] * dims[1] : -1;
+                })();
+          const altWeight =
+            Number.isFinite(version.weight) && version.weight > 0
+              ? version.weight
+              : null;
 
-            return {
-              versionId: version.versionId,
-              versionKey: version.versionKey,
-              name: cleanedName,
-              dimensions: {
-                length: version.length,
-                width: version.width,
-                depth: version.depth,
-              },
-              volume: volumeValue,
-              area: areaValue,
-              language: version.language,
-              versionYearPublished: version.versionYearPublished,
-            };
-          })
+          return {
+            versionId: version.versionId,
+            versionKey: version.versionKey,
+            name: cleanedName,
+            length: version.length,
+            width: version.width,
+            depth: version.depth,
+            weight: altWeight,
+            dimensions: {
+              length: version.length,
+              width: version.width,
+              depth: version.depth,
+              weight: altWeight,
+              missingDimensions: false,
+            },
+            volume: volumeValue,
+            area: areaValue,
+            language: version.language,
+            versionYearPublished: version.versionYearPublished,
+          };
+        })
       : [];
+
+  const objectType = game?.type || item.objecttype || item.subtype || null;
+  const subtype = item.subtype || objectType || null;
+  const gamePublishedYear =
+    Number.isInteger(game?.gamePublishedYear) && game.gamePublishedYear >= 0
+      ? game.gamePublishedYear
+      : -1;
+  const versionPublishedYear =
+    Number.isInteger(versionData?.versionYearPublished) &&
+    versionData.versionYearPublished >= 0
+      ? versionData.versionYearPublished
+      : -1;
 
   return {
     versionKey,
@@ -345,10 +449,28 @@ const buildVersionEntry = ({
     gameId,
     collectionId,
     preferred,
-    name: versionName || gameName,
-    versionName,
-    objecttype: game?.type || item.subtype || item.objecttype,
-    subtype: item.subtype,
+    name: resolvedVersionName,
+    versionName: resolvedVersionName,
+    gameName,
+    gamePublishedYear,
+    versionPublishedYear,
+    gameType: objectType,
+    objectType,
+    subtype,
+    categories: game?.categories || [],
+    mechanics: game?.mechanics || [],
+    families: game?.families || [],
+    bggRank: game?.bggRank ?? -1,
+    minPlayers: game?.minPlayers ?? -1,
+    maxPlayers: game?.maxPlayers ?? -1,
+    bestPlayerCount: game?.bestPlayerCount ?? -1,
+    minPlaytime: game?.minPlayTime ?? -1,
+    maxPlaytime: game?.maxPlayTime ?? -1,
+    minAge: game?.minAge ?? -1,
+    communityAge: game?.communityAge ?? -1,
+    languageDependence: game?.languageDependence ?? -1,
+    bggWeight: game?.bggWeight ?? -1,
+    bggRating: game?.bggRating ?? -1,
     statuses: {
       own: item.own,
       want: item.want,
@@ -361,22 +483,6 @@ const buildVersionEntry = ({
     },
     thumbnail: game?.thumbnail || item.thumbnail || null,
     image: game?.image || item.image || null,
-    bgg: {
-      categories: game?.categories || [],
-      mechanics: game?.mechanics || [],
-      families: game?.families || [],
-      bggRank: game?.bggRank ?? -1,
-      minPlayers: game?.minPlayers ?? -1,
-      maxPlayers: game?.maxPlayers ?? -1,
-      bestPlayerCount: game?.bestPlayerCount ?? -1,
-      minPlaytime: game?.minPlayTime ?? -1,
-      maxPlaytime: game?.maxPlayTime ?? -1,
-      minAge: game?.minAge ?? -1,
-      communityAge: game?.communityAge ?? -1,
-      languageDependence: game?.languageDependence ?? -1,
-      bggWeight: game?.bggWeight ?? -1,
-      bggRating: game?.bggRating ?? -1,
-    },
     baseGameId: game?.baseGameId || gameId,
     isExpansion: Boolean(game?.isExpansion || item.subtype === 'boardgameexpansion'),
     dimensions: derivedDimensions,

@@ -5,16 +5,53 @@ const { CUBE_SIZE } = PACKING_CONSTANTS;
 const DISPLAY_KALLAX_WIDTH = 13;
 const DISPLAY_KALLAX_HEIGHT = 13;
 const OVERSIZED_THRESHOLD = 13;
+const CUBE_DISPLAY_AREA = DISPLAY_KALLAX_WIDTH * DISPLAY_KALLAX_HEIGHT;
 
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-export const calculateStatsSummary = (cubes, stacking) => {
-  const isVertical = stacking === 'vertical';
+const computeGameArea = (game) => {
+  if (Number.isFinite(game.area) && game.area > 0) {
+    return game.area;
+  }
+
+  const length =
+    Number.isFinite(game.dimensions?.length) && game.dimensions.length > 0
+      ? game.dimensions.length
+      : null;
+  const width =
+    Number.isFinite(game.dimensions?.width) && game.dimensions.width > 0
+      ? game.dimensions.width
+      : null;
+
+  if (length && width) {
+    return length * width;
+  }
+
+  const packedWidth =
+    Number.isFinite(game.packedDims?.x) && game.packedDims.x > 0
+      ? game.packedDims.x
+      : null;
+  const packedHeight =
+    Number.isFinite(game.packedDims?.y) && game.packedDims.y > 0
+      ? game.packedDims.y
+      : null;
+
+  if (packedWidth && packedHeight) {
+    return packedWidth * packedHeight;
+  }
+
+  return 0;
+};
+
+const computeCubeAreaUsed = (cube) =>
+  (cube.games || []).reduce((sum, game) => sum + computeGameArea(game), 0);
+
+export const calculateStatsSummary = (cubes) => {
   const safeTotals = {
     totalGames: 0,
     totalCubes: 0,
-    avgGamesPerCube: '0.0',
-    avgUtilization: '0.0',
+    avgGamesPerCube: 0,
+    totalUtilization: 0,
   };
 
   if (!Array.isArray(cubes) || cubes.length === 0) {
@@ -27,27 +64,20 @@ export const calculateStatsSummary = (cubes, stacking) => {
   );
   const avgGamesPerCube = totalGames / cubes.length || 0;
 
-  const utilizations = cubes.map((cube) => {
-    const numerator = isVertical ? cube.currentHeight ?? 0 : cube.currentWidth ?? 0;
-    const denominator = isVertical ? DISPLAY_KALLAX_HEIGHT : DISPLAY_KALLAX_WIDTH;
+  const areaUsedPerCube = cubes.map((cube) => computeCubeAreaUsed(cube));
+  const totalAreaUsed = areaUsedPerCube.reduce((sum, value) => sum + value, 0);
+  const totalAreaCapacity = CUBE_DISPLAY_AREA * cubes.length;
 
-    if (!denominator) {
-      return 0;
-    }
-
-    return clamp((numerator / denominator) * 100, 0, 100);
-  });
-
-  const avgUtilization =
-    utilizations.length > 0
-      ? utilizations.reduce((sum, value) => sum + value, 0) / utilizations.length
+  const totalUtilization =
+    totalAreaCapacity > 0
+      ? Number(((totalAreaUsed / totalAreaCapacity) * 100).toFixed(1))
       : 0;
 
   return {
     totalGames,
     totalCubes: cubes.length,
-    avgGamesPerCube: avgGamesPerCube.toFixed(1),
-    avgUtilization: avgUtilization.toFixed(1),
+    avgGamesPerCube: Number(avgGamesPerCube.toFixed(1)),
+    totalUtilization: Number(totalUtilization),
   };
 };
 
@@ -91,12 +121,6 @@ export const finalizeCube = (cube, cubeIndex) => {
       widthUsed: totalWidth,
     });
   }
-
-  cube.currentHeight =
-    cube.games.length > 0
-      ? Math.max(...cube.games.map((g) => g.position.y + g.packedDims.y))
-      : 0;
-  cube.currentWidth = CUBE_SIZE;
 };
 
 export const createOversizedExcludedGame = (game) => {

@@ -2,8 +2,9 @@ import { extractVersionLabelFromName, extractVersionId, buildVersionsUrl, buildC
 
 export const DEFAULT_DIMENSIONS = {
   length: 12.8,
-  width: 12.8,
-  depth: 1.8,
+  width: 1.8,
+  depth: 12.8,
+  weight: null,
   missingDimensions: true,
 };
 
@@ -47,48 +48,6 @@ export const updateGameCorrectionUrl = (game, versionId) => {
     const versionIdForCorrection = extractVersionId(game, versionId);
     game.correctionUrl = versionIdForCorrection ? buildCorrectionUrl(versionIdForCorrection) : null;
   }
-};
-
-export const createCleanGameObject = (game) => {
-  const versionLabel = getFallbackVersionLabel(game);
-  
-  return {
-    id: game.id,
-    name: game.name,
-    dimensions: game.dimensions ? { ...game.dimensions } : game.dimensions,
-    position: game.position ? { ...game.position } : game.position,
-    packedDims: game.packedDims ? { ...game.packedDims } : game.packedDims,
-    actualDims: game.actualDims ? { ...game.actualDims } : game.actualDims,
-    orientedDims: game.orientedDims ? { ...game.orientedDims } : game.orientedDims,
-    actualOrientedDims: game.actualOrientedDims ? { ...game.actualOrientedDims } : game.actualOrientedDims,
-    oversizedX: game.oversizedX,
-    oversizedY: game.oversizedY,
-    categories: game.categories ? [...(game.categories || [])] : [],
-    families: game.families ? [...(game.families || [])] : [],
-    bggRank: game.bggRank,
-    minPlayers: game.minPlayers,
-    maxPlayers: game.maxPlayers,
-    bestPlayerCount: game.bestPlayerCount,
-    minPlaytime: game.minPlaytime,
-    maxPlaytime: game.maxPlaytime,
-    age: game.age,
-    communityAge: game.communityAge,
-    weight: game.weight,
-    bggRating: game.bggRating,
-    baseGameId: game.baseGameId,
-    isExpansion: game.isExpansion,
-    familyIds: game.familyIds ? [...(game.familyIds || [])] : [],
-    missingVersion: !!game.missingVersion,
-    versionsUrl: game.versionsUrl || null,
-    usedAlternateVersionDims: !!game.usedAlternateVersionDims,
-    versionName: versionLabel,
-    correctionUrl: game.correctionUrl || null,
-    selectedVersionId: game.selectedVersionId || null,
-    bggDimensions: game.bggDimensions ? { ...game.bggDimensions } : null,
-    userDimensions: game.userDimensions ? { ...game.userDimensions } : null,
-    forcedOrientation: game.forcedOrientation || null,
-    appliedOrientation: game.appliedOrientation || null,
-  };
 };
 
 export const removeInternalProperties = (game) => {

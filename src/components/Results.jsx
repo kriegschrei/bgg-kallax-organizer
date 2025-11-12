@@ -51,9 +51,9 @@ export default function Results({
       createStatItem('Total Games', stats?.totalGames, 'Unknown'),
       createStatItem('Kallax Cubes Needed', stats?.totalCubes, 'Unknown'),
       createStatItem('Avg Games/Cube', stats?.avgGamesPerCube, 'N/A'),
-      createStatItem('Avg Space Utilization', stats?.avgUtilization, 'N/A', '%'),
+      createStatItem('Avg Space Utilization', stats?.totalUtilization, 'N/A', '%'),
     ],
-    [stats?.avgGamesPerCube, stats?.avgUtilization, stats?.totalCubes, stats?.totalGames]
+    [stats?.avgGamesPerCube, stats?.totalUtilization, stats?.totalCubes, stats?.totalGames]
   );
   const renderDisclosureIcon = useCallback(
     (expanded) => (

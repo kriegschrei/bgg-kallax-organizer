@@ -47,12 +47,10 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "currentHeight": { "type": "number" },
-          "currentWidth": { "type": "number" },
           "totalGames": { "type": "integer" },
-          "utilization": { "type": "number" }
+          "totalUtilization": { "type": "number" }
         },
-        "required": ["currentHeight", "currentWidth", "totalGames", "utilization"]
+        "required": ["totalGames", "utilization"]
       },
       "statsSummary": {
         "type": "object",
@@ -61,9 +59,9 @@
           "totalGames": { "type": "integer" },
           "totalCubes": { "type": "integer" },
           "avgGamesPerCube": { "type": "number" },
-          "avgUtilization": { "type": "number" }
+          "totalUtilization": { "type": "number" }
         },
-        "required": ["totalGames", "totalCubes", "avgGamesPerCube", "avgUtilization"]
+        "required": ["totalGames", "totalCubes", "avgGamesPerCube", "totalUtilization"]
       }
     }
   }

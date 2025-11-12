@@ -246,11 +246,16 @@ export const mapVersionItems = (item) => {
   return versionItems
     .map((version) => {
       const attributes = version?.$ || {};
+      const primaryName =
+        Array.isArray(version?.name)
+          ? version.name.find((n) => n?.$?.type === 'primary')?.$?.value || null
+          : version?.name?.$?.value || version?.name?._ || version?.name || null;
       const canonName =
         version?.canonicalname?.$?.value ||
         version?.canonicalname?._ ||
         version?.canonicalname ||
         null;
+      const displayName = primaryName || canonName;
       const linkToGame = Array.isArray(version?.link)
         ? version.link.find((link) => link?.$?.type === 'boardgameversion')
         : version?.link?.$?.type === 'boardgameversion'
@@ -272,7 +277,7 @@ export const mapVersionItems = (item) => {
 
       return {
         versionId,
-        name: canonName,
+        name: displayName,
         gameId,
         versionKey: `${gameId}-${versionId !== -1 ? versionId : 'default'}`,
         versionYearPublished: parseInteger(version?.yearpublished?.$?.value, -1),

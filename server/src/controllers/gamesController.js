@@ -1,3 +1,5 @@
+import { writeFile } from 'fs/promises';
+
 import { normalizeUsername } from '../utils/gameUtils.js';
 import { validateGamesPayload } from '../validation/gamesValidator.js';
 import {
@@ -6,6 +8,26 @@ import {
   scheduleProgressCleanup,
 } from '../services/progressService.js';
 import { processGamesRequest } from '../services/gamesService.js';
+import { GAMES_RESPONSE_JSON } from '../services/configService.js';
+
+const logGamesResponse = async (payload) => {
+  if (!GAMES_RESPONSE_JSON) {
+    return;
+  }
+
+  try {
+    await writeFile(
+      GAMES_RESPONSE_JSON,
+      JSON.stringify(payload, null, 2),
+      'utf8',
+    );
+  } catch (logError) {
+    console.error(
+      `⚠️ Failed to write games response JSON to "${GAMES_RESPONSE_JSON}":`,
+      logError,
+    );
+  }
+};
 
 const ensureUsernameString = (value) => {
   if (typeof value === 'number') {
@@ -41,10 +63,12 @@ export const handleGamesRequest = async (req, res) => {
     });
 
     if (result?.status === 'missing_versions') {
+      await logGamesResponse(result);
       scheduleProgressCleanup(requestId);
       return res.json(result);
     }
 
+    await logGamesResponse(result);
     scheduleProgressCleanup(requestId);
     return res.json(result);
   } catch (error) {

@@ -76,26 +76,63 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
     .filter((game) => !excludedIdsSet.has(game.id))
     .map((game) => {
       const originalDimensions = {
-        length: game.dimensions?.length ?? 0,
-        width: game.dimensions?.width ?? 0,
-        depth: game.dimensions?.depth ?? 0,
+        length: Number.isFinite(game.dimensions?.length) ? game.dimensions.length : null,
+        width: Number.isFinite(game.dimensions?.width) ? game.dimensions.width : null,
+        depth: Number.isFinite(game.dimensions?.depth) ? game.dimensions.depth : null,
+        weight:
+          Number.isFinite(game.dimensions?.weight) && game.dimensions.weight > 0
+            ? game.dimensions.weight
+            : null,
         missingDimensions: game.dimensions?.missingDimensions ?? false,
+      };
+
+      const dimensionSources = game.dimensionSources || {
+        user: null,
+        version: null,
+        guessed: null,
+        default: null,
       };
 
       const overrideDims = dimensionOverrideMap.get(game.id);
       if (overrideDims) {
-        game.bggDimensions = { ...originalDimensions };
-        game.userDimensions = { ...overrideDims };
-        game.dimensions = {
-          length: overrideDims.length,
-          width: overrideDims.width,
-          depth: overrideDims.depth,
-          missingDimensions: originalDimensions.missingDimensions,
+        const overrideDimension = {
+          length: Number(overrideDims.length),
+          width: Number(overrideDims.width),
+          depth: Number(overrideDims.depth),
+          weight: null,
+          missingDimensions: false,
         };
+        game.bggDimensions = { ...originalDimensions };
+        game.userDimensions = { ...overrideDimension };
+        game.dimensions = {
+          length: overrideDimension.length,
+          width: overrideDimension.width,
+          depth: overrideDimension.depth,
+          weight: overrideDimension.weight,
+          missingDimensions: false,
+        };
+        dimensionSources.user = { ...overrideDimension };
+        game.selectedDimensionSource = 'user';
+        game.missingDimensions = false;
       } else {
         game.bggDimensions = { ...originalDimensions };
         game.userDimensions = null;
+        dimensionSources.user = null;
+        if (game.selectedDimensionSource === 'user') {
+          if (dimensionSources.version && !dimensionSources.version.missingDimensions) {
+            game.selectedDimensionSource = 'version';
+          } else if (dimensionSources.guessed && !dimensionSources.guessed.missingDimensions) {
+            game.selectedDimensionSource = 'guessed';
+          } else if (dimensionSources.default) {
+            game.selectedDimensionSource = 'default';
+          } else {
+            game.selectedDimensionSource = 'version';
+          }
+        }
+        game.missingDimensions = originalDimensions.missingDimensions;
       }
+
+      game.dimensionSources = dimensionSources;
 
       const forcedOrientation = orientationOverrideMap.get(game.id);
       if (forcedOrientation) {

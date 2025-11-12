@@ -333,13 +333,6 @@ const buildVersionEntry = ({
   const versionKey =
     versionData?.versionKey ||
     `${gameId}-${normalizedVersionId !== -1 ? normalizedVersionId : 'default'}`;
-  const versionNameRaw =
-    versionData?.name ||
-    item.versionName ||
-    item.name ||
-    game?.name ||
-    null;
-  const versionNameCandidate = unescapeName(versionNameRaw);
   const gameName = unescapeName(
     item.name || game?.name || versionNameRaw || `Game ${gameId}`,
   );
@@ -356,29 +349,6 @@ const buildVersionEntry = ({
       ? versionData.versionYearPublished
       : null;
 
-  const trimmedGameName = (gameName || '').trim();
-  let resolvedVersionName = (versionNameCandidate || '').trim();
-  const normalizedGameName = trimmedGameName.toLocaleLowerCase();
-  const normalizedVersionName = resolvedVersionName.toLocaleLowerCase();
-  const namesMatch =
-    resolvedVersionName.length === 0 ||
-    (normalizedGameName.length > 0 &&
-      normalizedGameName === normalizedVersionName);
-
-  if (namesMatch) {
-    const segments = [];
-    segments.push(trimmedGameName || `Game ${gameId}`);
-    if (versionLanguage) {
-      segments.push(versionLanguage);
-    }
-    if (versionYear) {
-      segments.push(String(versionYear));
-    }
-    if (normalizedVersionId > 0) {
-      segments.push(`#${normalizedVersionId}`);
-    }
-    resolvedVersionName = segments.filter(Boolean).join(' - ');
-  }
 
   const alternateCandidates = collectAvailableVersions(versionLookup, gameId).filter(
     (candidate) =>
@@ -449,8 +419,7 @@ const buildVersionEntry = ({
     gameId,
     collectionId,
     preferred,
-    name: resolvedVersionName,
-    versionName: resolvedVersionName,
+    versionName: versionData?.name,
     gameName,
     gamePublishedYear,
     versionPublishedYear,

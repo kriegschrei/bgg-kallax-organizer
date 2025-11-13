@@ -11,9 +11,9 @@
           "width": { "type": ["number", "null"] },
           "depth": { "type": ["number", "null"] },
           "weight": { "type": ["number", "null"] },
-          "missingDimensions": { "type": "boolean" }
+          "missing": { "type": "boolean" }
         },
-        "required": ["type", "length", "width", "depth", "weight"]
+        "required": ["type", "length", "width", "depth", "weight", "missing"]
       },
       "position": {
         "type": "object",
@@ -23,6 +23,16 @@
           "y": { "type": "number" }
         },
         "required": ["x", "y"]
+      },
+      "packedDims": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "z": { "type": "number" }
+        },
+        "required": ["x", "y", "z"]
       },
       "orientation": {
         "type": "object",
@@ -48,9 +58,11 @@
         "additionalProperties": false,
         "properties": {
           "totalGames": { "type": "integer" },
-          "totalUtilization": { "type": "number" }
+          "totalUtilization": { "type": "number" },
+          "areaUsed": { "type": "number" },
+          "areaCapacity": { "type": "number" }
         },
-        "required": ["totalGames", "utilization"]
+        "required": ["totalGames", "totalUtilization", "areaUsed", "areaCapacity"]
       },
       "statsSummary": {
         "type": "object",

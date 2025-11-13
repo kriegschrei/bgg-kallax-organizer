@@ -1,15 +1,7 @@
 import { hashData } from '../cache/cacheUtils.js';
+import { parseInteger } from '../../utils/numberUtils.js';
 
 const toBoolean = (value) => value === '1';
-
-const parseInteger = (value, defaultValue = -1) => {
-  if (value === undefined || value === null || value === '') {
-    return defaultValue;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
-};
 
 const normaliseVersionList = (versionNode) => {
   if (!versionNode) {

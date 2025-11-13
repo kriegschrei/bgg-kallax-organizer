@@ -1,54 +1,118 @@
-import { extractVersionLabelFromName, extractVersionId, buildVersionsUrl, buildCorrectionUrl } from './gameUtils.js';
+import { normalizePositiveNumber } from './numberUtils.js';
+
+/**
+ * Checks if dimensions are missing (length, width, or depth are 0 or null).
+ * If the dimensions object has a 'missing' property, uses that.
+ * Otherwise, checks the length, width, and depth values directly.
+ */
+export const checkMissingDimensions = (dimensions) => {
+  if (!dimensions) {
+    return true;
+  }
+  
+  // If missing property exists, use it
+  if (typeof dimensions.missing === 'boolean') {
+    return dimensions.missing;
+  }
+  
+  // Otherwise check the dimension values directly
+  const { length, width, depth } = dimensions;
+  return (
+    length == null || length === 0 ||
+    width == null || width === 0 ||
+    depth == null || depth === 0
+  );
+};
+
+/**
+ * Checks if dimensions are valid (all three dimensions are finite and positive).
+ * @param {Object} dimensions - The dimensions object with length, width, and depth
+ * @returns {boolean} True if all dimensions are valid
+ */
+export const hasValidDimensions = (dimensions) => {
+  if (!dimensions) {
+    return false;
+  }
+  return (
+    Number.isFinite(dimensions.length) &&
+    dimensions.length > 0 &&
+    Number.isFinite(dimensions.width) &&
+    dimensions.width > 0 &&
+    Number.isFinite(dimensions.depth) &&
+    dimensions.depth > 0
+  );
+};
+
+/**
+ * Extracts and normalizes dimensions from a game object.
+ * @param {Object} game - The game object
+ * @returns {Object} Normalized dimensions object with length, width, depth, weight, and missing
+ */
+export const extractDimensions = (game) => {
+  if (!game || !game.dimensions) {
+    return {
+      length: null,
+      width: null,
+      depth: null,
+      weight: null,
+      missing: true,
+    };
+  }
+
+  return {
+    length: normalizePositiveNumber(game.dimensions.length),
+    width: normalizePositiveNumber(game.dimensions.width),
+    depth: normalizePositiveNumber(game.dimensions.depth),
+    weight: normalizePositiveNumber(game.dimensions.weight),
+    missing: game.dimensions.missing ?? checkMissingDimensions({
+      length: game.dimensions.length,
+      width: game.dimensions.width,
+      depth: game.dimensions.depth,
+    }),
+  };
+};
 
 export const DEFAULT_DIMENSIONS = {
   length: 12.8,
   width: 1.8,
   depth: 12.8,
   weight: null,
-  missingDimensions: true,
+  missing: true,
 };
 
 export const getFallbackVersionLabel = (game) => {
-  return game.versionName || extractVersionLabelFromName(game.name) || null;
+  if (game.versionName) {
+    return game.versionName;
+  }
+  if (!game.name || typeof game.name !== 'string') {
+    return null;
+  }
+  const match = game.name.trim().match(/\(([^()]+)\)\s*$/);
+  if (!match) {
+    return null;
+  }
+  const label = match[1]?.trim();
+  return label && label.length > 0 ? label : null;
 };
 
-export const extractVersionIdFromGameId = (gameId) => {
-  if (!gameId || typeof gameId !== 'string') return null;
-  const parts = gameId.split('-');
-  return parts.length >= 2 ? parts[parts.length - 1] : null;
-};
 
-export const hasMissingDimensions = (dimensions) => {
-  if (!dimensions) return true;
-  return (
-    dimensions.missingDimensions ||
-    (dimensions.length === 0 && dimensions.width === 0 && dimensions.depth === 0)
-  );
-};
 
 export const setupGameVersionMetadata = (game, gameId, versionId, missingVersionInfo) => {
-  const normalizedVersionId = extractVersionId(game, versionId);
-  game.selectedVersionId = normalizedVersionId;
+  // Use versionId directly, or game.versionId if available
+  game.selectedVersionId = Number.isInteger(game.versionId) && game.versionId !== -1 
+    ? game.versionId 
+    : (versionId && versionId !== 'default' ? versionId : null);
   
-  if (!game.versionsUrl) {
-    game.versionsUrl = missingVersionInfo?.versionsUrl || buildVersionsUrl(gameId, game.name || `ID:${gameId}`);
+  // URLs should already be set from orchestrator
+  // If missingVersionInfo exists, use its URLs
+  if (missingVersionInfo) {
+    game.versionsUrl = missingVersionInfo.versionsUrl || game.versionsUrl || null;
   }
   
   game.missingVersion = !!missingVersionInfo;
-  if (missingVersionInfo) {
-    game.versionsUrl = missingVersionInfo.versionsUrl;
-  }
-  
   game.usedAlternateVersionDims = false;
-  game.correctionUrl = null;
 };
 
-export const updateGameCorrectionUrl = (game, versionId) => {
-  if (hasMissingDimensions(game.dimensions)) {
-    const versionIdForCorrection = extractVersionId(game, versionId);
-    game.correctionUrl = versionIdForCorrection ? buildCorrectionUrl(versionIdForCorrection) : null;
-  }
-};
 
 export const removeInternalProperties = (game) => {
   if (game._group !== undefined || '_group' in game) {

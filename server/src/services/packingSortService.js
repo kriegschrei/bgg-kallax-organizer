@@ -1,4 +1,4 @@
-import { extractBaseGameId, extractVersionId } from '../utils/gameUtils.js';
+import { getSafeGameArea } from '../utils/packingHelpers.js';
 
 const normalizeSortValue = (value) => {
   if (value === undefined || value === null) {
@@ -13,20 +13,19 @@ const normalizeSortValue = (value) => {
 const getGameSortValue = (game, field) => {
   switch (field) {
     case 'gameName':
-      return normalizeSortValue(game.name);
+      return normalizeSortValue(game.gameName || game.name || '');
     case 'versionName':
       return normalizeSortValue(game.versionName);
     case 'gameId': {
-      const id = extractBaseGameId(game);
-      return id ? Number.parseInt(id, 10) : Number.MAX_SAFE_INTEGER;
+      const id = game.gameId;
+      return Number.isInteger(id) && id > 0 ? id : Number.MAX_SAFE_INTEGER;
     }
     case 'versionId': {
-      const versionId = extractVersionId(game, game.selectedVersionId);
-      if (!versionId || versionId === 'default') {
+      const versionId = game.versionId;
+      if (!Number.isInteger(versionId) || versionId === -1) {
         return Number.MAX_SAFE_INTEGER;
       }
-      const parsed = Number.parseInt(versionId, 10);
-      return Number.isNaN(parsed) ? versionId : parsed;
+      return versionId;
     }
     case 'categories':
       return normalizeSortValue(game.categories?.[0] || '');
@@ -73,8 +72,8 @@ export const compareGames = (game1, game2, sortRules) => {
 
 export const sortGamesByArea = (games) => {
   return [...games].sort((a, b) => {
-    const areaA = (a.dims2D?.x || 0) * (a.dims2D?.y || 0);
-    const areaB = (b.dims2D?.x || 0) * (b.dims2D?.y || 0);
+    const areaA = getSafeGameArea(a);
+    const areaB = getSafeGameArea(b);
     return areaB - areaA;
   });
 };

@@ -43,7 +43,7 @@ const groupExpansionsWithBaseGames = (games, allGameIds) => {
       circularRefCount += 1;
       if (circularRefCount <= 3) {
         console.error(
-          `   ❌ Found circular ref in game "${games[i].name || 'unknown'}" (id: ${games[i].id})`,
+          `   ❌ Found circular ref in game "${games[i].gameName || games[i].name || 'unknown'}" (id: ${games[i].id})`,
         );
       }
     }
@@ -71,12 +71,16 @@ const groupExpansionsWithBaseGames = (games, allGameIds) => {
     if (game.isExpansion && game.baseGameId) {
       const baseId = game.baseGameId;
 
-      const baseGameInCollection =
-        allGameIds.has(baseId) ||
-        Array.from(allGameIds).some((id) => {
+      let baseGameInCollection = allGameIds.has(baseId);
+      if (!baseGameInCollection) {
+        for (const id of allGameIds) {
           const gameBaseId = getBaseId({ id });
-          return gameBaseId === baseId;
-        });
+          if (gameBaseId === baseId) {
+            baseGameInCollection = true;
+            break;
+          }
+        }
+      }
 
       if (baseGameInCollection) {
         if (!groups.has(baseId)) {

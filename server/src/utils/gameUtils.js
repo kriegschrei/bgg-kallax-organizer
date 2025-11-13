@@ -1,3 +1,5 @@
+import he from 'he';
+
 export const slugifyName = (name) => {
   if (!name || typeof name !== 'string') {
     return 'game';
@@ -14,23 +16,23 @@ export const slugifyName = (name) => {
   );
 };
 
-export const buildVersionsUrl = (gameId, gameName) => {
+/**
+ * Builds both correctionUrl and versionsUrl for a game.
+ * @param {number|string} gameId - The game ID
+ * @param {number|string|null} versionId - The version ID (optional)
+ * @param {string} gameName - The game name for URL slug generation
+ * @returns {Object} Object with correctionUrl and versionsUrl properties
+ */
+export const buildGameUrls = (gameId, versionId, gameName) => {
   const slug = slugifyName(gameName);
-  return `https://boardgamegeek.com/boardgame/${gameId}/${slug}/versions`;
-};
-
-export const buildCorrectionUrl = (versionId) => {
-  if (!versionId) {
-    return null;
-  }
-  return `https://boardgamegeek.com/item/correction/boardgameversion/${versionId}`;
-};
-
-export const buildGameCorrectionUrl = (gameId) => {
-  if (!gameId) {
-    return null;
-  }
-  return `https://boardgamegeek.com/item/correction/boardgame/${gameId}`;
+  const versionsUrl = `https://boardgamegeek.com/boardgame/${gameId}/${slug}/versions`;
+  
+  const correctionUrl =
+    versionId && versionId > 0
+      ? `https://boardgamegeek.com/item/correction/boardgameversion/${versionId}`
+      : `https://boardgamegeek.com/item/correction/boardgame/${gameId}`;
+  
+  return { correctionUrl, versionsUrl };
 };
 
 export const extractVersionId = (game, fallbackVersionId = null) => {
@@ -95,6 +97,46 @@ export const extractBaseGameId = (game) => {
 export const normalizeUsername = (username) =>
   username ? username.toString().toLowerCase() : username;
 
+/**
+ * Unescapes HTML/XML entities and escaped characters in a string.
+ * Uses the 'he' library for robust HTML entity decoding.
+ * Also handles backward compatibility with \' escape sequence.
+ * @param {*} value - The value to unescape
+ * @returns {string|*} The unescaped string or the original value if not a string
+ */
+export const unescapeName = (value) => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  // Handle backward compatibility: \' → '
+  const normalized = value.replace(/\\'/g, "'");
+  
+  // Use he.decode to handle all HTML/XML entities
+  return he.decode(normalized);
+};
+
+/**
+ * Gets the game name from a game object, falling back to gameId if not available.
+ * @param {Object} game - The game object
+ * @param {string|number|null} fallbackGameId - The game ID to use in fallback (optional)
+ * @returns {string} The game name or fallback ID string
+ */
+export const getGameName = (game, fallbackGameId = null) => {
+  return game?.gameName || game?.name || (fallbackGameId ? `ID:${fallbackGameId}` : `ID:${game?.gameId || 'Unknown'}`);
+};
+
+/**
+ * Creates a display name from gameName and versionName.
+ * Returns "gameName (versionName)" if versionName exists, otherwise just "gameName".
+ * Falls back to gameId if gameName is not available.
+ */
+export const createDisplayName = (game, fallbackGameId = null) => {
+  const gameName = game?.gameName || game?.name || (fallbackGameId ? `ID:${fallbackGameId}` : 'Unknown Game');
+  const versionName = game?.versionName || null;
+  return versionName ? `${gameName} (${versionName})` : gameName;
+};
+
 export const COLLECTION_STATUS_KEYS = [
   'own',
   'preordered',
@@ -105,40 +147,4 @@ export const COLLECTION_STATUS_KEYS = [
   'wanttobuy',
   'wishlist',
 ];
-
-export const COLLECTION_STATUS_SET = new Set(COLLECTION_STATUS_KEYS);
-
-export const isStatusActive = (value) => {
-  if (value === undefined || value === null) {
-    return false;
-  }
-  if (typeof value === 'number') {
-    return Number.isFinite(value) && value !== 0;
-  }
-  if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
-    if (
-      normalized === '1' ||
-      normalized === 'true' ||
-      normalized === 'yes' ||
-      normalized === 'y'
-    ) {
-      return true;
-    }
-    if (
-      normalized === '' ||
-      normalized === '0' ||
-      normalized === 'false' ||
-      normalized === 'no' ||
-      normalized === 'n'
-    ) {
-      return false;
-    }
-    const numeric = Number.parseFloat(normalized);
-    if (Number.isFinite(numeric)) {
-      return numeric !== 0;
-    }
-  }
-  return Boolean(value);
-};
 

@@ -1,6 +1,14 @@
-import { hasMissingDimensions } from '../utils/gameProcessingHelpers.js';
+import { checkMissingDimensions } from '../utils/gameProcessingHelpers.js';
 import { calculateStatsSummary, getOversizedStuffedGames } from './packingService.js';
 import { PACKING_DISPLAY_CONSTANTS } from './packingCubeService.js';
+import { getSafeGameArea } from '../utils/packingHelpers.js';
+import {
+  normalizePositiveNumber,
+  normalizeNumber,
+  toIntegerOrFallback,
+} from '../utils/numberUtils.js';
+import { cloneList } from '../utils/arrayUtils.js';
+import { getGameName } from '../utils/gameUtils.js';
 
 const DIMENSION_PRIORITY = ['user', 'version', 'guessed', 'default'];
 const STATUS_KEYS = [
@@ -14,56 +22,11 @@ const STATUS_KEYS = [
   'preordered',
 ];
 
-const normalizePositiveNumber = (value) =>
-  Number.isFinite(value) && value > 0 ? value : null;
-
-const normalizeNumber = (value, fallback = 0) =>
-  Number.isFinite(value) ? value : fallback;
-
-const toIntegerOrFallback = (value, fallback = -1) =>
-  Number.isInteger(value) ? value : fallback;
-
-const cloneList = (value) => (Array.isArray(value) ? [...value] : []);
-
 const CUBE_DISPLAY_AREA =
   PACKING_DISPLAY_CONSTANTS.DISPLAY_KALLAX_WIDTH *
   PACKING_DISPLAY_CONSTANTS.DISPLAY_KALLAX_HEIGHT;
 
 const clampPercentage = (value) => Math.min(Math.max(value, 0), 100);
-
-const computeGameArea = (game) => {
-  if (Number.isFinite(game.area) && game.area > 0) {
-    return game.area;
-  }
-
-  const length =
-    Number.isFinite(game.dimensions?.length) && game.dimensions.length > 0
-      ? game.dimensions.length
-      : null;
-  const width =
-    Number.isFinite(game.dimensions?.width) && game.dimensions.width > 0
-      ? game.dimensions.width
-      : null;
-
-  if (length && width) {
-    return length * width;
-  }
-
-  const packedWidth =
-    Number.isFinite(game.packedDims?.x) && game.packedDims.x > 0
-      ? game.packedDims.x
-      : null;
-  const packedHeight =
-    Number.isFinite(game.packedDims?.y) && game.packedDims.y > 0
-      ? game.packedDims.y
-      : null;
-
-  if (packedWidth && packedHeight) {
-    return packedWidth * packedHeight;
-  }
-
-  return 0;
-};
 
 const buildDimensionEntry = (type, source) => {
   if (!source) {
@@ -76,7 +39,10 @@ const buildDimensionEntry = (type, source) => {
     width: normalizePositiveNumber(source.width),
     depth: normalizePositiveNumber(source.depth),
     weight: normalizePositiveNumber(source.weight),
-    missingDimensions: Boolean(source.missingDimensions),
+    missing: Boolean(source.missing ?? 
+      (source.length == null || source.length === 0 ||
+       source.width == null || source.width === 0 ||
+       source.depth == null || source.depth === 0)),
   };
 };
 
@@ -97,7 +63,7 @@ const buildDimensions = (game) => {
       width: game.dimensions?.width,
       depth: game.dimensions?.depth,
       weight: game.dimensions?.weight,
-      missingDimensions: game.dimensions?.missingDimensions ?? true,
+      missing: game.dimensions?.missing ?? true,
     };
     const entry = buildDimensionEntry(
       game.selectedDimensionSource || 'version',
@@ -118,9 +84,15 @@ const buildStatuses = (statuses = {}) => {
   }, {});
 };
 
-const buildStartPosition = (game) => ({
+const buildPosition = (game) => ({
   x: normalizeNumber(game.position?.x, 0),
   y: normalizeNumber(game.position?.y, 0),
+});
+
+const buildPackedDims = (game) => ({
+  x: normalizeNumber(game.packedDims?.x, 0),
+  y: normalizeNumber(game.packedDims?.y, 0),
+  z: normalizeNumber(game.packedDims?.z, 0),
 });
 
 const buildOversized = (game) => {
@@ -158,7 +130,7 @@ const transformGameForResponse = (game) => {
     gameId: toIntegerOrFallback(game.gameId, -1),
     versionId: toIntegerOrFallback(game.versionId, -1),
     versionKey: String(game.versionKey ?? game.id ?? ''),
-    gameName: game.gameName || game.name || `ID:${game.gameId}`,
+    gameName: getGameName(game, game.gameId),
     versionName: game.versionName || game.name || `ID:${game.versionId}`,
     collectionId: toIntegerOrFallback(game.collectionId, -1),
     gamePublishedYear: toIntegerOrFallback(game.gamePublishedYear, -1),
@@ -167,7 +139,8 @@ const transformGameForResponse = (game) => {
     subType: normalizedSubtype,
     statuses: buildStatuses(game.statuses),
     dimensions: buildDimensions(game),
-    startPosition: buildStartPosition(game),
+    position: buildPosition(game),
+    packedDims: buildPackedDims(game),
     oversized: buildOversized(game),
     categories: cloneList(game.categories),
     mechanics: cloneList(game.mechanics),
@@ -187,9 +160,6 @@ const transformGameForResponse = (game) => {
     numplays: toIntegerOrFallback(game.numplays, 0),
     volume: Number.isFinite(game.volume) ? game.volume : -1,
     area: Number.isFinite(game.area) ? game.area : -1,
-    missingDimensions: Boolean(
-      game.missingDimensions ?? hasMissingDimensions(game.dimensions),
-    ),
     missingVersion: Boolean(game.missingVersion),
     versionsUrl: game.versionsUrl || null,
     usedAlternateVersionDims: Boolean(game.usedAlternateVersionDims),
@@ -207,14 +177,14 @@ const transformGameForResponse = (game) => {
   return response;
 };
 
-const buildCubeStats = (cube, stacking) => {
+const buildCubeStats = (cube) => {
   const totalGames = Array.isArray(cube.games) ? cube.games.length : 0;
   const totalAreaUsed = (cube.games || []).reduce(
-    (sum, game) => sum + computeGameArea(game),
+    (sum, game) => sum + getSafeGameArea(game),
     0,
   );
   const cubeArea = CUBE_DISPLAY_AREA > 0 ? CUBE_DISPLAY_AREA : 1;
-  const utilization =
+  const totalUtilization =
     cubeArea > 0
       ? Number(
           clampPercentage((totalAreaUsed / cubeArea) * 100).toFixed(1),
@@ -225,7 +195,7 @@ const buildCubeStats = (cube, stacking) => {
     totalGames,
     areaUsed: Number(totalAreaUsed.toFixed(2)),
     areaCapacity: cubeArea,
-    utilization,
+    totalUtilization,
   };
 };
 
@@ -245,7 +215,7 @@ const buildDimensionSummary = (cubes) => {
       if (game.usedAlternateVersionDims) {
         summary.selectedVersionFallbackCount += 1;
       }
-      if (hasMissingDimensions(game.dimensions)) {
+      if (checkMissingDimensions(game.dimensions)) {
         summary.missingDimensionCount += 1;
       }
       if (game.oversizedX || game.oversizedY) {
@@ -265,6 +235,8 @@ const normalizeOversizedGames = (packedCubes, oversizedExcludedGames) => {
     const entry = {
       id: String(item.id),
       name: item.name,
+      gameName: item.gameName || null,
+      versionName: item.versionName || null,
       status: item.status,
       correctionUrl: item.correctionUrl ?? null,
       versionsUrl: item.versionsUrl ?? null,
@@ -281,6 +253,8 @@ const normalizeOversizedGames = (packedCubes, oversizedExcludedGames) => {
       const entry = {
         id: String(item.id),
         name: item.name,
+        gameName: item.gameName || null,
+        versionName: item.versionName || null,
         status: item.status || 'excluded',
         correctionUrl: item.correctionUrl ?? null,
         versionsUrl: item.versionsUrl ?? null,
@@ -311,7 +285,7 @@ export const serializeCubesResponse = (
   const stats = calculateStatsSummary(packedCubes, stacking);
   const cubes = packedCubes.map((cube) => ({
     id: cube.id,
-    stats: buildCubeStats(cube, stacking),
+    stats: buildCubeStats(cube),
     games: (cube.games || []).map(transformGameForResponse),
   }));
 

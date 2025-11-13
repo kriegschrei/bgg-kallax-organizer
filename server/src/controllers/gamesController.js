@@ -8,7 +8,29 @@ import {
   scheduleProgressCleanup,
 } from '../services/progressService.js';
 import { processGamesRequest } from '../services/gamesService.js';
-import { GAMES_RESPONSE_JSON } from '../services/configService.js';
+import {
+  GAMES_REQUEST_JSON,
+  GAMES_RESPONSE_JSON,
+} from '../services/configService.js';
+
+const logGamesRequest = async (payload) => {
+  if (!GAMES_REQUEST_JSON) {
+    return;
+  }
+
+  try {
+    await writeFile(
+      GAMES_REQUEST_JSON,
+      JSON.stringify(payload, null, 2),
+      'utf8',
+    );
+  } catch (logError) {
+    console.error(
+      `⚠️ Failed to write games request JSON to "${GAMES_REQUEST_JSON}":`,
+      logError,
+    );
+  }
+};
 
 const logGamesResponse = async (payload) => {
   if (!GAMES_RESPONSE_JSON) {
@@ -51,6 +73,9 @@ export const handleGamesRequest = async (req, res) => {
 
   const requestId =
     req.get('x-request-id')?.toString() || `${username}-${Date.now()}`;
+
+  const normalizedPayload = { ...payload, username };
+  await logGamesRequest(normalizedPayload);
 
   registerRequest(requestId);
 

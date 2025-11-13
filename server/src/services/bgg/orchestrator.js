@@ -13,17 +13,13 @@ import { bggApiRequest } from './apiClient.js';
 import { xmlToJson } from './xmlParser.js';
 import { mapCollectionItems, generateCollectionHash } from './collectionMapper.js';
 import { mapThingItem, mapVersionItems } from './thingMapper.js';
-import { buildCorrectionUrl, buildVersionsUrl, buildGameCorrectionUrl } from '../../utils/gameUtils.js';
+import { buildGameUrls } from '../../utils/gameUtils.js';
+import { ensureArray } from '../../utils/arrayUtils.js';
+import { hasValidDimensions } from '../../utils/gameProcessingHelpers.js';
+import { isPositiveFinite, isNonNegativeInteger } from '../../utils/numberUtils.js';
 
 const COLLECTION_MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
-
-const ensureArray = (value) => {
-  if (!value) {
-    return [];
-  }
-  return Array.isArray(value) ? value : [value];
-};
 
 const buildCollectionKey = (username, includeStatuses = [], includeExpansions = true) => {
   const includeKeySegment = includeStatuses.slice().sort().join('|') || 'none';
@@ -204,27 +200,17 @@ const collectCachedData = (collectionItems) => {
       const cachedVersion = getVersion(gameId, normalizedVersionId);
       if (cachedVersion) {
         const dimensions = cachedVersion.dimensions;
-        const length =
-          Number.isFinite(cachedVersion.length) && cachedVersion.length > 0
-            ? cachedVersion.length
-            : dimensions?.length;
-        const width =
-          Number.isFinite(cachedVersion.width) && cachedVersion.width > 0
-            ? cachedVersion.width
-            : dimensions?.width;
-        const depth =
-          Number.isFinite(cachedVersion.depth) && cachedVersion.depth > 0
-            ? cachedVersion.depth
-            : dimensions?.depth;
-        const hasValidDimensions =
-          Number.isFinite(length) &&
-          Number.isFinite(width) &&
-          Number.isFinite(depth) &&
-          length > 0 &&
-          width > 0 &&
-          depth > 0;
+        const length = isPositiveFinite(cachedVersion.length)
+          ? cachedVersion.length
+          : dimensions?.length;
+        const width = isPositiveFinite(cachedVersion.width)
+          ? cachedVersion.width
+          : dimensions?.width;
+        const depth = isPositiveFinite(cachedVersion.depth)
+          ? cachedVersion.depth
+          : dimensions?.depth;
 
-        if (hasValidDimensions) {
+        if (hasValidDimensions({ length, width, depth })) {
           cachedVersions.set(key, cachedVersion);
         } else {
           gamesToRefresh.add(gameId);
@@ -288,9 +274,6 @@ const DEFAULT_DIMENSIONS = {
   depth: -1,
 };
 
-const unescapeName = (value) =>
-  typeof value === 'string' ? value.replace(/\\'/g, "'") : value;
-
 const buildVersionEntry = ({
   item,
   game,
@@ -302,49 +285,41 @@ const buildVersionEntry = ({
   versionLookup,
 }) => {
   const normalizedVersionId = Number.isInteger(versionId) ? versionId : -1;
-  const missingDimensions = versionData ? versionData.missingDimensions : true;
-  const normalizedWeight =
-    versionData && Number.isFinite(versionData.weight) && versionData.weight > 0
-      ? versionData.weight
-      : null;
+  const normalizedWeight = versionData && isPositiveFinite(versionData.weight)
+    ? versionData.weight
+    : null;
+  
   const derivedDimensions = versionData
     ? {
         length: versionData.length,
         width: versionData.width,
         depth: versionData.depth,
         weight: normalizedWeight,
-        missingDimensions,
+        missing: versionData.missingDimensions ?? false,
       }
     : {
         length: DEFAULT_DIMENSIONS.length,
         width: DEFAULT_DIMENSIONS.width,
         depth: DEFAULT_DIMENSIONS.depth,
         weight: null,
-        missingDimensions: true,
+        missing: true,
       };
-  const volume =
-    !missingDimensions && versionData && Number.isFinite(versionData.volume)
-      ? versionData.volume
-      : -1;
-  const area =
-    !missingDimensions && versionData && Number.isFinite(versionData.area)
-      ? versionData.area
-      : -1;
+  
+  const missingDimensions = derivedDimensions.missing;
+  const volume = !missingDimensions && versionData && isPositiveFinite(versionData.volume)
+    ? versionData.volume
+    : -1;
+  const area = !missingDimensions && versionData && isPositiveFinite(versionData.area)
+    ? versionData.area
+    : -1;
   const versionKey =
     versionData?.versionKey ||
     `${gameId}-${normalizedVersionId !== -1 ? normalizedVersionId : 'default'}`;
-  const gameName = unescapeName(
-    item.name || game?.name || versionNameRaw || `Game ${gameId}`,
-  );
-  const versionsUrl = buildVersionsUrl(gameId, gameName);
-  const correctionUrl =
-    normalizedVersionId > 0
-      ? buildCorrectionUrl(normalizedVersionId)
-      : buildGameCorrectionUrl(gameId);
+  const gameName = item.name || game?.name || versionData?.name || `Game ${gameId}`;
+  const { correctionUrl, versionsUrl } = buildGameUrls(gameId, normalizedVersionId, gameName);
 
   const versionLanguage = versionData?.language || item.language || null;
-  const versionYear =
-    Number.isInteger(versionData?.versionYearPublished) &&
+  const versionYear = isNonNegativeInteger(versionData?.versionYearPublished) &&
     versionData.versionYearPublished > 0
       ? versionData.versionYearPublished
       : null;
@@ -358,60 +333,45 @@ const buildVersionEntry = ({
 
   const alternateVersions =
     missingDimensions || normalizedVersionId === -1
-      ? alternateCandidates.map((version) => {
-          const cleanedName = unescapeName(version.name);
-          const volumeValue =
-            Number.isFinite(version.volume) && version.volume > 0
-              ? version.volume
-              : version.length * version.width * version.depth;
-          const areaValue =
-            Number.isFinite(version.area) && version.area > 0
-              ? version.area
-              : (() => {
-                  const dims = [version.length, version.width, version.depth]
-                    .filter((value) => Number.isFinite(value) && value > 0)
-                    .sort((a, b) => a - b);
-                  return dims.length >= 2 ? dims[0] * dims[1] : -1;
-                })();
-          const altWeight =
-            Number.isFinite(version.weight) && version.weight > 0
-              ? version.weight
-              : null;
+      ? alternateCandidates.length > 0
+        ? [
+            (() => {
+              const version = alternateCandidates[0];
+              const altWeight = isPositiveFinite(version.weight) ? version.weight : null;
 
-          return {
-            versionId: version.versionId,
-            versionKey: version.versionKey,
-            name: cleanedName,
-            length: version.length,
-            width: version.width,
-            depth: version.depth,
-            weight: altWeight,
-            dimensions: {
-              length: version.length,
-              width: version.width,
-              depth: version.depth,
-              weight: altWeight,
-              missingDimensions: false,
-            },
-            volume: volumeValue,
-            area: areaValue,
-            language: version.language,
-            versionYearPublished: version.versionYearPublished,
-          };
-        })
+              return {
+                versionId: version.versionId,
+                versionKey: version.versionKey,
+                name: version.name,
+                length: version.length,
+                width: version.width,
+                depth: version.depth,
+                weight: altWeight,
+                dimensions: {
+                  length: version.length,
+                  width: version.width,
+                  depth: version.depth,
+                  weight: altWeight,
+                  missing: false,
+                },
+                volume: isPositiveFinite(version.volume) ? version.volume : -1,
+                area: isPositiveFinite(version.area) ? version.area : -1,
+                language: version.language,
+                versionYearPublished: version.versionYearPublished,
+              };
+            })(),
+          ]
+        : []
       : [];
 
   const objectType = game?.type || item.objecttype || item.subtype || null;
   const subtype = item.subtype || objectType || null;
-  const gamePublishedYear =
-    Number.isInteger(game?.gamePublishedYear) && game.gamePublishedYear >= 0
-      ? game.gamePublishedYear
-      : -1;
-  const versionPublishedYear =
-    Number.isInteger(versionData?.versionYearPublished) &&
-    versionData.versionYearPublished >= 0
-      ? versionData.versionYearPublished
-      : -1;
+  const gamePublishedYear = isNonNegativeInteger(game?.gamePublishedYear)
+    ? game.gamePublishedYear
+    : -1;
+  const versionPublishedYear = isNonNegativeInteger(versionData?.versionYearPublished)
+    ? versionData.versionYearPublished
+    : -1;
 
   return {
     versionKey,
@@ -457,7 +417,6 @@ const buildVersionEntry = ({
     dimensions: derivedDimensions,
     volume,
     area,
-    missingDimensions,
     alternateVersions,
     lastModified: item.lastModified || null,
     numplays: item.numplays ?? 0,

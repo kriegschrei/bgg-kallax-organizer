@@ -1,36 +1,49 @@
-import { calculate2DDimensions, PACKING_CONSTANTS } from './packingPositionService.js';
+import { calculateBothOrientations, PACKING_CONSTANTS } from './packingPositionService.js';
 import { createOversizedExcludedGame, PACKING_DISPLAY_CONSTANTS } from './packingCubeService.js';
 import { splitOversizedGroup, getGroupRepresentative, getGroupTotalArea } from './packingGroupService.js';
 import { compareGames, sortGamesByArea } from './packingSortService.js';
 import { tryPlaceGame, tryAggressiveReorganization, calculateOccupiedAreaForCube } from './packingPlacementService.js';
 import { createGameGroups } from './groupingService.js';
+import { getSafeGameArea, selectCubesToCheck, MAX_GROUP_AREA } from '../utils/packingHelpers.js';
+import { getGameName } from '../utils/gameUtils.js';
+import { hasValidDimensions } from '../utils/gameProcessingHelpers.js';
 
-const { CUBE_SIZE } = PACKING_CONSTANTS;
+const { CUBE_SIZE, CUBE_AREA } = PACKING_CONSTANTS;
 const { OVERSIZED_THRESHOLD } = PACKING_DISPLAY_CONSTANTS;
 
+/* 
+ * Prepare games for packing by calculating 2D dimensions and checking for oversized games.
+ * @param {Array} games - The games to prepare for packing.
+ * @param {string} primaryOrder - The primary order of the games.
+ * @param {boolean} fitOversized - Whether to fit oversized games into the cubes.
+ * @returns {Object} An object containing the valid games and oversized excluded games.
+ */
 export const prepareGamesForPacking = (games, primaryOrder, fitOversized) => {
   const oversizedExcludedGames = [];
 
   for (const game of games) {
-    if (
-      !game.dimensions ||
-      !game.dimensions.length ||
-      !game.dimensions.width ||
-      !game.dimensions.depth
-    ) {
-      console.error(`❌ Game "${game.name}" has invalid dimensions`);
+    if (!hasValidDimensions(game.dimensions)) {
+      const gameName = getGameName(game, game.gameId);
+      console.error(`❌ Game "${gameName}" has invalid dimensions`);
       game.dims2D = null;
       continue;
     }
-    const forcedOrientation =
-      game.forcedOrientation === 'horizontal' || game.forcedOrientation === 'vertical'
-        ? game.forcedOrientation
-        : null;
-    const orientationToUse = forcedOrientation || primaryOrder;
-    game.dims2D = calculate2DDimensions(game.dimensions, orientationToUse);
-    game.primaryOrientation = orientationToUse;
+    
+    // Calculate both orientations at once
+    const orientations = calculateBothOrientations(game.dimensions);
+    
+    game.dims2D = {
+      horizontal: orientations.horizontal,
+      vertical: orientations.vertical,
+    };
+    
+    const primaryOrientation = game.forcedOrientation || game.primaryOrientation || primaryOrder;
+    game.primaryOrientation = primaryOrientation;
+    
+    // Use primary orientation for oversized check
+    const primaryDims = primaryOrientation === 'vertical' ? orientations.vertical : orientations.horizontal;
     game.exceedsMaxDimension =
-      game.dims2D.x > OVERSIZED_THRESHOLD || game.dims2D.y > OVERSIZED_THRESHOLD;
+      primaryDims.x > OVERSIZED_THRESHOLD || primaryDims.y > OVERSIZED_THRESHOLD;
 
     if (game.exceedsMaxDimension && !fitOversized) {
       oversizedExcludedGames.push(createOversizedExcludedGame(game));
@@ -38,7 +51,7 @@ export const prepareGamesForPacking = (games, primaryOrder, fitOversized) => {
   }
 
   const validGames = games.filter((g) => {
-    if (!g.dims2D || g.dims2D.x <= 0 || g.dims2D.y <= 0) {
+    if (!g.dims2D || !g.dims2D.horizontal || !g.dims2D.vertical) {
       return false;
     }
 
@@ -55,7 +68,6 @@ export const prepareGamesForPacking = (games, primaryOrder, fitOversized) => {
 export const processGameGroups = (validGames, groupExpansions, groupSeries) => {
   let gameGroups = new Map();
   let standaloneGames = [...validGames];
-  const MAX_GROUP_AREA = CUBE_SIZE * CUBE_SIZE * 0.95;
 
   if (groupExpansions || groupSeries) {
     const groupingResult = createGameGroups(validGames, groupExpansions, groupSeries);
@@ -112,7 +124,17 @@ export const sortGroupsAndStandaloneGames = (gameGroups, standaloneGames, sortRu
   }
 
   if (standaloneGames.length > 0) {
-    standaloneGames.sort((a, b) => compareGames(a, b, sortRules));
+    if (optimizeSpace) {
+      // Sort by area descending when optimizing space
+      standaloneGames.sort((a, b) => {
+        const areaA = getSafeGameArea(a);
+        const areaB = getSafeGameArea(b);
+        if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
+        return compareGames(a, b, sortRules);
+      });
+    } else {
+      standaloneGames.sort((a, b) => compareGames(a, b, sortRules));
+    }
   }
 
   return { sortedGroups, standaloneGames };
@@ -123,22 +145,49 @@ export const buildOrientations = (game, primaryOrder, lockRotation) => {
     game.forcedOrientation === 'horizontal' || game.forcedOrientation === 'vertical'
       ? game.forcedOrientation
       : null;
+  
   const orientations = [];
+  
+  // Use pre-computed dimensions
+  const horizontalDims = game.dims2D?.horizontal;
+  const verticalDims = game.dims2D?.vertical;
+  
+  if (!horizontalDims || !verticalDims) {
+    // Fallback (shouldn't happen if prepareGamesForPacking ran)
+    return [];
+  }
+  
   if (forcedOrientation) {
-    orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: forcedOrientation });
+    const forcedDims = forcedOrientation === 'horizontal' ? horizontalDims : verticalDims;
+    orientations.push({ x: forcedDims.x, y: forcedDims.y, label: forcedOrientation });
   } else {
     const primary = game.primaryOrientation || primaryOrder;
-    orientations.push({ x: game.dims2D.x, y: game.dims2D.y, label: primary });
-    if (!lockRotation && Math.abs(game.dims2D.x - game.dims2D.y) > 0.01) {
-      const alternate = primary === 'vertical' ? 'horizontal' : 'vertical';
-      orientations.push({ x: game.dims2D.y, y: game.dims2D.x, label: alternate });
+    
+    // Add primary orientation first
+    if (primary === 'horizontal') {
+      orientations.push({ x: horizontalDims.x, y: horizontalDims.y, label: 'horizontal' });
+      // Add alternate if rotation is not locked and dimensions differ
+      if (!lockRotation && Math.abs(horizontalDims.x - verticalDims.x) > 0.01) {
+        orientations.push({ x: verticalDims.x, y: verticalDims.y, label: 'vertical' });
+      }
+    } else {
+      orientations.push({ x: verticalDims.x, y: verticalDims.y, label: 'vertical' });
+      // Add alternate if rotation is not locked and dimensions differ
+      if (!lockRotation && Math.abs(horizontalDims.x - verticalDims.x) > 0.01) {
+        orientations.push({ x: horizontalDims.x, y: horizontalDims.y, label: 'horizontal' });
+      }
     }
   }
+  
   return orientations;
 };
 
 export const tryPlaceGroup = (cube, group, primaryOrder, lockRotation, placed) => {
-  const tempCube = { games: [...cube.games], rows: [] };
+  const tempCube = { 
+    games: [...cube.games], 
+    rows: [],
+    occupiedArea: cube.occupiedArea !== undefined ? cube.occupiedArea : 0
+  };
   const groupPlaced = [];
 
   const sortedGroup = sortGamesByArea(group);
@@ -171,6 +220,7 @@ export const tryPlaceGroup = (cube, group, primaryOrder, lockRotation, placed) =
   }
 
   cube.games = tempCube.games;
+  cube.occupiedArea = tempCube.occupiedArea;
   for (const game of groupPlaced) {
     placed.add(game.id);
   }
@@ -194,23 +244,12 @@ export const placeStandaloneGame = (
 
   let wasPlaced = false;
 
-  let cubesToCheck = [];
-  if (optimizeSpace) {
-    cubesToCheck = [...cubes].sort((a, b) => {
-      const occupiedA = calculateOccupiedAreaForCube(a);
-      const occupiedB = calculateOccupiedAreaForCube(b);
-      return occupiedB - occupiedA;
-    });
-  } else if (respectSortOrder) {
-    if (cubes.length > 0) {
-      cubesToCheck = [cubes[cubes.length - 1]];
-    }
-  } else if (cubes.length > 0) {
-    cubesToCheck = [cubes[cubes.length - 1]];
-    if (cubes.length > 1) {
-      cubesToCheck.unshift(cubes[cubes.length - 2]);
-    }
-  }
+  const cubesToCheck = selectCubesToCheck(
+    cubes,
+    optimizeSpace,
+    respectSortOrder,
+    calculateOccupiedAreaForCube,
+  );
 
   for (const cube of cubesToCheck) {
     for (const orientation of orientations) {
@@ -222,30 +261,27 @@ export const placeStandaloneGame = (
     }
     if (wasPlaced) break;
 
-    if (!wasPlaced) {
-      for (const orientation of orientations) {
-        if (
-          tryAggressiveReorganization(
-            cube,
-            game,
-            orientation.x,
-            orientation.y,
-            sortRules,
-            optimizeSpace,
-            orientation.label,
-          )
-        ) {
-          placed.add(game.id);
-          wasPlaced = true;
-          break;
-        }
+    for (const orientation of orientations) {
+      if (
+        tryAggressiveReorganization(
+          cube,
+          game,
+          orientation.x,
+          orientation.y,
+          sortRules,
+          orientation.label,
+        )
+      ) {
+        placed.add(game.id);
+        wasPlaced = true;
+        break;
       }
-      if (wasPlaced) break;
     }
+    if (wasPlaced) break;
   }
 
   if (!wasPlaced) {
-    const newCube = { games: [], rows: [] };
+    const newCube = { games: [], rows: [], occupiedArea: 0 };
 
     for (const orientation of orientations) {
       if (tryPlaceGame(newCube, game, orientation.x, orientation.y, orientation.label)) {
@@ -277,23 +313,12 @@ export const placeGroups = (
 
     let groupPlaced = false;
 
-    let cubesToCheck = [];
-    if (optimizeSpace) {
-      cubesToCheck = [...cubes].sort((a, b) => {
-        const occupiedA = calculateOccupiedAreaForCube(a);
-        const occupiedB = calculateOccupiedAreaForCube(b);
-        return occupiedB - occupiedA;
-      });
-    } else if (respectSortOrder) {
-      if (cubes.length > 0) {
-        cubesToCheck = [cubes[cubes.length - 1]];
-      }
-    } else if (cubes.length > 0) {
-      cubesToCheck = [cubes[cubes.length - 1]];
-      if (cubes.length > 1) {
-        cubesToCheck.unshift(cubes[cubes.length - 2]);
-      }
-    }
+    const cubesToCheck = selectCubesToCheck(
+      cubes,
+      optimizeSpace,
+      respectSortOrder,
+      calculateOccupiedAreaForCube,
+    );
 
     for (const cube of cubesToCheck) {
       if (tryPlaceGroup(cube, group, primaryOrder, lockRotation, placed)) {
@@ -303,7 +328,7 @@ export const placeGroups = (
     }
 
     if (!groupPlaced) {
-      const newCube = { games: [], rows: [] };
+      const newCube = { games: [], rows: [], occupiedArea: 0 };
       if (tryPlaceGroup(newCube, group, primaryOrder, lockRotation, placed)) {
         cubes.push(newCube);
         groupPlaced = true;

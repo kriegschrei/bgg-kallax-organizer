@@ -1,11 +1,13 @@
 import { findPosition, PACKING_CONSTANTS } from './packingPositionService.js';
 import { checkAndImproveStability } from './packingStabilityService.js';
 import { compareGames, sortGamesByArea } from './packingSortService.js';
+import { PACKING_DISPLAY_CONSTANTS } from './packingCubeService.js';
+import { getSafeGameArea } from '../utils/packingHelpers.js';
 
-const { CUBE_SIZE, GRID_PRECISION } = PACKING_CONSTANTS;
-const OVERSIZED_THRESHOLD = 13;
+const { CUBE_SIZE, CUBE_AREA, GRID_PRECISION } = PACKING_CONSTANTS;
+const { OVERSIZED_THRESHOLD } = PACKING_DISPLAY_CONSTANTS;
 
-const calculateOccupiedArea = (cube) => {
+export const calculateOccupiedAreaForCube = (cube) => {
   let area = 0;
   for (const game of cube.games) {
     area += game.packedDims.x * game.packedDims.y;
@@ -19,18 +21,17 @@ export const tryPlaceGame = (cube, game, width, height, orientationLabel = null)
   const packedWidth = Math.min(width, CUBE_SIZE);
   const packedHeight = Math.min(height, CUBE_SIZE);
 
-  const sorted = [
-    game.dimensions.length,
-    game.dimensions.width,
-    game.dimensions.depth,
-  ].sort((a, b) => b - a);
-  const depthDimension = sorted[0];
+  const depthDimension = game.maxDepth || 0;
 
   const gameArea = packedWidth * packedHeight;
-  const cubeArea = CUBE_SIZE * CUBE_SIZE;
-  const occupiedArea = calculateOccupiedArea(cube);
+  const cubeArea = CUBE_AREA;
+  
+  // Initialize occupiedArea if not set
+  if (cube.occupiedArea === undefined) {
+    cube.occupiedArea = calculateOccupiedAreaForCube(cube);
+  }
 
-  if (occupiedArea + gameArea > cubeArea) {
+  if (cube.occupiedArea + gameArea > cubeArea) {
     return false;
   }
 
@@ -49,6 +50,9 @@ export const tryPlaceGame = (cube, game, width, height, orientationLabel = null)
         packedWidth >= packedHeight ? 'horizontal' : 'vertical';
     }
     cube.games.push(game);
+    
+    // Update cached occupied area
+    cube.occupiedArea += gameArea;
 
     checkAndImproveStability(cube, game);
 
@@ -64,14 +68,17 @@ export const tryAggressiveReorganization = (
   width,
   height,
   sortRules,
-  optimizeSpace,
   orientationLabel = null,
 ) => {
-  const gameArea = width * height;
-  const cubeArea = CUBE_SIZE * CUBE_SIZE;
-  const occupiedArea = calculateOccupiedArea(cube);
+  const gameArea = getSafeGameArea(newGame) || width * height;
+  const cubeArea = CUBE_AREA;
+  
+  // Initialize occupiedArea if not set
+  if (cube.occupiedArea === undefined) {
+    cube.occupiedArea = calculateOccupiedAreaForCube(cube);
+  }
 
-  if (occupiedArea + gameArea > cubeArea) {
+  if (cube.occupiedArea + gameArea > cubeArea) {
     return false;
   }
 
@@ -81,6 +88,7 @@ export const tryAggressiveReorganization = (
     packedDims: { ...g.packedDims },
     actualDims: { ...g.actualDims },
   }));
+  const originalOccupiedArea = cube.occupiedArea;
 
   const allGames = [
     ...cube.games.map((g) => ({
@@ -96,21 +104,10 @@ export const tryAggressiveReorganization = (
     },
   ];
 
-  if (optimizeSpace) {
-    allGames.sort((a, b) => {
-      const aArea =
-        (a.packedDims?.x || a.dims2D?.x || width) *
-        (a.packedDims?.y || a.dims2D?.y || height);
-      const bArea =
-        (b.packedDims?.x || b.dims2D?.x || width) *
-        (b.packedDims?.y || b.dims2D?.y || height);
-      return bArea - aArea;
-    });
-  } else {
-    allGames.sort((a, b) => compareGames(a, b, sortRules));
-  }
+  allGames.sort((a, b) => compareGames(a, b, sortRules));
 
   cube.games = [];
+  cube.occupiedArea = 0;
 
   let failedToPlace = null;
   for (const gameToPlace of allGames) {
@@ -120,25 +117,22 @@ export const tryAggressiveReorganization = (
     const position = findPosition(cube, gWidth, gHeight);
 
     if (position) {
-      const sorted = [
-        gameToPlace.dimensions.length,
-        gameToPlace.dimensions.width,
-        gameToPlace.dimensions.depth,
-      ].sort((a, b) => b - a);
-      const depthDimension = sorted[0];
+      const depthDimension = gameToPlace.maxDepth || 0;
 
       gameToPlace.position = position;
       gameToPlace.packedDims = { x: gWidth, y: gHeight, z: depthDimension };
       gameToPlace.actualDims = gameToPlace.actualDims || {
         x: gWidth,
         y: gHeight,
-        z: depthDimension,
       };
       const orientationForGame =
         gameToPlace.manualOrientation ||
         (gWidth >= gHeight ? 'horizontal' : 'vertical');
       gameToPlace.appliedOrientation = orientationForGame;
       cube.games.push(gameToPlace);
+      
+      // Update cached occupied area
+      cube.occupiedArea += gWidth * gHeight;
     } else {
       failedToPlace = gameToPlace;
       break;
@@ -149,7 +143,9 @@ export const tryAggressiveReorganization = (
     return true;
   }
 
+  // Restore original state
   cube.games = [];
+  cube.occupiedArea = originalOccupiedArea;
   for (const orig of originalGames) {
     orig.game.position = orig.position;
     orig.game.packedDims = orig.packedDims;
@@ -159,6 +155,4 @@ export const tryAggressiveReorganization = (
 
   return false;
 };
-
-export const calculateOccupiedAreaForCube = calculateOccupiedArea;
 

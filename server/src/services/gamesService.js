@@ -6,17 +6,17 @@ import { serializeCubesResponse } from './responseSerializer.js';
 import {
   DEFAULT_DIMENSIONS,
   getFallbackVersionLabel,
-  hasMissingDimensions,
   removeInternalProperties,
   setupGameVersionMetadata,
-  updateGameCorrectionUrl,
+  checkMissingDimensions,
+  hasValidDimensions,
 } from '../utils/gameProcessingHelpers.js';
 import {
-  buildCorrectionUrl,
-  buildGameCorrectionUrl,
-  buildVersionsUrl,
   COLLECTION_STATUS_KEYS,
+  getGameName,
 } from '../utils/gameUtils.js';
+import { normalizePositiveNumber, isPositiveFinite } from '../utils/numberUtils.js';
+import { getMaxDepthDimension } from '../utils/packingHelpers.js';
 
 const getPrioritiesFromSort = (sort = []) =>
   Array.isArray(sort)
@@ -66,10 +66,11 @@ const detectMissingVersionSelections = (entries) => {
 
     if ((entry.versionId === -1 || entry.versionId === null) && !missing.has(gameId)) {
       const name = entry.name || `ID:${gameId}`;
+      const { versionsUrl } = buildGameUrls(gameId, null, name);
       missing.set(gameId, {
         id: gameId,
         name,
-        versionsUrl: buildVersionsUrl(gameId, name),
+        versionsUrl,
       });
     }
   });
@@ -77,89 +78,48 @@ const detectMissingVersionSelections = (entries) => {
   return missing;
 };
 
-const computeVolume = (length, width, depth) => {
-  if (![length, width, depth].every((value) => Number.isFinite(value) && value > 0)) {
-    return -1;
-  }
-  return length * width * depth;
-};
-
-const computeFootprintArea = (length, width, depth) => {
-  if (![length, width, depth].every((value) => Number.isFinite(value) && value > 0)) {
-    return -1;
-  }
-  const dims = [length, width, depth].sort((a, b) => a - b);
-  return dims[0] * dims[1];
-};
-
-const toDimensionsObject = (length, width, depth, weight, missingDimensions) => ({
+const toDimensionsObject = (length, width, depth, weight) => ({
   length,
   width,
   depth,
   weight,
-  missingDimensions,
+  missing: checkMissingDimensions({ length, width, depth }),
 });
 
 const resolveDimensionsForEntry = (entry) => {
   const dims = entry.dimensions || {};
-  const normalizedWeight =
-    Number.isFinite(dims.weight) && dims.weight > 0 ? dims.weight : null;
-  const hasValidDimensions =
-    Number.isFinite(dims.length) &&
-    dims.length > 0 &&
-    Number.isFinite(dims.width) &&
-    dims.width > 0 &&
-    Number.isFinite(dims.depth) &&
-    dims.depth > 0;
+  const normalizedWeight = isPositiveFinite(dims.weight) ? dims.weight : null;
+  const dimensionsValid = hasValidDimensions(dims);
 
-  if (!entry.missingDimensions && hasValidDimensions) {
+  if (dimensionsValid) {
     return {
       source: 'version',
       dimensions: toDimensionsObject(
         dims.length,
         dims.width,
         dims.depth,
-        normalizedWeight,
-        false,
+        normalizedWeight
       ),
-      volume:
-        Number.isFinite(entry.volume) && entry.volume > 0
-          ? entry.volume
-          : computeVolume(dims.length, dims.width, dims.depth),
-      area:
-        Number.isFinite(entry.area) && entry.area > 0
-          ? entry.area
-          : computeFootprintArea(dims.length, dims.width, dims.depth),
+      volume: isPositiveFinite(entry.volume) ? entry.volume : -1,
+      area: isPositiveFinite(entry.area) ? entry.area : -1,
       usedAlternate: false,
       alternateVersion: null,
     };
   }
 
-  const alternate = (entry.alternateVersions || []).find(
-    (version) => !version.missingDimensions,
-  );
+  const alternate = entry.alternateVersions?.[0] || null;
   if (alternate) {
-    const alternateWeight =
-      Number.isFinite(alternate.weight) && alternate.weight > 0
-        ? alternate.weight
-        : null;
+    const alternateWeight = isPositiveFinite(alternate.weight) ? alternate.weight : null;
     return {
       source: 'guessed',
       dimensions: toDimensionsObject(
         alternate.length,
         alternate.width,
         alternate.depth,
-        alternateWeight,
-        false,
+        alternateWeight
       ),
-      volume:
-        Number.isFinite(alternate.volume) && alternate.volume > 0
-          ? alternate.volume
-          : computeVolume(alternate.length, alternate.width, alternate.depth),
-      area:
-        Number.isFinite(alternate.area) && alternate.area > 0
-          ? alternate.area
-          : computeFootprintArea(alternate.length, alternate.width, alternate.depth),
+      volume: isPositiveFinite(alternate.volume) ? alternate.volume : -1,
+      area: isPositiveFinite(alternate.area) ? alternate.area : -1,
       usedAlternate: true,
       alternateVersion: alternate,
     };
@@ -172,7 +132,6 @@ const resolveDimensionsForEntry = (entry) => {
       DEFAULT_DIMENSIONS.width,
       DEFAULT_DIMENSIONS.depth,
       DEFAULT_DIMENSIONS.weight ?? null,
-      true,
     ),
     volume: -1,
     area: -1,
@@ -186,15 +145,16 @@ const cloneDimensionSource = (dimension) => {
     return null;
   }
 
-  const normalize = (value) =>
-    Number.isFinite(value) && value > 0 ? value : null;
+  const length = normalizePositiveNumber(dimension.length);
+  const width = normalizePositiveNumber(dimension.width);
+  const depth = normalizePositiveNumber(dimension.depth);
 
   return {
-    length: normalize(dimension.length),
-    width: normalize(dimension.width),
-    depth: normalize(dimension.depth),
-    weight: normalize(dimension.weight),
-    missingDimensions: Boolean(dimension.missingDimensions),
+    length,
+    width,
+    depth,
+    weight: normalizePositiveNumber(dimension.weight),
+    missing: dimension.missing ?? checkMissingDimensions({ length, width, depth }),
   };
 };
 
@@ -209,7 +169,7 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
   } = resolveDimensionsForEntry(entry);
 
   const versionKey = entry.versionKey || `${entry.gameId}-${entry.versionId !== -1 ? entry.versionId : 'default'}`;
-  const gameName = entry.gameName || entry.name || `ID:${entry.gameId}`;
+  const gameName = getGameName(entry, entry.gameId);
   const versionName = entry.versionName || gameName;
   const gameType = entry.gameType || entry.objectType || entry.objecttype || entry.subtype || null;
   const subType = entry.subtype || null;
@@ -228,7 +188,6 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
           alternateVersion.weight ??
           alternateVersion.dimensions?.weight ??
           null,
-        missingDimensions: false,
       })
     : null;
   const defaultDimensions =
@@ -274,7 +233,7 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
     dimensions,
     volume,
     area,
-    missingDimensions: Boolean(dimensions?.missingDimensions),
+    maxDepth: getMaxDepthDimension(dimensions, true),
     alternateVersions: entry.alternateVersions || [],
     lastModified: entry.lastModified || null,
     correctionUrl: entry.correctionUrl || null,
@@ -291,14 +250,9 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
   };
 
   const statusFlags = entry.statuses || {};
-  game.own = Boolean(statusFlags.own);
-  game.prevowned = Boolean(statusFlags.prevowned);
-  game.fortrade = Boolean(statusFlags.fortrade);
-  game.want = Boolean(statusFlags.want);
-  game.wanttoplay = Boolean(statusFlags.wanttoplay);
-  game.wanttobuy = Boolean(statusFlags.wanttobuy);
-  game.wishlist = Boolean(statusFlags.wishlist);
-  game.preordered = Boolean(statusFlags.preordered);
+  COLLECTION_STATUS_KEYS.forEach((key) => {
+    game[key] = Boolean(statusFlags[key]);
+  });
 
   setupGameVersionMetadata(
     game,
@@ -307,30 +261,14 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
     missingVersionInfo,
   );
 
-  const fallbackCorrectionUrl =
-    entry.correctionUrl ||
-    (entry.versionId && entry.versionId > 0
-      ? buildCorrectionUrl(entry.versionId)
-      : buildGameCorrectionUrl(entry.gameId));
-  if (fallbackCorrectionUrl) {
-    game.correctionUrl = fallbackCorrectionUrl;
-  }
+  // URLs are already set from orchestrator, use them directly
+  game.correctionUrl = entry.correctionUrl || null;
+  game.versionsUrl = entry.versionsUrl || null;
 
   game.usedAlternateVersionDims = usedAlternate;
   if (usedAlternate && alternateVersion) {
     game.alternateVersionId = alternateVersion.versionId;
     game.alternateVersionName = alternateVersion.name || null;
-  }
-
-  if (hasMissingDimensions(game.dimensions)) {
-    updateGameCorrectionUrl(
-      game,
-      entry.versionId !== -1 ? entry.versionId : 'default',
-    );
-  }
-
-  if (!game.correctionUrl && fallbackCorrectionUrl) {
-    game.correctionUrl = fallbackCorrectionUrl;
   }
 
   removeInternalProperties(game);
@@ -522,33 +460,7 @@ export const processGamesRequest = async ({
   const filteredGames = filterExpansionsFromGames(allGames, includeExpansionsFlag);
   const uniqueGames = removeDuplicateGames(filteredGames);
 
-  uniqueGames.forEach((game) => {
-    if (hasMissingDimensions(game.dimensions)) {
-      game.dimensions = { ...DEFAULT_DIMENSIONS };
-      game.missingDimensions = true;
-      game.usedAlternateVersionDims = true;
-      game.selectedDimensionSource = 'default';
-      if (!game.dimensionSources) {
-        game.dimensionSources = {
-          user: null,
-          version: null,
-          guessed: null,
-          default: null,
-        };
-      }
-      if (!game.dimensionSources.default) {
-        game.dimensionSources.default = {
-          length: DEFAULT_DIMENSIONS.length,
-          width: DEFAULT_DIMENSIONS.width,
-          depth: DEFAULT_DIMENSIONS.depth,
-          weight: DEFAULT_DIMENSIONS.weight ?? null,
-          missingDimensions: true,
-        };
-      }
-      updateGameCorrectionUrl(game, game.selectedVersionId || null);
-    }
-  });
-
+  
   console.log(`   ℹ️  Total items to pack: ${uniqueGames.length} (includes multiple versions of same games)`);
 
   const overrideMaps = buildOverrideMaps(overridesPayload);

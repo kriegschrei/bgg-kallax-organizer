@@ -3,22 +3,28 @@ const CUBE_SIZE = 12.8;
 
 export const roundToGrid = (value) => Math.round(value / GRID_PRECISION) * GRID_PRECISION;
 
-export const calculate2DDimensions = (dims3D, primaryOrder) => {
-  const sorted = [dims3D.length, dims3D.width, dims3D.depth].sort((a, b) => b - a);
 
-  const dim1 = sorted[1];
-  const dim2 = sorted[2];
+// New function that calculates both orientations at once
+export const calculateBothOrientations = (dims) => {
+  // Sort all three dimensions, largest first
+  const sorted = [dims.length, dims.width, dims.depth]
+    .filter(d => Number.isFinite(d) && d > 0)
+    .sort((a, b) => b - a);
 
-  if (primaryOrder === 'vertical') {
-    return {
-      x: Math.min(dim1, dim2),
-      y: Math.max(dim1, dim2),
-    };
-  }
+  // Use the two shorter dimensions for 2D packing (X and Y)
+  // The longest dimension (sorted[0]) is already handled as Z via maxDepth
+  const dim1 = sorted[1] || 0; // middle dimension
+  const dim2 = sorted[2] || 0; // shortest dimension
 
   return {
-    x: Math.max(dim1, dim2),
-    y: Math.min(dim1, dim2),
+    horizontal: {
+      x: Math.max(dim1, dim2),
+      y: Math.min(dim1, dim2),
+    },
+    vertical: {
+      x: Math.min(dim1, dim2),
+      y: Math.max(dim1, dim2),
+    },
   };
 };
 
@@ -101,5 +107,6 @@ export const findPosition = (cube, width, height) => {
 export const PACKING_CONSTANTS = {
   GRID_PRECISION,
   CUBE_SIZE,
+  CUBE_AREA: CUBE_SIZE * CUBE_SIZE,
 };
 

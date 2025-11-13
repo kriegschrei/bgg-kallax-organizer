@@ -1,3 +1,6 @@
+import { extractDimensions } from '../utils/gameProcessingHelpers.js';
+import { normalizePositiveNumber } from '../utils/numberUtils.js';
+
 export const buildOverrideMaps = (overridesPayload) => {
   const excludedIdsSet = new Set(
     Array.isArray(overridesPayload.excludedVersions)
@@ -75,16 +78,7 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
   const preparedGames = uniqueGames
     .filter((game) => !excludedIdsSet.has(game.id))
     .map((game) => {
-      const originalDimensions = {
-        length: Number.isFinite(game.dimensions?.length) ? game.dimensions.length : null,
-        width: Number.isFinite(game.dimensions?.width) ? game.dimensions.width : null,
-        depth: Number.isFinite(game.dimensions?.depth) ? game.dimensions.depth : null,
-        weight:
-          Number.isFinite(game.dimensions?.weight) && game.dimensions.weight > 0
-            ? game.dimensions.weight
-            : null,
-        missingDimensions: game.dimensions?.missingDimensions ?? false,
-      };
+      const originalDimensions = extractDimensions(game);
 
       const dimensionSources = game.dimensionSources || {
         user: null,
@@ -100,7 +94,7 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
           width: Number(overrideDims.width),
           depth: Number(overrideDims.depth),
           weight: null,
-          missingDimensions: false,
+          missing: false,
         };
         game.bggDimensions = { ...originalDimensions };
         game.userDimensions = { ...overrideDimension };
@@ -109,19 +103,19 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
           width: overrideDimension.width,
           depth: overrideDimension.depth,
           weight: overrideDimension.weight,
-          missingDimensions: false,
+          missing: false,
         };
         dimensionSources.user = { ...overrideDimension };
         game.selectedDimensionSource = 'user';
-        game.missingDimensions = false;
+        game.dimensions.missing = false;
       } else {
         game.bggDimensions = { ...originalDimensions };
         game.userDimensions = null;
         dimensionSources.user = null;
         if (game.selectedDimensionSource === 'user') {
-          if (dimensionSources.version && !dimensionSources.version.missingDimensions) {
+          if (dimensionSources.version && !dimensionSources.version.missing) {
             game.selectedDimensionSource = 'version';
-          } else if (dimensionSources.guessed && !dimensionSources.guessed.missingDimensions) {
+          } else if (dimensionSources.guessed && !dimensionSources.guessed.missing) {
             game.selectedDimensionSource = 'guessed';
           } else if (dimensionSources.default) {
             game.selectedDimensionSource = 'default';
@@ -129,7 +123,7 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
             game.selectedDimensionSource = 'version';
           }
         }
-        game.missingDimensions = originalDimensions.missingDimensions;
+        game.dimensions.missing = originalDimensions.missing ?? false;
       }
 
       game.dimensionSources = dimensionSources;

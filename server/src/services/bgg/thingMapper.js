@@ -1,20 +1,6 @@
-const parseInteger = (value, defaultValue = -1) => {
-  if (value === undefined || value === null || value === '') {
-    return defaultValue;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
-};
-
-const parseFloatValue = (value, defaultValue = -1) => {
-  if (value === undefined || value === null || value === '') {
-    return defaultValue;
-  }
-
-  const parsed = Number.parseFloat(value);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
-};
+import { parseInteger, parseFloat } from '../../utils/numberUtils.js';
+import { ensureArray } from '../../utils/arrayUtils.js';
+import { unescapeName } from '../../utils/gameUtils.js';
 
 const uniqueSortedValues = (values = []) =>
   Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -75,7 +61,7 @@ const calculateWeightedAverage = (results, { valueKey = 'value', weightKey = 'nu
     const valueRaw = entry?.$?.[valueKey];
 
     const weight = parseInteger(weightRaw, 0);
-    const value = parseFloatValue(valueRaw, -1);
+    const value = parseFloat(valueRaw, -1);
 
     if (weight > 0 && value >= 0) {
       totalWeight += weight;
@@ -128,12 +114,6 @@ const extractLinkIds = (item, type) => {
   return linkArray.filter((link) => link?.$?.type === type).map((link) => link.$?.id);
 };
 
-const ensureArray = (value) => {
-  if (!value) {
-    return [];
-  }
-  return Array.isArray(value) ? value : [value];
-};
 
 const deriveExpansionInfo = (item) => {
   const categories = extractLinks(item, 'boardgamecategory');
@@ -200,17 +180,19 @@ export const mapThingItem = (item) => {
 
   const expansionInfo = deriveExpansionInfo(item);
 
+  const rawName =
+    Array.isArray(item.name)
+      ? item.name.find((entry) => entry?.$?.type === 'primary')?.$?.value ||
+        item.name[0]?.$?.value ||
+        null
+      : item.name?.$?.value || item.name?._ || item.name || null;
+
   return {
     id: parseInteger(item.$.id, -1),
     type: item.$.type || 'thing',
     thumbnail: item.thumbnail || null,
     image: item.image || null,
-    name:
-      Array.isArray(item.name)
-        ? item.name.find((entry) => entry?.$?.type === 'primary')?.$?.value ||
-          item.name[0]?.$?.value ||
-          null
-        : item.name?.$?.value || item.name?._ || item.name || null,
+    name: unescapeName(rawName),
     gamePublishedYear: parseInteger(item.yearpublished?.$?.value, -1),
     minPlayers: parseInteger(item.minplayers?.$?.value, -1),
     maxPlayers: parseInteger(item.maxplayers?.$?.value, -1),
@@ -224,12 +206,12 @@ export const mapThingItem = (item) => {
     mechanics: uniqueSortedValues(extractLinks(item, 'boardgamemechanic')),
     families: uniqueSortedValues(extractLinks(item, 'boardgamefamily')),
     versionIds: versionItems.map((version) => parseInteger(version?.$?.id, -1)).filter((id) => id !== -1),
-    bggWeight: parseFloatValue(stats?.averageweight?.$?.value, -1),
+    bggWeight: parseFloat(stats?.averageweight?.$?.value, -1),
     bggRank:
       rankValue && rankValue !== 'Not Ranked'
         ? parseInteger(rankValue, -1)
         : -1,
-    bggRating: parseFloatValue(stats?.average?.$?.value, -1),
+    bggRating: parseFloat(stats?.average?.$?.value, -1),
     baseGameId: expansionInfo.baseGameId !== -1 ? expansionInfo.baseGameId : parseInteger(item.$?.id, -1),
     isExpansion: expansionInfo.isExpansion,
   };
@@ -255,7 +237,7 @@ export const mapVersionItems = (item) => {
         version?.canonicalname?._ ||
         version?.canonicalname ||
         null;
-      const displayName = primaryName || canonName;
+      const displayName = unescapeName(primaryName || canonName);
       const linkToGame = Array.isArray(version?.link)
         ? version.link.find((link) => link?.$?.type === 'boardgameversion')
         : version?.link?.$?.type === 'boardgameversion'
@@ -269,9 +251,9 @@ export const mapVersionItems = (item) => {
         : null;
 
       const gameId = parseInteger(linkToGame?.$?.id, -1);
-      const length = parseFloatValue(version?.length?.$?.value, -1);
-      const width = parseFloatValue(version?.width?.$?.value, -1);
-      const depth = parseFloatValue(version?.depth?.$?.value, -1);
+      const length = parseFloat(version?.length?.$?.value, -1);
+      const width = parseFloat(version?.width?.$?.value, -1);
+      const depth = parseFloat(version?.depth?.$?.value, -1);
       const dimensionsMeta = computeDimensionsMeta({ length, width, depth });
       const versionId = parseInteger(attributes.id, -1);
 
@@ -284,9 +266,9 @@ export const mapVersionItems = (item) => {
         width,
         length,
         depth,
-        weight: parseFloatValue(version?.weight?.$?.value, -1),
+        weight: parseFloat(version?.weight?.$?.value, -1),
         language: languageLink?.$?.value || null,
-        missingDimensions: dimensionsMeta.missingDimensions,
+        missingDimensions: dimensionsMeta.missingDimensions, // Keep for backward compatibility in cache
         volume: dimensionsMeta.volume,
         area: dimensionsMeta.area,
       };

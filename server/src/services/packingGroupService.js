@@ -1,17 +1,16 @@
-import { PACKING_CONSTANTS } from './packingPositionService.js';
 import { sortGamesByArea } from './packingSortService.js';
-
-const { CUBE_SIZE } = PACKING_CONSTANTS;
+import { getSafeGameArea, MAX_GROUP_AREA as DEFAULT_MAX_GROUP_AREA } from '../utils/packingHelpers.js';
 
 export const splitOversizedGroup = (group, maxArea) => {
-  const MAX_GROUP_AREA = maxArea || CUBE_SIZE * CUBE_SIZE * 0.95;
+  const MAX_GROUP_AREA = maxArea || DEFAULT_MAX_GROUP_AREA;
 
-  const currentArea = group.reduce((total, game) => {
-    if (game.dims2D) {
-      return total + game.dims2D.x * game.dims2D.y;
-    }
-    return total;
-  }, 0);
+  // Pre-compute area for all games upfront
+  const gamesWithArea = group.map((game) => ({
+    game,
+    area: getSafeGameArea(game),
+  }));
+
+  const currentArea = gamesWithArea.reduce((total, { area }) => total + area, 0);
 
   if (currentArea <= MAX_GROUP_AREA) {
     return [group];
@@ -26,33 +25,29 @@ export const splitOversizedGroup = (group, maxArea) => {
     (g, i) => i !== (baseGameIndex >= 0 ? baseGameIndex : 0),
   );
 
-  const subGroups = [[baseGame]];
+  const subGroups = [{ games: [baseGame], area: getSafeGameArea(baseGame) }];
 
   for (const game of otherGames) {
-    const gameArea = (game.dims2D?.x || 0) * (game.dims2D?.y || 0);
+    const gameArea = getSafeGameArea(game);
 
     let added = false;
     for (let i = 0; i < subGroups.length; i += 1) {
-      const groupArea = subGroups[i].reduce((total, g) => {
-        if (g.dims2D) {
-          return total + g.dims2D.x * g.dims2D.y;
-        }
-        return total;
-      }, 0);
+      const groupArea = subGroups[i].area;
 
       if (groupArea + gameArea <= MAX_GROUP_AREA) {
-        subGroups[i].push(game);
+        subGroups[i].games.push(game);
+        subGroups[i].area += gameArea;
         added = true;
         break;
       }
     }
 
     if (!added) {
-      subGroups.push([game]);
+      subGroups.push({ games: [game], area: gameArea });
     }
   }
 
-  return subGroups;
+  return subGroups.map(({ games }) => games);
 };
 
 export const getGroupRepresentative = (group) => {
@@ -61,10 +56,5 @@ export const getGroupRepresentative = (group) => {
 };
 
 export const getGroupTotalArea = (group) =>
-  group.reduce((total, game) => {
-    if (game.dims2D) {
-      return total + game.dims2D.x * game.dims2D.y;
-    }
-    return total;
-  }, 0);
+  group.reduce((total, game) => total + getSafeGameArea(game), 0);
 

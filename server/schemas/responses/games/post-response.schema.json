@@ -48,7 +48,8 @@
                     "type": "array",
                     "items": { "$ref": "../../$defs/types.schema.json#/$defs/dimension" }
                   },
-                  "startPosition": { "$ref": "../../$defs/types.schema.json#/$defs/position" },
+                  "position": { "$ref": "../../$defs/types.schema.json#/$defs/position" },
+                  "packedDims": { "$ref": "../../$defs/types.schema.json#/$defs/packedDims" },
                   "oversized": { "$ref": "../../$defs/types.schema.json#/$defs/oversized" },
                   "categories": { "type": "array", "items": { "type": "string" } },
                   "mechanics": { "type": "array", "items": { "type": "string" } },
@@ -68,7 +69,6 @@
                   "numplays": { "type": "integer", "default": 0 },
                   "volume": { "type": "number" },
                   "area": { "type": "number" },
-                  "missingDimensions": { "type": "boolean" },
                   "missingVersion": { "type": "boolean" },
                   "versionsUrl": { "type": "string", "format": "uri" },
                   "usedAlternateVersionDims": { "type": "boolean" },
@@ -76,8 +76,8 @@
                   "orientation": { "$ref": "../../$defs/types.schema.json#/$defs/orientation" }
                 },
                 "required": [
-                  "versionKey","gameId","versionId","gameName","versionName","dimensions","startPosition",
-                  "oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
+                  "versionKey","gameId","versionId","gameName","versionName","dimensions","position",
+                  "packedDims","oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
                   "bestPlayerCount","minPlaytime","maxPlaytime","minAge","communityAge","bggWeight","bggRating","numplays",
                   "missingVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","gameType",
                   "gamePublishedYear","versionPublishedYear"
@@ -107,7 +107,8 @@
           "additionalProperties": false,
           "properties": {
             "id": { "type": "string" },
-            "name": { "type": "string" },
+            "gameName": { "type": ["string", "null"] },
+            "versionName": { "type": ["string", "null"] },
             "status": {
               "type": "string",
               "enum": ["stuffed", "excluded"]
@@ -126,7 +127,7 @@
               }
             }
           },
-          "required": ["id", "name", "status"]
+          "required": ["id", "gameName", "versionName","status"]
         }
       }
     },

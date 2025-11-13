@@ -1,50 +1,14 @@
-import { PACKING_CONSTANTS, roundToGrid } from './packingPositionService.js';
-import { extractBaseGameId, extractVersionId, buildVersionsUrl, buildCorrectionUrl, buildGameCorrectionUrl } from '../utils/gameUtils.js';
+import { roundToGrid } from './packingPositionService.js';
+import { createDisplayName, getGameName } from '../utils/gameUtils.js';
+import { getSafeGameArea } from '../utils/packingHelpers.js';
 
-const { CUBE_SIZE } = PACKING_CONSTANTS;
 const DISPLAY_KALLAX_WIDTH = 13;
 const DISPLAY_KALLAX_HEIGHT = 13;
 const OVERSIZED_THRESHOLD = 13;
 const CUBE_DISPLAY_AREA = DISPLAY_KALLAX_WIDTH * DISPLAY_KALLAX_HEIGHT;
 
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-const computeGameArea = (game) => {
-  if (Number.isFinite(game.area) && game.area > 0) {
-    return game.area;
-  }
-
-  const length =
-    Number.isFinite(game.dimensions?.length) && game.dimensions.length > 0
-      ? game.dimensions.length
-      : null;
-  const width =
-    Number.isFinite(game.dimensions?.width) && game.dimensions.width > 0
-      ? game.dimensions.width
-      : null;
-
-  if (length && width) {
-    return length * width;
-  }
-
-  const packedWidth =
-    Number.isFinite(game.packedDims?.x) && game.packedDims.x > 0
-      ? game.packedDims.x
-      : null;
-  const packedHeight =
-    Number.isFinite(game.packedDims?.y) && game.packedDims.y > 0
-      ? game.packedDims.y
-      : null;
-
-  if (packedWidth && packedHeight) {
-    return packedWidth * packedHeight;
-  }
-
-  return 0;
-};
-
 const computeCubeAreaUsed = (cube) =>
-  (cube.games || []).reduce((sum, game) => sum + computeGameArea(game), 0);
+  (cube.games || []).reduce((sum, game) => sum + getSafeGameArea(game), 0);
 
 export const calculateStatsSummary = (cubes) => {
   const safeTotals = {
@@ -64,8 +28,7 @@ export const calculateStatsSummary = (cubes) => {
   );
   const avgGamesPerCube = totalGames / cubes.length || 0;
 
-  const areaUsedPerCube = cubes.map((cube) => computeCubeAreaUsed(cube));
-  const totalAreaUsed = areaUsedPerCube.reduce((sum, value) => sum + value, 0);
+  const totalAreaUsed = cubes.reduce((sum, cube) => sum + computeCubeAreaUsed(cube), 0);
   const totalAreaCapacity = CUBE_DISPLAY_AREA * cubes.length;
 
   const totalUtilization =
@@ -108,8 +71,6 @@ export const finalizeCube = (cube, cubeIndex) => {
     for (const game of rowGames) {
       game.orientedDims = { ...game.packedDims };
       game.actualOrientedDims = { ...game.actualDims };
-      delete game._group;
-      delete game._groupId;
     }
 
     const maxHeight = Math.max(...rowGames.map((g) => g.packedDims.y));
@@ -124,25 +85,15 @@ export const finalizeCube = (cube, cubeIndex) => {
 };
 
 export const createOversizedExcludedGame = (game) => {
-  const baseGameId = extractBaseGameId(game);
-  const correctionVersionId = extractVersionId(game, game.selectedVersionId);
-  let correctionUrl = game.correctionUrl || null;
-  if (!correctionUrl && correctionVersionId) {
-    correctionUrl = buildCorrectionUrl(correctionVersionId);
-  }
-  if (!correctionUrl && baseGameId) {
-    correctionUrl = buildGameCorrectionUrl(baseGameId);
-  }
-  const versionsUrl =
-    game.versionsUrl || buildVersionsUrl(baseGameId || game.id, game.name);
-
   return {
     id: game.id,
-    name: game.name,
+    name: createDisplayName(game, game.gameId),
+    gameName: getGameName(game, game.gameId),
+    versionName: game.versionName || null,
     status: 'excluded',
-    correctionUrl,
-    versionsUrl,
-    baseGameId: baseGameId || null,
+    correctionUrl: game.correctionUrl || null,
+    versionsUrl: game.versionsUrl || null,
+    baseGameId: game.baseGameId || game.gameId || null,
     dimensions: {
       length: game.dimensions.length,
       width: game.dimensions.width,
@@ -157,15 +108,15 @@ export const getOversizedStuffedGames = (cubes) => {
   for (const cube of cubes) {
     for (const game of cube.games) {
       if ((game.oversizedX || game.oversizedY) && !stuffedSeen.has(game.id)) {
-        const versionId = extractVersionId(game, game.selectedVersionId);
-        const baseGameId = extractBaseGameId(game);
         oversizedStuffedGames.push({
           id: game.id,
-          name: game.name,
+          name: createDisplayName(game, game.gameId),
+          gameName: getGameName(game, game.gameId),
+          versionName: game.versionName || null,
           status: 'stuffed',
           cubeId: cube.id,
-          correctionUrl: versionId ? buildCorrectionUrl(versionId) : null,
-          versionsUrl: game.versionsUrl || (baseGameId ? buildVersionsUrl(baseGameId, game.name) : null),
+          correctionUrl: game.correctionUrl || null,
+          versionsUrl: game.versionsUrl || null,
         });
         stuffedSeen.add(game.id);
       }

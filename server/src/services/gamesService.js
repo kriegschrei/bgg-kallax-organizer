@@ -383,11 +383,16 @@ export const processGamesRequest = async ({
 
   if (versionEntries.length === 0) {
     console.warn('⚠️  No items in collection');
-    return {
+    const emptyResult = {
       cubes: [],
       totalGames: 0,
       message: 'No games were found in the BoardGameGeek collection for this username.',
     };
+    progress(requestId, 'No games found in collection', {
+      ...emptyResult,
+      status: 'complete',
+    });
+    return emptyResult;
   }
 
   console.log(`   Found ${versionEntries.length} items in collection`);
@@ -411,25 +416,33 @@ export const processGamesRequest = async ({
   );
 
   if (filteredEntries.length === 0) {
-    progress(requestId, 'No games matched the selected collection filters.', {
-      step: 'collection',
-      count: 0,
-    });
-    return {
+    const noMatchesResult = {
       cubes: [],
       totalGames: 0,
       message: 'No games matched the selected collection filters.',
     };
+    progress(requestId, 'No games matched the selected collection filters.', {
+      ...noMatchesResult,
+      status: 'complete',
+      step: 'collection',
+      count: 0,
+    });
+    return noMatchesResult;
   }
 
   const uniqueEntries = dedupeVersionEntries(filteredEntries);
 
   if (uniqueEntries.length === 0) {
-    return {
+    const noUniqueResult = {
       cubes: [],
       totalGames: 0,
       message: 'No games matched the selected filters.',
     };
+    progress(requestId, 'No unique games found', {
+      ...noUniqueResult,
+      status: 'complete',
+    });
+    return noUniqueResult;
   }
 
   const missingVersionGames = detectMissingVersionSelections(uniqueEntries);
@@ -444,18 +457,22 @@ export const processGamesRequest = async ({
     const secondaryMessage =
       'We can try to guess dimensions by checking the most recent English version first. This can take a while and may still require manual adjustments later.';
 
-    progress(requestId, 'Missing game versions detected. Waiting for user confirmation...', {
-      step: 'warning',
-      warningType: 'missing_versions',
-    });
-
-    return {
+    const missingVersionsResult = {
       status: 'missing_versions',
       requestId,
       message: warningMessage,
       details: secondaryMessage,
       games: warningGames,
     };
+
+    // Store result in progress state for polling
+    progress(requestId, 'Missing game versions detected. Waiting for user confirmation...', {
+      ...missingVersionsResult,
+      step: 'warning',
+      warningType: 'missing_versions',
+    });
+
+    return missingVersionsResult;
   }
 
   const allGames = buildGamesFromVersionEntries(uniqueEntries, missingVersionGames);
@@ -518,6 +535,12 @@ export const processGamesRequest = async ({
   });
 
   const responsePayload = serializeCubesResponse(packedCubes, stacking, oversizedExcludedGames);
+
+  // Store final result in progress state for polling
+  progress(requestId, 'Complete', {
+    ...responsePayload,
+    status: 'complete',
+  });
 
   return responsePayload;
 };

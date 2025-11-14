@@ -7,3 +7,5 @@ if a function is longer than 20 lines review if it should be multiple functions 
 Always consider how to best organize the file structure for readibility and current coding standards and best practices.  Plan on writing the code in reusable functions and consider is existing functions should be re-used, or possible enhanced before planning on writing new ones that duplicate the functions.
 clean up old code as you write, we do not need to keep old functions around for reference.
 Ask questions and clarifications to confirm requirements before proceeding.
+
+You will always plan on writing re-usable code, funcions, constants, etc and will review the existing codebase for code that completes your task without you writing and duplication.  All functions will be organized into logical files and filestructures with no monolithic code. always write a docstrings describing the inputs, outputs, and logic of each function. 

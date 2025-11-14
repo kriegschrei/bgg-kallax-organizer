@@ -1,4 +1,5 @@
 import { writeFile } from 'fs/promises';
+import crypto from 'crypto';
 
 import { normalizeUsername } from '../utils/gameUtils.js';
 import { validateGamesPayload } from '../validation/gamesValidator.js';
@@ -8,6 +9,7 @@ import {
   scheduleProgressCleanup,
 } from '../services/progressService.js';
 import { processGamesRequest } from '../services/gamesService.js';
+import { generateRequestToken } from '../services/tokenService.js';
 import {
   GAMES_REQUEST_JSON,
   GAMES_RESPONSE_JSON,
@@ -71,40 +73,58 @@ export const handleGamesRequest = async (req, res) => {
     typeof usernameInput === 'string' ? usernameInput.trim() : usernameInput;
   const username = normalizeUsername(normalizedInput);
 
-  const requestId =
-    req.get('x-request-id')?.toString() || `${username}-${Date.now()}`;
+  // Generate server-side GUID
+  const requestId = crypto.randomUUID();
+  const token = generateRequestToken(requestId);
+  const progressUrl = `/api/progress/${requestId}`;
 
   const normalizedPayload = { ...payload, username };
   await logGamesRequest(normalizedPayload);
 
   registerRequest(requestId);
 
-  try {
-    const result = await processGamesRequest({
-      payload: { ...payload, username },
-      username,
-      requestId,
-      onProgress: sendProgressUpdate,
-    });
+  // Process asynchronously (don't await)
+  processGamesRequest({
+    payload: { ...payload, username },
+    username,
+    requestId,
+    onProgress: sendProgressUpdate,
+  })
+    .then((result) => {
+      if (result?.status === 'missing_versions') {
+        sendProgressUpdate(requestId, 'Missing versions detected', {
+          ...result,
+          status: 'missing_versions',
+        });
+        logGamesResponse(result);
+        scheduleProgressCleanup(requestId);
+        return;
+      }
 
-    if (result?.status === 'missing_versions') {
-      await logGamesResponse(result);
+      sendProgressUpdate(requestId, 'Complete', {
+        ...result,
+        status: 'complete',
+      });
+      logGamesResponse(result);
       scheduleProgressCleanup(requestId);
-      return res.json(result);
-    }
-
-    await logGamesResponse(result);
-    scheduleProgressCleanup(requestId);
-    return res.json(result);
-  } catch (error) {
-    console.error('❌ Error processing games:', error.message);
-    console.error('   Stack trace:', error.stack);
-    sendProgressUpdate(requestId, `Error: ${error.message}`, {
-      error: true,
-      message: error.message,
+    })
+    .catch((error) => {
+      console.error('❌ Error processing games:', error.message);
+      console.error('   Stack trace:', error.stack);
+      sendProgressUpdate(requestId, `Error: ${error.message}`, {
+        error: true,
+        message: error.message,
+        status: 'error',
+      });
+      scheduleProgressCleanup(requestId);
     });
-    scheduleProgressCleanup(requestId);
-    return res.status(500).json({ error: error.message });
-  }
+
+  // Return 202 Accepted immediately
+  return res.status(202).json({
+    requestId,
+    token,
+    progressUrl,
+    message: 'Request accepted and processing started',
+  });
 };
 

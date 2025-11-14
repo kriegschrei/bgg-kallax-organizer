@@ -86,7 +86,7 @@ const WARNING_PANEL_CONFIG = [
         {count} game{count !== 1 ? 's' : ''}{' '}
         {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
         dimensions of 11.7&quot; × 11.7&quot; × 2.8&quot; were assumed and marked with the warning icon{' '}
-        <FaRulerCombined className="inline-icon" aria-hidden="true" /> for easy reference.
+        <FaQuestionCircle className="inline-icon" aria-hidden="true" /> for easy reference.
       </>
     ),
     renderItem: createGameRenderer({

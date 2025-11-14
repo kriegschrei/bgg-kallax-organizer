@@ -12,8 +12,6 @@ const apiClient = axios.create({
   timeout: 120000, // 2 minutes
 });
 
-const generateRequestId = (username) => `${username}-${Date.now()}`;
-
 const compressJsonPayload = (payload) => {
   const payloadString = JSON.stringify(payload);
   const encoder = new TextEncoder();
@@ -48,11 +46,7 @@ const logRequestError = (error) => {
   console.error('   Error:', error?.message || 'Unknown error');
 };
 
-const startProgressPolling = (requestId, onProgress) => {
-  if (!onProgress) {
-    return null;
-  }
-
+const startProgressPolling = (requestId, token, onProgress, resolve, reject) => {
   let isPolling = true;
   let pending = false;
 
@@ -63,13 +57,42 @@ const startProgressPolling = (requestId, onProgress) => {
 
     pending = true;
     try {
-      const { data } = await apiClient.get(`${API_BASE}/progress/${requestId}`);
-      if (isPolling && data?.message) {
-        onProgress(data);
+      // Send token in header (preferred)
+      const { data } = await apiClient.get(`${API_BASE}/progress/${requestId}`, {
+        headers: {
+          'X-Request-Token': token,
+        },
+      });
+      
+      if (isPolling) {
+        // Check if processing is complete (has result data, not just progress)
+        if (data?.cubes || data?.status === 'missing_versions' || data?.error) {
+          isPolling = false;
+          if (onProgress) {
+            onProgress(data);
+          }
+          if (resolve) {
+            resolve(data);
+          }
+          return;
+        }
+        
+        if (data?.message && onProgress) {
+          onProgress(data);
+        }
       }
     } catch (error) {
       if (isPolling) {
         console.warn('⚠️ Progress polling error:', error?.message || error);
+        // If 401, token expired or invalid - stop polling
+        if (error?.response?.status === 401) {
+          isPolling = false;
+          const errorMsg = 'Request token expired or invalid';
+          if (reject) {
+            reject(new Error(errorMsg));
+          }
+          return;
+        }
       }
     } finally {
       pending = false;
@@ -91,29 +114,61 @@ export const fetchPackedCubes = async (requestPayload, { onProgress } = {}) => {
     throw new Error('fetchPackedCubes requires a username in the payload.');
   }
 
-  const requestId = generateRequestId(requestPayload.username);
-  const headers = {
-    ...REQUEST_HEADERS,
-    'X-Request-Id': requestId,
-  };
-
   logRequestStart(requestPayload);
 
   const compressedPayload = compressJsonPayload(requestPayload);
-  const stopPolling = startProgressPolling(requestId, onProgress);
 
   try {
     const response = await apiClient.post(`${API_BASE}/games`, compressedPayload, {
-      headers,
+      headers: REQUEST_HEADERS,
     });
+
+    // Handle 202 Accepted response
+    if (response.status === 202) {
+      const { requestId, token, progressUrl } = response.data;
+      
+      if (!requestId || !token) {
+        throw new Error('Invalid response: missing requestId or token');
+      }
+
+      console.log('📡 Frontend: Request accepted, polling for progress');
+      console.log('   Request ID:', requestId);
+      console.log('   Progress URL:', progressUrl);
+
+      // Wait for completion by polling
+      return new Promise((resolve, reject) => {
+        let pollingStopFn = null;
+        
+        // Timeout after 5 minutes
+        const timeoutId = setTimeout(() => {
+          if (pollingStopFn) pollingStopFn();
+          reject(new Error('Request timeout: processing took too long'));
+        }, 5 * 60 * 1000);
+
+        pollingStopFn = startProgressPolling(
+          requestId,
+          token,
+          onProgress,
+          (result) => {
+            clearTimeout(timeoutId);
+            if (pollingStopFn) pollingStopFn();
+            logSuccess(result);
+            resolve({ data: result, requestId });
+          },
+          (error) => {
+            clearTimeout(timeoutId);
+            if (pollingStopFn) pollingStopFn();
+            reject(error);
+          }
+        );
+      });
+    }
+
+    // Legacy 200 response (shouldn't happen with new flow)
     logSuccess(response.data);
-    return { data: response.data, requestId };
+    return { data: response.data, requestId: response.data.requestId };
   } catch (error) {
     logRequestError(error);
     throw error;
-  } finally {
-    if (stopPolling) {
-      stopPolling();
-    }
   }
 };

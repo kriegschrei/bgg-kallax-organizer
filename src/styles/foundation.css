@@ -57,6 +57,10 @@
   --color-callout-danger-border: rgba(231, 76, 60, 0.3);
   --color-callout-danger-text: #922b21;
 
+  --color-callout-error-bg: rgba(220, 53, 69, 0.12);
+  --color-callout-error-border: rgba(220, 53, 69, 0.3);
+  --color-callout-error-text: #a0261a;
+
   --color-status-neutral-bg: #f4f6fb;
   --color-status-neutral-border: rgba(99, 102, 241, 0.12);
   --color-status-neutral-border-strong: rgba(99, 102, 241, 0.2);

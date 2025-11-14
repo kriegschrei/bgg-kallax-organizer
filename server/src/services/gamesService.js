@@ -65,9 +65,12 @@ const detectMissingVersionSelections = (entries) => {
     }
 
     if ((entry.versionId === -1 || entry.versionId === null) && !missing.has(gameId)) {
+      const gameName = entry.gameName || entry.name || `ID:${gameId}`;
       missing.set(gameId, {
         id: gameId,
         name: entry.name || `ID:${gameId}`,
+        gameName,
+        displayName: createDisplayName({ gameName, name: entry.name }, gameId),
         versionsUrl: entry.versionsUrl || null,
       });
     }

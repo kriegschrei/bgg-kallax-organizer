@@ -227,6 +227,17 @@
   --callout-scrollbar-thumb-hover: rgba(15, 76, 69, 0.5);
 }
 
+.callout--error {
+  --callout-bg: var(--color-callout-error-bg);
+  --callout-border: var(--color-callout-error-border);
+  --callout-accent: var(--color-callout-error-border);
+  --callout-text: var(--color-callout-error-text);
+  --callout-hover: rgba(220, 53, 69, 0.12);
+  --callout-scrollbar-track: rgba(220, 53, 69, 0.12);
+  --callout-scrollbar-thumb: rgba(160, 38, 26, 0.3);
+  --callout-scrollbar-thumb-hover: rgba(160, 38, 26, 0.5);
+}
+
 .callout--danger {
   --callout-bg: var(--color-callout-danger-bg);
   --callout-border: var(--color-callout-danger-border);

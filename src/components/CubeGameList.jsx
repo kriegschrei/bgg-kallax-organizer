@@ -61,7 +61,7 @@ function CubeGameList({
           
           // Get primary dimension from array to check missingDimensions
           const primaryDim = getPrimaryDimension(game.dimensions);
-          const missingDimensions = primaryDim?.missingDimensions ?? false;
+          const missingDimensions = primaryDim?.missing ?? false;
           const bggDefaultDimensions = Boolean(game.bggDefaultDimensions);
           const missingVersion = Boolean(game.missingVersion);
           const usedAlternateVersionDims = Boolean(game.usedAlternateVersionDims);
@@ -154,10 +154,10 @@ function CubeGameList({
                     {displayDims.z.toFixed(1)}"
                   </span>
                 </span>
-                {bggDefaultDimensions && (
+                {bggDefaultDimensions && !usedAlternateVersionDims && (
                   <FaQuestionCircle
                     className="dimension-icon bgg-default-icon"
-                    title={`BoardGameGeek default dimensions (12.8" × 12.8" × 1.8") were used`}
+                    title={`BoardGameGeek default dimensions (11.7" × 11.7" × 2.8") were used`}
                     aria-hidden="true"
                   />
                 )}
@@ -175,7 +175,7 @@ function CubeGameList({
                     aria-hidden="true"
                   />
                 )}
-                {missingDimensions && (
+                {(missingDimensions || (bggDefaultDimensions && !usedAlternateVersionDims)) && (
                   <FaExclamationTriangle
                     className="dimension-icon warning-icon"
                     title="Dimensions not available in BGG"

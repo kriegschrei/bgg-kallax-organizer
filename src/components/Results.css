@@ -92,7 +92,7 @@
 
 .results-warnings > .callout {
   width: 100%;
-  max-width: 100%;
+  min-width: 0;
 }
 
 .callout {
@@ -261,15 +261,12 @@
 
 .results-overrides .callout {
   width: 100%;
-  max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 1200px) {
-  .callout-grid.callout-count-3,
-  .callout-grid.callout-count-4,
-  .callout-grid.callout-count-5 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+  /* Let auto-fit handle the responsive behavior naturally */
+  /* Panels will automatically flow to fewer columns as space decreases */
   .stats-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

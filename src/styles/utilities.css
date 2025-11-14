@@ -77,16 +77,13 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.callout-grid.callout-count-3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.callout-grid.callout-count-4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
+/* For 3+ panels, use auto-fit to naturally prefer fitting more columns */
+/* The 280px minimum ensures panels try to fit as many as possible per row */
+/* When there are fewer columns, 1fr allows them to grow to fill space */
+.callout-grid.callout-count-3,
+.callout-grid.callout-count-4,
 .callout-grid.callout-count-5 {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .override-pill {

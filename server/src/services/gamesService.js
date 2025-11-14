@@ -3,6 +3,7 @@ import { packGamesIntoCubes } from './packingService.js';
 import { BGG_API_TOKEN } from './configService.js';
 import { buildOverrideMaps, applyOverridesToGames } from './overrideService.js';
 import { serializeCubesResponse } from './responseSerializer.js';
+import { getRandomBoardGameMessage } from './progressService.js';
 import {
   DEFAULT_DIMENSIONS,
   getFallbackVersionLabel,
@@ -374,6 +375,8 @@ export const processGamesRequest = async ({
     username,
     includeStatuses,
     includeExpansions: includeExpansionsFlag,
+    onProgress,
+    requestId,
   });
 
   const versionEntries = Array.isArray(collectionResult.items) ? collectionResult.items : [];
@@ -474,10 +477,19 @@ export const processGamesRequest = async ({
 
   const gamesToPack = preparedGames;
 
-  progress(requestId, `Packing ${gamesToPack.length} games into cubes...`, {
-    step: 'packing',
-    gameCount: gamesToPack.length,
-  });
+  // Transition 4: After processing games, before packing
+  if (onProgress && requestId) {
+    const catchyPhrase = getRandomBoardGameMessage();
+    progress(requestId, `Packing ${gamesToPack.length} games into cubes... ${catchyPhrase}`, {
+      step: 'packing',
+      gameCount: gamesToPack.length,
+    });
+  } else {
+    progress(requestId, `Packing ${gamesToPack.length} games into cubes...`, {
+      step: 'packing',
+      gameCount: gamesToPack.length,
+    });
+  }
 
   const shouldGroupExpansions =
     !optimizeSpaceFlag && groupExpansionsFlag && includeExpansionsFlag;

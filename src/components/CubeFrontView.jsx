@@ -7,8 +7,6 @@ function CubeFrontView({ cube, canvasWidth, canvasHeight, scale }) {
   return (
     <div className="front-view">
       <svg width={canvasWidth} height={canvasHeight} className="cube-svg">
-        <rect x="0" y="0" width={canvasWidth} height={canvasHeight} fill="none" stroke="#34495e" strokeWidth="2" />
-
         {games.map((game, index) => {
           // Use position and packedDims directly from API response
           const positionX = game.position?.x ?? 0;
@@ -53,6 +51,7 @@ function CubeFrontView({ cube, canvasWidth, canvasHeight, scale }) {
             </g>
           );
         })}
+        <rect x="0" y="0" width={canvasWidth} height={canvasHeight} fill="none" stroke="#34495e" strokeWidth="2" />
       </svg>
     </div>
   );

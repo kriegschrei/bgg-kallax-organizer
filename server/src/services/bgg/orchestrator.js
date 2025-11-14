@@ -17,6 +17,7 @@ import { buildGameUrls, buildVersionKey } from '../../utils/gameUtils.js';
 import { ensureArray } from '../../utils/arrayUtils.js';
 import { hasValidDimensions } from '../../utils/gameProcessingHelpers.js';
 import { isPositiveFinite, isNonNegativeInteger, parseInteger } from '../../utils/numberUtils.js';
+import { getRandomBoardGameMessage } from '../progressService.js';
 
 const COLLECTION_MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
@@ -118,10 +119,14 @@ const fetchThingBatch = async (gameIds) => {
   return { games, versions, returnedIds };
 };
 
-const fetchThingDetailsWithRetries = async (gameIds) => {
+const fetchThingDetailsWithRetries = async (gameIds, onProgress, requestId) => {
   const remaining = new Set(gameIds);
   const fetchedGames = new Map();
   const fetchedVersions = new Map();
+  const totalBatches = Math.ceil(gameIds.length / BATCH_SIZE);
+  let batchNumber = 0;
+
+  const progress = typeof onProgress === 'function' ? onProgress : () => {};
 
   const fetchAndMerge = async (ids) => {
     if (ids.length === 0) {
@@ -129,7 +134,19 @@ const fetchThingDetailsWithRetries = async (gameIds) => {
     }
 
     for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+      batchNumber++;
       const batch = ids.slice(i, i + BATCH_SIZE);
+      
+      if (onProgress && requestId) {
+        progress(requestId, `Getting games batch ${batchNumber}/${totalBatches}...`, {
+          step: 'fetching',
+          batch: batchNumber,
+          totalBatches,
+          current: Math.min(batchNumber * BATCH_SIZE, gameIds.length),
+          total: gameIds.length,
+        });
+      }
+      
       const { games, versions, returnedIds } = await fetchThingBatch(batch);
 
       games.forEach((game, id) => {
@@ -452,10 +469,15 @@ const buildVersionEntry = ({
   };
 };
 
-const mergeCollectionWithDetails = (collectionItems, gameLookup, versionLookup) => {
+const mergeCollectionWithDetails = (collectionItems, gameLookup, versionLookup, onProgress, requestId) => {
   const versionEntries = [];
+  const totalItems = collectionItems.length;
+  const PROGRESS_INTERVAL = 20; // Send progress every 20 collection items
+  let processedCount = 0;
 
-  collectionItems.forEach((item) => {
+  const progress = typeof onProgress === 'function' ? onProgress : () => {};
+
+  collectionItems.forEach((item, index) => {
     const gameId = item.gameId;
     const game = gameLookup.get(gameId);
     const selectedVersionsRaw =
@@ -477,6 +499,17 @@ const mergeCollectionWithDetails = (collectionItems, gameLookup, versionLookup) 
 
       versionEntries.push(versionEntry);
     });
+
+    processedCount++;
+
+    // Send progress every PROGRESS_INTERVAL collection items
+    if (onProgress && requestId && processedCount % PROGRESS_INTERVAL === 0) {
+      progress(requestId, `Parsing games ${processedCount}/${totalItems}...`, {
+        step: 'parsing',
+        current: processedCount,
+        total: totalItems,
+      });
+    }
   });
 
   console.debug(`   ✅ Built ${versionEntries.length} version entry(ies) for packing analysis`);
@@ -488,15 +521,30 @@ export const fetchUserCollectionWithDetails = async ({
   username,
   includeStatuses = [],
   includeExpansions = true,
+  onProgress,
+  requestId,
 } = {}) => {
   if (!username) {
     throw new Error('Username is required to fetch collection data.');
   }
 
+  const progress = typeof onProgress === 'function' ? onProgress : () => {};
+
   const collectionKey = buildCollectionKey(username, includeStatuses, includeExpansions);
   const collectionUrl = buildCollectionUrl(username, includeStatuses);
 
+  if (onProgress && requestId) {
+    progress(requestId, 'Fetching collection from BoardGameGeek...', { step: 'collection_fetch' });
+  }
+
   const xml = await fetchCollectionXml(collectionUrl);
+  
+  // Transition 1: After fetching collection, before parsing
+  if (onProgress && requestId) {
+    const catchyPhrase = getRandomBoardGameMessage();
+    progress(requestId, `Parsing collection... ${catchyPhrase}`, { step: 'parsing_start' });
+  }
+  
   const collectionJson = await xmlToJson(xml);
   const collectionItems = mapCollectionItems(collectionJson);
   const collectionHash = generateCollectionHash(collectionItems);
@@ -515,10 +563,27 @@ export const fetchUserCollectionWithDetails = async ({
   let missingIds = [];
 
   if (gamesToRefresh.size > 0) {
-    const fetchResult = await fetchThingDetailsWithRetries(Array.from(gamesToRefresh));
+    if (onProgress && requestId) {
+      progress(requestId, `Found ${gamesToRefresh.size} games to fetch details for...`, {
+        step: 'preparing_fetch',
+        total: gamesToRefresh.size,
+      });
+    }
+
+    const fetchResult = await fetchThingDetailsWithRetries(
+      Array.from(gamesToRefresh),
+      onProgress,
+      requestId,
+    );
     fetchedGames = fetchResult.fetchedGames;
     fetchedVersions = fetchResult.fetchedVersions;
     missingIds = fetchResult.missingIds;
+
+    // Transition 2: After fetching all game details, before organizing
+    if (onProgress && requestId) {
+      const catchyPhrase = getRandomBoardGameMessage();
+      progress(requestId, `Organizing game data... ${catchyPhrase}`, { step: 'organizing' });
+    }
 
     fetchedGames.forEach((game, gameId) => setGame(gameId, game));
     fetchedVersions.forEach((version) => {
@@ -526,13 +591,37 @@ export const fetchUserCollectionWithDetails = async ({
         setVersion(version.versionKey, version);
       }
     });
+  } else if (onProgress && requestId) {
+    // When using cached data, still send progress updates
+    progress(requestId, 'Using cached game data...', { step: 'cached' });
+    // Transition 2: Even with cached data, we still organize it
+    const catchyPhrase = getRandomBoardGameMessage();
+    progress(requestId, `Organizing game data... ${catchyPhrase}`, { step: 'organizing' });
   }
 
   const combinedGames = new Map([...cachedGames, ...fetchedGames]);
   const combinedVersions = new Map([...cachedVersions, ...fetchedVersions]);
 
+  if (onProgress && requestId && effectiveCollection.length > 0) {
+    progress(requestId, `Building version entries from ${effectiveCollection.length} collection items...`, {
+      step: 'building_entries',
+      total: effectiveCollection.length,
+    });
+  }
 
-  const versionEntries = mergeCollectionWithDetails(effectiveCollection, combinedGames, combinedVersions);
+  const versionEntries = mergeCollectionWithDetails(
+    effectiveCollection,
+    combinedGames,
+    combinedVersions,
+    onProgress,
+    requestId,
+  );
+
+  // Transition 3: After building version entries, before processing in gamesService
+  if (onProgress && requestId) {
+    const catchyPhrase = getRandomBoardGameMessage();
+    progress(requestId, `Preparing games for packing... ${catchyPhrase}`, { step: 'preparing' });
+  }
 
   const debugOutputFile = process.env.BGG_DEBUG_OUTPUT_FILE;
   if (debugOutputFile) {

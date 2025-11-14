@@ -277,7 +277,8 @@ const useCollectionRequestHandlers = (options) => {
 
     setLoading(true);
     setError(null);
-    setProgress('Attempting fallback dimension lookup. This may take a little while...');
+    // Set initial message, but server progress will override it quickly
+    setProgress('Starting fallback dimension lookup...');
     setMissingVersionWarning(null);
     setOversizedGames([]);
     setStats(null);

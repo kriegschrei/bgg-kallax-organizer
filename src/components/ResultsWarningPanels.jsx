@@ -80,12 +80,12 @@ const WARNING_PANEL_CONFIG = [
     dataKey: 'bggDefaultDimensions',
     variant: 'warning',
     Icon: FaQuestionCircle ,
-    title: 'BoardGameGeek Default Dimensions',
+    title: 'BGG Default Dimensions',
     getDescription: ({ count }) => (
       <>
         {count} game{count !== 1 ? 's' : ''}{' '}
         {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
-        dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
+        dimensions of 11.7&quot; × 11.7&quot; × 2.8&quot; were assumed and marked with the warning icon{' '}
         <FaRulerCombined className="inline-icon" aria-hidden="true" /> for easy reference.
       </>
     ),
@@ -128,7 +128,7 @@ const WARNING_PANEL_CONFIG = [
       <>
         {count} game{count !== 1 ? 's' : ''}{' '}
         {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
-        dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
+        dimensions of 11.7&quot; × 11.7&quot; × 2.8&quot; were assumed and marked with the warning icon{' '}
         <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
       </>
     ),
@@ -145,7 +145,7 @@ const WARNING_PANEL_CONFIG = [
     getDescription: ({ fitOversized }) => (
       <>
         {fitOversized
-          ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 12.8 to fit, but may not actually fit.'
+          ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 11.7 x 11.7 x 2.8 to fit, but may not actually fit.'
           : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
         If you believe the dimensions are incorrect, please click the game name below to submit a
         dimension correction in BoardGameGeek.

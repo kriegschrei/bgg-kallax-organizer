@@ -64,7 +64,7 @@ const startProgressPolling = (requestId, onProgress) => {
     pending = true;
     try {
       const { data } = await apiClient.get(`${API_BASE}/progress/${requestId}`);
-      if (isPolling) {
+      if (isPolling && data?.message) {
         onProgress(data);
       }
     } catch (error) {
@@ -76,6 +76,7 @@ const startProgressPolling = (requestId, onProgress) => {
     }
   };
 
+  // Poll immediately to catch early progress updates
   void poll();
   const intervalId = setInterval(poll, PROGRESS_POLL_INTERVAL_MS);
 

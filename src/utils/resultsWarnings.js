@@ -41,6 +41,7 @@ export const collectWarningGroups = ({
   oversizedGames = [],
   includeCubeId = true,
 } = {}) => {
+  const bggDefaultDimensions = [];
   const guessedVersions = [];
   const selectedVersionFallback = [];
   const missingDimensions = [];
@@ -49,30 +50,41 @@ export const collectWarningGroups = ({
     const cubeId = cube?.id ?? null;
     toArray(cube?.games).forEach((game) => {
       const baseGameData = includeCubeId ? { ...game, cubeId } : { ...game };
-      const classification = classifyGameByDimensions(game.dimensions);
+      
+      // Check for bggDefaultDimensions flag first
+      if (game.bggDefaultDimensions === true) {
+        bggDefaultDimensions.push({
+          ...baseGameData,
+          correctionUrl: game?.correctionUrl ?? null,
+          versionsUrl: game?.versionsUrl ?? null,
+        });
+      } else {
+        const classification = classifyGameByDimensions(game.dimensions);
 
-      if (classification === 'selectedVersionFallback') {
-        selectedVersionFallback.push({
-          ...baseGameData,
-          versionsUrl: game?.versionsUrl ?? null,
-          correctionUrl: game?.correctionUrl ?? null,
-        });
-      } else if (classification === 'guessedVersions') {
-        guessedVersions.push({
-          ...baseGameData,
-          versionsUrl: game?.versionsUrl ?? null,
-        });
-      } else if (classification === 'missingDimensions') {
-        missingDimensions.push({
-          ...baseGameData,
-          correctionUrl: game?.correctionUrl ?? null,
-          versionsUrl: game?.versionsUrl ?? null,
-        });
+        if (classification === 'selectedVersionFallback') {
+          selectedVersionFallback.push({
+            ...baseGameData,
+            versionsUrl: game?.versionsUrl ?? null,
+            correctionUrl: game?.correctionUrl ?? null,
+          });
+        } else if (classification === 'guessedVersions') {
+          guessedVersions.push({
+            ...baseGameData,
+            versionsUrl: game?.versionsUrl ?? null,
+          });
+        } else if (classification === 'missingDimensions') {
+          missingDimensions.push({
+            ...baseGameData,
+            correctionUrl: game?.correctionUrl ?? null,
+            versionsUrl: game?.versionsUrl ?? null,
+          });
+        }
+        // If classification is null, the game has correct version dimensions, so no warning needed
       }
-      // If classification is null, the game has correct version dimensions, so no warning needed
     });
   });
 
+  bggDefaultDimensions.sort(sortByName);
   guessedVersions.sort(sortByName);
   selectedVersionFallback.sort(sortByName);
   missingDimensions.sort(sortByName);
@@ -87,6 +99,7 @@ export const collectWarningGroups = ({
     .sort(sortByName);
 
   return {
+    bggDefaultDimensions,
     guessedVersions,
     selectedVersionFallback,
     missingDimensions,

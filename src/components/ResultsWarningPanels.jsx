@@ -74,6 +74,24 @@ const createGameRenderer = ({
  */
 const WARNING_PANEL_CONFIG = [
   {
+    id: 'bggDefaultDimensions',
+    dataKey: 'bggDefaultDimensions',
+    variant: 'warning',
+    Icon: FaExclamationTriangle,
+    title: 'BoardGameGeek Default Dimensions',
+    getDescription: ({ count }) => (
+      <>
+        {count} game{count !== 1 ? 's' : ''}{' '}
+        {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
+        dimensions of 12.8&quot; × 12.8&quot; × 1.8&quot; were assumed and marked with the warning icon{' '}
+        <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
+      </>
+    ),
+    renderItem: createGameRenderer({
+      linkKeys: ['correctionUrl', 'versionsUrl'],
+    }),
+  },
+  {
     id: 'guessedVersions',
     dataKey: 'guessedVersions',
     variant: 'info',

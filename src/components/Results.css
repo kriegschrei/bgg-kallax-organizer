@@ -266,7 +266,8 @@
 
 @media (max-width: 1200px) {
   .callout-grid.callout-count-3,
-  .callout-grid.callout-count-4 {
+  .callout-grid.callout-count-4,
+  .callout-grid.callout-count-5 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .stats-summary {

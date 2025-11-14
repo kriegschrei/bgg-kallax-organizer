@@ -85,6 +85,10 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.callout-grid.callout-count-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .override-pill {
   --override-pill-bg: var(--color-accent-info-tint);
   --override-pill-text: var(--color-accent-info-contrast);

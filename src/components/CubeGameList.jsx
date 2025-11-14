@@ -11,6 +11,9 @@ import {
   FaChevronDown,
   FaChevronRight,
   FaUser,
+  FaQuestionCircle,
+  FaInfoCircle,
+  FaTools,
 } from 'react-icons/fa';
 import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
@@ -58,7 +61,10 @@ function CubeGameList({
           
           // Get primary dimension from array to check missingDimensions
           const primaryDim = getPrimaryDimension(game.dimensions);
-          const dimensionWarning = primaryDim?.missingDimensions ?? false;
+          const missingDimensions = primaryDim?.missingDimensions ?? false;
+          const bggDefaultDimensions = Boolean(game.bggDefaultDimensions);
+          const missingVersion = Boolean(game.missingVersion);
+          const usedAlternateVersionDims = Boolean(game.usedAlternateVersionDims);
           const oversizedWarning = game.oversized?.x || game.oversized?.y;
           
           // Use gameName and versionName directly from the new schema
@@ -148,7 +154,28 @@ function CubeGameList({
                     {displayDims.z.toFixed(1)}"
                   </span>
                 </span>
-                {dimensionWarning && (
+                {bggDefaultDimensions && (
+                  <FaQuestionCircle
+                    className="dimension-icon bgg-default-icon"
+                    title={`BoardGameGeek default dimensions (12.8" × 12.8" × 1.8") were used`}
+                    aria-hidden="true"
+                  />
+                )}
+                {missingVersion && (
+                  <FaInfoCircle
+                    className="dimension-icon missing-version-icon"
+                    title="No specific version selected - alternate version dimensions used"
+                    aria-hidden="true"
+                  />
+                )}
+                {usedAlternateVersionDims && (
+                  <FaTools
+                    className="dimension-icon alternate-dims-icon"
+                    title="Dimensions from alternate version substituted"
+                    aria-hidden="true"
+                  />
+                )}
+                {missingDimensions && (
                   <FaExclamationTriangle
                     className="dimension-icon warning-icon"
                     title="Dimensions not available in BGG"

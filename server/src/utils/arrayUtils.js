@@ -16,5 +16,5 @@ export const ensureArray = (value) => {
  * @param {*} value - The value to clone
  * @returns {Array} A cloned array or empty array
  */
-export const cloneList = (value) => (Array.isArray(value) ? [...value] : []);
+export const cloneList = (value) => [...ensureArray(value)];
 

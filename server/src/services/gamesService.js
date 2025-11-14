@@ -13,7 +13,7 @@ import {
 } from '../utils/gameProcessingHelpers.js';
 import {
   COLLECTION_STATUS_KEYS,
-  getGameName,
+  createDisplayName,
 } from '../utils/gameUtils.js';
 import { normalizePositiveNumber, isPositiveFinite } from '../utils/numberUtils.js';
 import { getMaxDepthDimension } from '../utils/packingHelpers.js';
@@ -46,7 +46,7 @@ const filterVersionEntries = (entries, includeStatuses, excludeStatuses, include
 const dedupeVersionEntries = (entries) => {
   const seen = new Set();
   return entries.filter((entry) => {
-    const key = entry.versionKey || `${entry.gameId}-${entry.versionId ?? 'default'}`;
+    const key = entry.versionKey;
     if (seen.has(key)) {
       return false;
     }
@@ -65,12 +65,10 @@ const detectMissingVersionSelections = (entries) => {
     }
 
     if ((entry.versionId === -1 || entry.versionId === null) && !missing.has(gameId)) {
-      const name = entry.name || `ID:${gameId}`;
-      const { versionsUrl } = buildGameUrls(gameId, null, name);
       missing.set(gameId, {
         id: gameId,
-        name,
-        versionsUrl,
+        name: entry.name || `ID:${gameId}`,
+        versionsUrl: entry.versionsUrl || null,
       });
     }
   });
@@ -149,6 +147,11 @@ const cloneDimensionSource = (dimension) => {
   const width = normalizePositiveNumber(dimension.width);
   const depth = normalizePositiveNumber(dimension.depth);
 
+  // If all dimensions are null/missing, return null instead of an object with null values
+  if (length == null && width == null && depth == null) {
+    return null;
+  }
+
   return {
     length,
     width,
@@ -168,8 +171,8 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
     source: selectedDimensionSource,
   } = resolveDimensionsForEntry(entry);
 
-  const versionKey = entry.versionKey || `${entry.gameId}-${entry.versionId !== -1 ? entry.versionId : 'default'}`;
-  const gameName = getGameName(entry, entry.gameId);
+  const versionKey = entry.versionKey;
+  const gameName = entry.gameName || null;
   const versionName = entry.versionName || gameName;
   const gameType = entry.gameType || entry.objectType || entry.objecttype || entry.subtype || null;
   const subType = entry.subtype || null;
@@ -181,19 +184,16 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
     : -1;
 
   const versionDimensions = cloneDimensionSource(entry.dimensions);
-  const guessedDimensions = alternateVersion
+  const guessedDimensions = entry.alternateVersions?.[0]
     ? cloneDimensionSource({
-        ...(alternateVersion.dimensions || {}),
+        ...(entry.alternateVersions[0].dimensions || {}),
         weight:
-          alternateVersion.weight ??
-          alternateVersion.dimensions?.weight ??
+          entry.alternateVersions[0].weight ??
+          entry.alternateVersions[0].dimensions?.weight ??
           null,
       })
     : null;
-  const defaultDimensions =
-    selectedDimensionSource === 'default'
-      ? cloneDimensionSource(DEFAULT_DIMENSIONS)
-      : null;
+  const defaultDimensions = cloneDimensionSource(DEFAULT_DIMENSIONS);
 
   const game = {
     id: versionKey,
@@ -266,6 +266,7 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
   game.versionsUrl = entry.versionsUrl || null;
 
   game.usedAlternateVersionDims = usedAlternate;
+  game.bggDefaultDimensions = Boolean(entry.bggDefaultDimensions); // Flag to indicate BGG defaults were filtered
   if (usedAlternate && alternateVersion) {
     game.alternateVersionId = alternateVersion.versionId;
     game.alternateVersionName = alternateVersion.name || null;
@@ -276,6 +277,8 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
   if (!game.versionName) {
     game.versionName = getFallbackVersionLabel(game);
   }
+
+  game.displayName = createDisplayName(game, game.gameId);
 
   return game;
 };
@@ -499,7 +502,7 @@ export const processGamesRequest = async ({
     games: gamesToPack.length,
   });
 
-  const responsePayload = serializeCubesResponse(packedCubes, gamesToPack, stacking, oversizedExcludedGames);
+  const responsePayload = serializeCubesResponse(packedCubes, stacking, oversizedExcludedGames);
 
   return responsePayload;
 };

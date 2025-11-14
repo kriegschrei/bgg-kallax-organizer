@@ -1,5 +1,4 @@
 import { roundToGrid } from './packingPositionService.js';
-import { createDisplayName, getGameName } from '../utils/gameUtils.js';
 import { getSafeGameArea } from '../utils/packingHelpers.js';
 
 const DISPLAY_KALLAX_WIDTH = 13;
@@ -87,9 +86,9 @@ export const finalizeCube = (cube, cubeIndex) => {
 export const createOversizedExcludedGame = (game) => {
   return {
     id: game.id,
-    name: createDisplayName(game, game.gameId),
-    gameName: getGameName(game, game.gameId),
+    gameName: game.gameName || null,
     versionName: game.versionName || null,
+    displayName: game.displayName || null,
     status: 'excluded',
     correctionUrl: game.correctionUrl || null,
     versionsUrl: game.versionsUrl || null,
@@ -110,9 +109,9 @@ export const getOversizedStuffedGames = (cubes) => {
       if ((game.oversizedX || game.oversizedY) && !stuffedSeen.has(game.id)) {
         oversizedStuffedGames.push({
           id: game.id,
-          name: createDisplayName(game, game.gameId),
-          gameName: getGameName(game, game.gameId),
+          gameName: game.gameName || null,
           versionName: game.versionName || null,
+          displayName: game.displayName || null,
           status: 'stuffed',
           cubeId: cube.id,
           correctionUrl: game.correctionUrl || null,

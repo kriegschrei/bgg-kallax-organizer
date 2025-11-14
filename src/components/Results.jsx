@@ -6,7 +6,7 @@ import ResultsOverrides from './ResultsOverrides';
 import ResultsWarningPanels from './ResultsWarningPanels';
 import { formatGameDimensions, getScrollableListClassName } from '../utils/results';
 import { formatEditorDimensions } from '../utils/dimensions';
-import { collectWarningGroups } from '../utils/resultsWarnings.jsx';
+import { collectWarningGroups } from '../utils/resultsWarnings';
 import { useOverrideData } from '../hooks/useOverrideData';
 import { useDimensionOverrideEditor } from '../hooks/useDimensionOverrideEditor';
 import './Results.css';

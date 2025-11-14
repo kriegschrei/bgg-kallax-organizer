@@ -1,4 +1,5 @@
 import { resolveGameIdentity } from './overrideIdentity';
+import { getPrimaryDimension } from './dimensions';
 
 export function getGameColor(index, total) {
   return `hsl(${(index * 360) / total}, 70%, 80%)`;
@@ -149,7 +150,8 @@ export const SORTING_BADGE_BUILDERS = {
     ];
   },
   age: (game) => {
-    const value = Number.isFinite(game.age) ? game.age : null;
+    // Use minAge from new schema
+    const value = Number.isFinite(game.minAge) ? game.minAge : null;
     if (value === null) {
       return [];
     }
@@ -175,7 +177,9 @@ export const SORTING_BADGE_BUILDERS = {
     ];
   },
   weight: (game) => {
-    const value = Number.isFinite(game.weight) ? game.weight : null;
+    // Get weight from dimensions array
+    const primaryDim = getPrimaryDimension(game.dimensions);
+    const value = primaryDim?.weight != null && Number.isFinite(primaryDim.weight) ? primaryDim.weight : null;
     if (value === null) {
       return [];
     }

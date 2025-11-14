@@ -10,48 +10,24 @@ function CubeFrontView({ cube, canvasWidth, canvasHeight, scale }) {
         <rect x="0" y="0" width={canvasWidth} height={canvasHeight} fill="none" stroke="#34495e" strokeWidth="2" />
 
         {games.map((game, index) => {
-          const fallbackDims = { x: 0, y: 0 };
-          const actualDims = game.actualOrientedDims ?? game.orientedDims ?? fallbackDims;
-          const clampedDims = game.orientedDims ?? fallbackDims;
+          // Use position and packedDims directly from API response
+          const positionX = game.position?.x ?? 0;
+          const positionY = game.position?.y ?? 0;
+          const packedDims = game.packedDims ?? { x: 0, y: 0, z: 0 };
+          
+          const rectX = positionX * scale;
+          const rectY = canvasHeight - (positionY + packedDims.y) * scale;
 
-          let rectX = 0;
-          let rectY = 0;
-
-          if (game.position) {
-            const positionX = game.position?.x ?? 0;
-            const positionY = game.position?.y ?? 0;
-            rectX = positionX * scale;
-            rectY = canvasHeight - (positionY + clampedDims.y) * scale;
-          } else {
-            const rowIndex = cube.rows?.findIndex((row) => row?.games?.includes(game)) ?? -1;
-            if (rowIndex >= 0 && cube.rows[rowIndex]) {
-              const row = cube.rows[rowIndex];
-              const rowBottomOffset = cube.rows
-                .slice(0, rowIndex)
-                .reduce((sum, r) => sum + (r?.heightUsed ?? 0), 0);
-
-              const gameIndexInRow = row.games?.indexOf(game) ?? -1;
-              const xOffsetInRow = (row.games ?? [])
-                .slice(0, Math.max(0, gameIndexInRow))
-                .reduce((sum, g) => sum + (g.orientedDims?.x ?? 0), 0);
-
-              rectX = xOffsetInRow * scale;
-              rectY = canvasHeight - (rowBottomOffset + clampedDims.y) * scale;
-            } else {
-              console.warn('Game missing row data:', game.name, game);
-            }
-          }
-
-          if (actualDims.x <= 0 || actualDims.y <= 0) {
+          if (packedDims.x <= 0 || packedDims.y <= 0) {
             return null;
           }
 
-          const rectWidth = actualDims.x * scale;
-          const rectHeight = actualDims.y * scale;
-          const isOversized = game.oversizedX || game.oversizedY;
+          const rectWidth = packedDims.x * scale;
+          const rectHeight = packedDims.y * scale;
+          const isOversized = game.oversized?.x || game.oversized?.y;
 
           return (
-            <g key={game.id}>
+            <g key={game.versionKey || game.id || index}>
               <rect
                 x={rectX}
                 y={rectY}

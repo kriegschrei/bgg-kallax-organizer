@@ -1,6 +1,7 @@
 import { parseInteger, parseFloat } from '../../utils/numberUtils.js';
 import { ensureArray } from '../../utils/arrayUtils.js';
-import { unescapeName } from '../../utils/gameUtils.js';
+import { unescapeName, buildVersionKey } from '../../utils/gameUtils.js';
+import { DEFAULT_DIMENSIONS } from '../../utils/gameProcessingHelpers.js';
 
 const uniqueSortedValues = (values = []) =>
   Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -8,9 +9,9 @@ const uniqueSortedValues = (values = []) =>
 const extractBestPlayerCount = (item) => {
   const summaryResult = item['poll-summary']?.result;
   if (summaryResult) {
-    const bestWith = Array.isArray(summaryResult)
-      ? summaryResult.find((result) => result?.$?.name === 'bestwith')
-      : summaryResult;
+    const wasArray = Array.isArray(summaryResult);
+    const summaryArray = ensureArray(summaryResult);
+    const bestWith = summaryArray.find((result) => result?.$?.name === 'bestwith') || (!wasArray ? summaryResult : undefined);
     const value = bestWith?.$?.value;
     if (value) {
       const match = value.match(/(\d+)/);
@@ -26,7 +27,7 @@ const extractBestPlayerCount = (item) => {
   }
 
   const results = poll.results;
-  const entries = Array.isArray(results) ? results : [results];
+  const entries = ensureArray(results);
 
   let bestCount = -1;
   let maxBestVotes = 0;
@@ -51,7 +52,7 @@ const calculateWeightedAverage = (results, { valueKey = 'value', weightKey = 'nu
     return -1;
   }
 
-  const entries = Array.isArray(results) ? results : [results];
+  const entries = ensureArray(results);
 
   let totalWeight = 0;
   let totalValue = 0;
@@ -100,7 +101,7 @@ const extractLinks = (item, type) => {
     return [];
   }
 
-  const linkArray = Array.isArray(links) ? links : [links];
+  const linkArray = ensureArray(links);
   return linkArray.filter((link) => link?.$?.type === type).map((link) => link.$?.value);
 };
 
@@ -110,7 +111,7 @@ const extractLinkIds = (item, type) => {
     return [];
   }
 
-  const linkArray = Array.isArray(links) ? links : [links];
+  const linkArray = ensureArray(links);
   return linkArray.filter((link) => link?.$?.type === type).map((link) => link.$?.id);
 };
 
@@ -171,21 +172,21 @@ export const mapThingItem = (item) => {
   const stats = item.statistics?.ratings;
 
   const ranks = stats?.ranks;
-  const ranksArray = Array.isArray(ranks?.rank) ? ranks.rank : ranks?.rank ? [ranks.rank] : [];
+  const ranksArray = ensureArray(ranks?.rank);
   const boardGameRank = ranksArray.find((rank) => rank?.$?.friendlyname === 'Board Game Rank');
   const rankValue = boardGameRank?.$?.value;
 
   const versionsNode = item.versions?.item || item.versions;
-  const versionItems = Array.isArray(versionsNode) ? versionsNode : versionsNode ? [versionsNode] : [];
+  const versionItems = ensureArray(versionsNode);
 
   const expansionInfo = deriveExpansionInfo(item);
 
-  const rawName =
-    Array.isArray(item.name)
-      ? item.name.find((entry) => entry?.$?.type === 'primary')?.$?.value ||
-        item.name[0]?.$?.value ||
-        null
-      : item.name?.$?.value || item.name?._ || item.name || null;
+  const nameArray = ensureArray(item.name);
+  const rawName = nameArray.length > 0
+    ? nameArray.find((entry) => entry?.$?.type === 'primary')?.$?.value ||
+      nameArray[0]?.$?.value ||
+      null
+    : item.name?.$?.value || item.name?._ || item.name || null;
 
   return {
     id: parseInteger(item.$.id, -1),
@@ -217,51 +218,80 @@ export const mapThingItem = (item) => {
   };
 };
 
-export const mapVersionItems = (item) => {
+export const mapVersionItems = (item, thingGameId) => {
   const versionsNode = item?.versions?.item || item?.versions;
   if (!versionsNode) {
     return [];
   }
 
-  const versionItems = Array.isArray(versionsNode) ? versionsNode : [versionsNode];
+  const versionItems = ensureArray(versionsNode);
 
   return versionItems
     .map((version) => {
       const attributes = version?.$ || {};
-      const primaryName =
-        Array.isArray(version?.name)
-          ? version.name.find((n) => n?.$?.type === 'primary')?.$?.value || null
-          : version?.name?.$?.value || version?.name?._ || version?.name || null;
+      const nameArray = ensureArray(version?.name);
+      const primaryName = nameArray.length > 0
+        ? nameArray.find((n) => n?.$?.type === 'primary')?.$?.value || null
+        : version?.name?.$?.value || version?.name?._ || version?.name || null;
       const canonName =
         version?.canonicalname?.$?.value ||
         version?.canonicalname?._ ||
         version?.canonicalname ||
         null;
       const displayName = unescapeName(primaryName || canonName);
-      const linkToGame = Array.isArray(version?.link)
-        ? version.link.find((link) => link?.$?.type === 'boardgameversion')
-        : version?.link?.$?.type === 'boardgameversion'
-        ? version.link
-        : null;
+      const linkArray = ensureArray(version?.link);
+      const linkToGame = linkArray.find((link) => link?.$?.type === 'boardgameversion') || null;
+      const languageLink = linkArray.find((link) => link?.$?.type === 'language') || null;
 
-      const languageLink = Array.isArray(version?.link)
-        ? version.link.find((link) => link?.$?.type === 'language')
-        : version?.link?.$?.type === 'language'
-        ? version.link
-        : null;
-
-      const gameId = parseInteger(linkToGame?.$?.id, -1);
-      const length = parseFloat(version?.length?.$?.value, -1);
-      const width = parseFloat(version?.width?.$?.value, -1);
-      const depth = parseFloat(version?.depth?.$?.value, -1);
-      const dimensionsMeta = computeDimensionsMeta({ length, width, depth });
+      // Use thingGameId if provided and valid, otherwise fall back to link gameId
+      const linkGameId = parseInteger(linkToGame?.$?.id, -1);
+      const gameId = (Number.isInteger(thingGameId) && thingGameId > 0) 
+        ? thingGameId 
+        : (linkGameId !== -1 ? linkGameId : -1);
+      
       const versionId = parseInteger(attributes.id, -1);
+      
+      const rawLength = version?.length?.$?.value;
+      const rawWidth = version?.width?.$?.value;
+      const rawDepth = version?.depth?.$?.value;
+      
+      let length = parseFloat(rawLength, -1);
+      let width = parseFloat(rawWidth, -1);
+      let depth = parseFloat(rawDepth, -1);
+      
+      // BGG returns default dimensions matching DEFAULT_DIMENSIONS for games without dimensions
+      // Treat these as missing dimensions so we can try alternate versions or use our defaults
+      const TOLERANCE = 0.01;
+      const matchesDefault = (val, defaultVal) => Math.abs(val - defaultVal) < TOLERANCE;
+      
+      // Check if dimensions match DEFAULT_DIMENSIONS (in any order)
+      const defaultDims = [DEFAULT_DIMENSIONS.length, DEFAULT_DIMENSIONS.width, DEFAULT_DIMENSIONS.depth];
+      const parsedDims = [length, width, depth];
+      
+      // Sort both arrays to compare regardless of order
+      const sortedDefaults = [...defaultDims].sort((a, b) => a - b);
+      const sortedParsed = [...parsedDims].sort((a, b) => a - b);
+      
+      const isBggDefaultDimensions = sortedDefaults.every((def, idx) => 
+        matchesDefault(sortedParsed[idx], def)
+      );
+      
+      // If these match DEFAULT_DIMENSIONS, treat them as missing
+      if (isBggDefaultDimensions) {
+        console.debug(`⚠️  Filtering BGG default dimensions (${DEFAULT_DIMENSIONS.length}" × ${DEFAULT_DIMENSIONS.width}" × ${DEFAULT_DIMENSIONS.depth}") for ${buildVersionKey(gameId, versionId)}`);
+        // Set to -1 to mark as missing
+        length = -1;
+        width = -1;
+        depth = -1;
+      }
+      
+      const dimensionsMeta = computeDimensionsMeta({ length, width, depth });
 
       return {
         versionId,
         name: displayName,
         gameId,
-        versionKey: `${gameId}-${versionId !== -1 ? versionId : 'default'}`,
+        versionKey: buildVersionKey(gameId, versionId),
         versionYearPublished: parseInteger(version?.yearpublished?.$?.value, -1),
         width,
         length,
@@ -271,6 +301,7 @@ export const mapVersionItems = (item) => {
         missingDimensions: dimensionsMeta.missingDimensions, // Keep for backward compatibility in cache
         volume: dimensionsMeta.volume,
         area: dimensionsMeta.area,
+        bggDefaultDimensions: isBggDefaultDimensions, // Flag to indicate BGG defaults were filtered
       };
     })
     .filter((version) => version.versionId !== -1);

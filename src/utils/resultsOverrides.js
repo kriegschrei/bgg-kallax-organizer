@@ -1,10 +1,4 @@
-const toArray = (value) => (Array.isArray(value) ? value : []);
-
-const sortByName = (a, b) => {
-  const nameA = typeof a?.name === 'string' ? a.name : '';
-  const nameB = typeof b?.name === 'string' ? b.name : '';
-  return nameA.localeCompare(nameB);
-};
+import { toArray, sortByName } from './results';
 
 export const buildOverrideLookups = ({
   excludedGames = [],

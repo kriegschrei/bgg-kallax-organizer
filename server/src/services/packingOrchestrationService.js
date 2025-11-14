@@ -5,10 +5,9 @@ import { compareGames, sortGamesByArea } from './packingSortService.js';
 import { tryPlaceGame, tryAggressiveReorganization, calculateOccupiedAreaForCube } from './packingPlacementService.js';
 import { createGameGroups } from './groupingService.js';
 import { getSafeGameArea, selectCubesToCheck, MAX_GROUP_AREA } from '../utils/packingHelpers.js';
-import { getGameName } from '../utils/gameUtils.js';
 import { hasValidDimensions } from '../utils/gameProcessingHelpers.js';
 
-const { CUBE_SIZE, CUBE_AREA } = PACKING_CONSTANTS;
+const { CUBE_AREA } = PACKING_CONSTANTS;
 const { OVERSIZED_THRESHOLD } = PACKING_DISPLAY_CONSTANTS;
 
 /* 
@@ -23,7 +22,7 @@ export const prepareGamesForPacking = (games, primaryOrder, fitOversized) => {
 
   for (const game of games) {
     if (!hasValidDimensions(game.dimensions)) {
-      const gameName = getGameName(game, game.gameId);
+      const gameName = game.gameName;
       console.error(`❌ Game "${gameName}" has invalid dimensions`);
       game.dims2D = null;
       continue;

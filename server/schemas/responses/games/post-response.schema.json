@@ -24,6 +24,7 @@
                   "versionKey": { "type": "string" },
                   "gameName": { "type": "string" },
                   "versionName": { "type": "string" },
+                  "displayName": { "type": "string" },
                   "collectionId": { "type": "integer" },
                   "gamePublishedYear": { "type": "integer" },
                   "versionPublishedYear": { "type": "integer" },
@@ -72,11 +73,12 @@
                   "missingVersion": { "type": "boolean" },
                   "versionsUrl": { "type": "string", "format": "uri" },
                   "usedAlternateVersionDims": { "type": "boolean" },
+                  "bggDefaultDimensions": { "type": "boolean" },
                   "correctionUrl": { "type": "string", "format": "uri" },
                   "orientation": { "$ref": "../../$defs/types.schema.json#/$defs/orientation" }
                 },
                 "required": [
-                  "versionKey","gameId","versionId","gameName","versionName","dimensions","position",
+                  "versionKey","gameId","versionId","gameName","versionName","displayName","dimensions","position",
                   "packedDims","oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
                   "bestPlayerCount","minPlaytime","maxPlaytime","minAge","communityAge","bggWeight","bggRating","numplays",
                   "missingVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","gameType",
@@ -109,6 +111,7 @@
             "id": { "type": "string" },
             "gameName": { "type": ["string", "null"] },
             "versionName": { "type": ["string", "null"] },
+            "displayName": { "type": "string" },
             "status": {
               "type": "string",
               "enum": ["stuffed", "excluded"]
@@ -127,7 +130,7 @@
               }
             }
           },
-          "required": ["id", "gameName", "versionName","status"]
+          "required": ["id", "gameName", "versionName", "displayName", "status"]
         }
       }
     },

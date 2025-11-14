@@ -25,11 +25,6 @@ export const tryPlaceGame = (cube, game, width, height, orientationLabel = null)
 
   const gameArea = packedWidth * packedHeight;
   const cubeArea = CUBE_AREA;
-  
-  // Initialize occupiedArea if not set
-  if (cube.occupiedArea === undefined) {
-    cube.occupiedArea = calculateOccupiedAreaForCube(cube);
-  }
 
   if (cube.occupiedArea + gameArea > cubeArea) {
     return false;
@@ -72,11 +67,6 @@ export const tryAggressiveReorganization = (
 ) => {
   const gameArea = getSafeGameArea(newGame) || width * height;
   const cubeArea = CUBE_AREA;
-  
-  // Initialize occupiedArea if not set
-  if (cube.occupiedArea === undefined) {
-    cube.occupiedArea = calculateOccupiedAreaForCube(cube);
-  }
 
   if (cube.occupiedArea + gameArea > cubeArea) {
     return false;

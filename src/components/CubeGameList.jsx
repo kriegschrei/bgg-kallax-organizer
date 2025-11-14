@@ -14,8 +14,8 @@ import {
 } from 'react-icons/fa';
 import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
-import { getGameColor, splitNameAndVersion } from '../utils/cubeVisualization';
-import { resolveDisplayDimensions } from '../utils/dimensions';
+import { getGameColor } from '../utils/cubeVisualization';
+import { resolveDisplayDimensions, getPrimaryDimension } from '../utils/dimensions';
 import { resolveGameIdentity } from '../utils/overrideIdentity';
 
 function CubeGameList({
@@ -44,39 +44,28 @@ function CubeGameList({
         {games.map((game, index) => {
           const backgroundColor = getGameColor(index, games.length);
           const borderColor = backgroundColor.replace('80%', '60%');
-          const orientedDims = game.actualOrientedDims || game.orientedDims || { x: 0, y: 0, z: 0 };
+          
+          // Use packedDims directly from API response
+          const packedDims = game.packedDims ?? { x: 0, y: 0, z: 0 };
+          
           const identity = resolveGameIdentity(game);
           const overrideKey = identity?.key ?? null;
           const isExcluded = overrideKey ? Boolean(excludedLookup[overrideKey]) : false;
           const forcedOrientation = overrideKey ? orientationLookup[overrideKey] || null : null;
           const userDims = overrideKey ? dimensionLookup[overrideKey] || null : null;
-          const displayDims = resolveDisplayDimensions(userDims, orientedDims, dimensionEditor, overrideKey);
+          const displayDims = resolveDisplayDimensions(userDims, packedDims, dimensionEditor, overrideKey);
           const editingThisGame = dimensionEditor.overrideKey === overrideKey;
-          const dimensionWarning = game.dimensions?.missingDimensions;
-          const oversizedWarning = game.oversizedX || game.oversizedY;
-          const rawName = typeof game.name === 'string' ? game.name.trim() : '';
-          const { name: parsedName, version: detectedVersion } = splitNameAndVersion(rawName);
-          const rawVersionId =
-            typeof game.selectedVersionId === 'string'
-              ? game.selectedVersionId.trim()
-              : game.selectedVersionId;
-          const normalizedVersionId =
-            typeof rawVersionId === 'string' ? rawVersionId.toLowerCase() : rawVersionId;
-          const hasExplicitVersion =
-            normalizedVersionId !== null &&
-            normalizedVersionId !== undefined &&
-            normalizedVersionId !== '' &&
-            normalizedVersionId !== 'default' &&
-            normalizedVersionId !== 'no-version';
-          const versionNameProp =
-            typeof game.versionName === 'string' ? game.versionName.trim() : '';
-          const displayName = (parsedName || rawName || '').trim();
-          const candidateVersionName = (versionNameProp || detectedVersion || '').trim();
-          const versionLabel = candidateVersionName
-            ? candidateVersionName
-            : hasExplicitVersion
-            ? 'Default Version'
-            : 'No Version Selected';
+          
+          // Get primary dimension from array to check missingDimensions
+          const primaryDim = getPrimaryDimension(game.dimensions);
+          const dimensionWarning = primaryDim?.missingDimensions ?? false;
+          const oversizedWarning = game.oversized?.x || game.oversized?.y;
+          
+          // Use gameName and versionName directly from the new schema
+          const gameName = typeof game.gameName === 'string' ? game.gameName.trim() : '';
+          const versionName = typeof game.versionName === 'string' ? game.versionName.trim() : '';
+          const displayName = gameName || 'Unknown Game';
+          const versionLabel = versionName || 'No Version Selected';
           const showVersionLine = Boolean(displayName) && Boolean(versionLabel);
           const orientationIcon =
             forcedOrientation === 'horizontal' ? (
@@ -169,9 +158,9 @@ function CubeGameList({
                 {oversizedWarning && (
                   <FaBoxOpen
                     className="dimension-icon oversized-icon"
-                    title={`This game may be too large for the cube (${game.oversizedX ? 'width' : ''}${
-                      game.oversizedX && game.oversizedY ? ' and ' : ''
-                    }${game.oversizedY ? 'height' : ''} > 13")`}
+                    title={`This game may be too large for the cube (${game.oversized?.x ? 'width' : ''}${
+                      game.oversized?.x && game.oversized?.y ? ' and ' : ''
+                    }${game.oversized?.y ? 'height' : ''} > 13")`}
                     aria-hidden="true"
                   />
                 )}

@@ -73,9 +73,9 @@ export const extractDimensions = (game) => {
 };
 
 export const DEFAULT_DIMENSIONS = {
-  length: 12.8,
-  width: 1.8,
-  depth: 12.8,
+  length: 11.7,
+  width: 11.7,
+  depth: 2.8,
   weight: null,
   missing: true,
 };
@@ -84,10 +84,11 @@ export const getFallbackVersionLabel = (game) => {
   if (game.versionName) {
     return game.versionName;
   }
-  if (!game.name || typeof game.name !== 'string') {
+  const name = game.name;
+  if (!name || typeof name !== 'string') {
     return null;
   }
-  const match = game.name.trim().match(/\(([^()]+)\)\s*$/);
+  const match = name.trim().match(/\(([^()]+)\)\s*$/);
   if (!match) {
     return null;
   }

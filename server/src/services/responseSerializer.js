@@ -8,19 +8,9 @@ import {
   toIntegerOrFallback,
 } from '../utils/numberUtils.js';
 import { cloneList } from '../utils/arrayUtils.js';
-import { getGameName } from '../utils/gameUtils.js';
+import { COLLECTION_STATUS_KEYS } from '../utils/gameUtils.js';
 
 const DIMENSION_PRIORITY = ['user', 'version', 'guessed', 'default'];
-const STATUS_KEYS = [
-  'own',
-  'prevowned',
-  'fortrade',
-  'want',
-  'wanttobuy',
-  'wanttoplay',
-  'wishlist',
-  'preordered',
-];
 
 const CUBE_DISPLAY_AREA =
   PACKING_DISPLAY_CONSTANTS.DISPLAY_KALLAX_WIDTH *
@@ -57,6 +47,20 @@ const buildDimensions = (game) => {
     }
   }
 
+  // If version dimension is missing but game has a versionId, include it as missing
+  // This allows the frontend to detect missing dimensions correctly
+  if (!sources.version && game.versionId !== undefined && game.versionId !== -1) {
+    const missingVersionEntry = {
+      type: 'version',
+      length: null,
+      width: null,
+      depth: null,
+      weight: null,
+      missing: true,
+    };
+    entries.unshift(missingVersionEntry); // Add at the beginning to maintain priority order
+  }
+
   if (entries.length === 0) {
     const fallback = {
       length: game.dimensions?.length,
@@ -78,7 +82,7 @@ const buildDimensions = (game) => {
 };
 
 const buildStatuses = (statuses = {}) => {
-  return STATUS_KEYS.reduce((acc, key) => {
+  return COLLECTION_STATUS_KEYS.reduce((acc, key) => {
     acc[key] = Boolean(statuses[key]);
     return acc;
   }, {});
@@ -130,8 +134,9 @@ const transformGameForResponse = (game) => {
     gameId: toIntegerOrFallback(game.gameId, -1),
     versionId: toIntegerOrFallback(game.versionId, -1),
     versionKey: String(game.versionKey ?? game.id ?? ''),
-    gameName: getGameName(game, game.gameId),
-    versionName: game.versionName || game.name || `ID:${game.versionId}`,
+    gameName: game.gameName,
+    versionName: game.versionName,
+    displayName: game.displayName,
     collectionId: toIntegerOrFallback(game.collectionId, -1),
     gamePublishedYear: toIntegerOrFallback(game.gamePublishedYear, -1),
     versionPublishedYear: toIntegerOrFallback(game.versionPublishedYear, -1),
@@ -163,6 +168,7 @@ const transformGameForResponse = (game) => {
     missingVersion: Boolean(game.missingVersion),
     versionsUrl: game.versionsUrl || null,
     usedAlternateVersionDims: Boolean(game.usedAlternateVersionDims),
+    bggDefaultDimensions: Boolean(game.bggDefaultDimensions),
     correctionUrl: game.correctionUrl || null,
     orientation: buildOrientation(game),
   };
@@ -234,7 +240,7 @@ const normalizeOversizedGames = (packedCubes, oversizedExcludedGames) => {
   for (const item of stuffedGames) {
     const entry = {
       id: String(item.id),
-      name: item.name,
+      displayName: item.displayName,
       gameName: item.gameName || null,
       versionName: item.versionName || null,
       status: item.status,
@@ -252,7 +258,7 @@ const normalizeOversizedGames = (packedCubes, oversizedExcludedGames) => {
     for (const item of oversizedExcludedGames) {
       const entry = {
         id: String(item.id),
-        name: item.name,
+        displayName: item.displayName,
         gameName: item.gameName || null,
         versionName: item.versionName || null,
         status: item.status || 'excluded',
@@ -276,7 +282,6 @@ const normalizeOversizedGames = (packedCubes, oversizedExcludedGames) => {
 
 export const serializeCubesResponse = (
   packedCubes,
-  _gamesToPack,
   stacking,
   oversizedExcludedGames,
 ) => {

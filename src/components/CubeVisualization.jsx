@@ -7,6 +7,7 @@ import {
   buildBadgesForGame as computeBadgesForGame,
 } from '../utils/cubeVisualization';
 import { resolveGameIdentity } from '../utils/overrideIdentity';
+import { getPrimaryDimension } from '../utils/dimensions';
 
 const KALLAX_WIDTH = 13;
 const KALLAX_HEIGHT = 13;
@@ -113,12 +114,9 @@ export default function CubeVisualization({
     }
 
     const customDims = dimensionLookup[overrideKey];
-    const source =
-      customDims ||
-      game.userDimensions ||
-      game.bggDimensions ||
-      game.dimensions ||
-      {};
+    // Get primary dimension from dimensions array, or use custom override
+    const primaryDim = getPrimaryDimension(game.dimensions);
+    const source = customDims || primaryDim || {};
 
     setDimensionEditor({
       overrideKey,

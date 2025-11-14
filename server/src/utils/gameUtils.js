@@ -35,67 +35,22 @@ export const buildGameUrls = (gameId, versionId, gameName) => {
   return { correctionUrl, versionsUrl };
 };
 
-export const extractVersionId = (game, fallbackVersionId = null) => {
-  if (game?.selectedVersionId) {
-    return game.selectedVersionId;
-  }
-
-  if (game?.id && typeof game.id === 'string' && game.id.includes('-')) {
-    const parts = game.id.split('-');
-    const possibleVersionId = parts[parts.length - 1];
-    if (
-      possibleVersionId &&
-      possibleVersionId !== 'default' &&
-      possibleVersionId !== 'no-version'
-    ) {
-      return possibleVersionId;
-    }
-  }
-
-  if (
-    fallbackVersionId &&
-    fallbackVersionId !== 'default' &&
-    fallbackVersionId !== 'no-version'
-  ) {
-    return fallbackVersionId;
-  }
-
-  return null;
-};
-
-export const extractVersionLabelFromName = (name) => {
-  if (!name || typeof name !== 'string') {
-    return null;
-  }
-
-  const match = name.trim().match(/\(([^()]+)\)\s*$/);
-  if (!match) {
-    return null;
-  }
-
-  const label = match[1]?.trim();
-  return label && label.length > 0 ? label : null;
-};
-
-export const extractBaseGameId = (game) => {
-  if (!game) return null;
-  if (game.baseGameId && /^\d+$/.test(game.baseGameId)) {
-    return game.baseGameId;
-  }
-  if (game.id) {
-    const idPart = game.id.split('-')[0];
-    if (idPart && /^\d+$/.test(idPart)) {
-      return idPart;
-    }
-  }
-  if (game.gameId && /^\d+$/.test(game.gameId)) {
-    return game.gameId;
-  }
-  return null;
-};
-
 export const normalizeUsername = (username) =>
   username ? username.toString().toLowerCase() : username;
+
+/**
+ * Builds a version key string from gameId and versionId.
+ * @param {number|string} gameId - The game ID
+ * @param {number|string|null|undefined} versionId - The version ID (can be -1, null, or undefined for default)
+ * @returns {string} Version key in format "gameId-versionId" or "gameId-default"
+ */
+export const buildVersionKey = (gameId, versionId) => {
+  const normalizedVersionId = versionId !== -1 && versionId !== null && versionId !== undefined 
+    ? versionId 
+    : 'default';
+  return `${gameId}-${normalizedVersionId}`;
+};
+
 
 /**
  * Unescapes HTML/XML entities and escaped characters in a string.
@@ -116,15 +71,7 @@ export const unescapeName = (value) => {
   return he.decode(normalized);
 };
 
-/**
- * Gets the game name from a game object, falling back to gameId if not available.
- * @param {Object} game - The game object
- * @param {string|number|null} fallbackGameId - The game ID to use in fallback (optional)
- * @returns {string} The game name or fallback ID string
- */
-export const getGameName = (game, fallbackGameId = null) => {
-  return game?.gameName || game?.name || (fallbackGameId ? `ID:${fallbackGameId}` : `ID:${game?.gameId || 'Unknown'}`);
-};
+
 
 /**
  * Creates a display name from gameName and versionName.

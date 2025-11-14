@@ -13,13 +13,14 @@ import { bggApiRequest } from './apiClient.js';
 import { xmlToJson } from './xmlParser.js';
 import { mapCollectionItems, generateCollectionHash } from './collectionMapper.js';
 import { mapThingItem, mapVersionItems } from './thingMapper.js';
-import { buildGameUrls } from '../../utils/gameUtils.js';
+import { buildGameUrls, buildVersionKey } from '../../utils/gameUtils.js';
 import { ensureArray } from '../../utils/arrayUtils.js';
 import { hasValidDimensions } from '../../utils/gameProcessingHelpers.js';
-import { isPositiveFinite, isNonNegativeInteger } from '../../utils/numberUtils.js';
+import { isPositiveFinite, isNonNegativeInteger, parseInteger } from '../../utils/numberUtils.js';
 
 const COLLECTION_MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
+const COLLECTION_RETRY_DELAY_BASE_MS = 2000;
 
 const buildCollectionKey = (username, includeStatuses = [], includeExpansions = true) => {
   const includeKeySegment = includeStatuses.slice().sort().join('|') || 'none';
@@ -56,7 +57,7 @@ const fetchCollectionXml = async (url) => {
     }
 
     attempt += 1;
-    const delay = (2 + attempt) * 1000;
+    const delay = (COLLECTION_RETRY_DELAY_BASE_MS / 1000 + attempt) * 1000;
     await new Promise((resolve) => setTimeout(resolve, delay));
   }
 
@@ -108,10 +109,9 @@ const fetchThingBatch = async (gameIds) => {
     games.set(game.id, game);
     returnedIds.add(game.id);
 
-    const versionEntries = mapVersionItems(rawItem);
+    const versionEntries = mapVersionItems(rawItem, game.id);
     versionEntries.forEach((version) => {
-      const key = `${game.id}:${version.versionId}`;
-      versions.set(key, version);
+      versions.set(version.versionKey, version);
     });
   }
 
@@ -189,15 +189,14 @@ const collectCachedData = (collectionItems) => {
       gamesToRefresh.add(gameId);
     }
 
-    item.versions.forEach(({ versionId }) => {
+    item.versions.forEach(({ versionId, versionKey }) => {
       const normalizedVersionId = Number.isInteger(versionId) ? versionId : -1;
       if (normalizedVersionId === -1) {
         gamesToRefresh.add(gameId);
         return;
       }
 
-      const key = `${gameId}:${normalizedVersionId}`;
-      const cachedVersion = getVersion(gameId, normalizedVersionId);
+      const cachedVersion = getVersion(versionKey);
       if (cachedVersion) {
         const dimensions = cachedVersion.dimensions;
         const length = isPositiveFinite(cachedVersion.length)
@@ -211,7 +210,7 @@ const collectCachedData = (collectionItems) => {
           : dimensions?.depth;
 
         if (hasValidDimensions({ length, width, depth })) {
-          cachedVersions.set(key, cachedVersion);
+          cachedVersions.set(versionKey, cachedVersion);
         } else {
           gamesToRefresh.add(gameId);
         }
@@ -229,10 +228,25 @@ const collectCachedData = (collectionItems) => {
 };
 
 const collectAvailableVersions = (versionLookup, gameId) => {
-  const prefix = `${gameId}:`;
-  return Array.from(versionLookup.entries())
-    .filter(([key]) => key.startsWith(prefix))
-    .map(([, version]) => version);
+  return Array.from(versionLookup.values())
+    .filter((version) => {
+      // Validate gameId matches
+      if (version.gameId !== gameId) {
+        return false;
+      }
+      
+      // Validate versionKey matches the gameId (extra safety check)
+      if (version.versionKey) {
+        const keyParts = version.versionKey.split('-');
+        const keyGameId = parseInteger(keyParts[0], -1);
+        if (keyGameId !== gameId) {
+          console.warn(`⚠️  Version ${version.versionKey} has mismatched gameId: stored=${version.gameId}, key=${keyGameId}`);
+          return false;
+        }
+      }
+      
+      return true;
+    });
 };
 
 const compareAlternateVersions = (a, b) => {
@@ -268,7 +282,7 @@ const compareAlternateVersions = (a, b) => {
   return (b.versionId ?? 0) - (a.versionId ?? 0);
 };
 
-const DEFAULT_DIMENSIONS = {
+const MISSING_DIMENSIONS_PLACEHOLDER = {
   length: -1,
   width: -1,
   depth: -1,
@@ -289,18 +303,22 @@ const buildVersionEntry = ({
     ? versionData.weight
     : null;
   
-  const derivedDimensions = versionData
+    const derivedDimensions = versionData
     ? {
         length: versionData.length,
         width: versionData.width,
         depth: versionData.depth,
         weight: normalizedWeight,
-        missing: versionData.missingDimensions ?? false,
+        missing: !hasValidDimensions({
+          length: versionData.length,
+          width: versionData.width,
+          depth: versionData.depth,
+        }),
       }
     : {
-        length: DEFAULT_DIMENSIONS.length,
-        width: DEFAULT_DIMENSIONS.width,
-        depth: DEFAULT_DIMENSIONS.depth,
+        length: MISSING_DIMENSIONS_PLACEHOLDER.length,
+        width: MISSING_DIMENSIONS_PLACEHOLDER.width,
+        depth: MISSING_DIMENSIONS_PLACEHOLDER.depth,
         weight: null,
         missing: true,
       };
@@ -312,9 +330,7 @@ const buildVersionEntry = ({
   const area = !missingDimensions && versionData && isPositiveFinite(versionData.area)
     ? versionData.area
     : -1;
-  const versionKey =
-    versionData?.versionKey ||
-    `${gameId}-${normalizedVersionId !== -1 ? normalizedVersionId : 'default'}`;
+  const versionKey = versionData?.versionKey || buildVersionKey(gameId, normalizedVersionId);
   const gameName = item.name || game?.name || versionData?.name || `Game ${gameId}`;
   const { correctionUrl, versionsUrl } = buildGameUrls(gameId, normalizedVersionId, gameName);
 
@@ -327,9 +343,19 @@ const buildVersionEntry = ({
 
   const alternateCandidates = collectAvailableVersions(versionLookup, gameId).filter(
     (candidate) =>
-      candidate.versionId !== normalizedVersionId && !candidate.missingDimensions,
+      candidate.versionId !== normalizedVersionId &&
+      hasValidDimensions({
+        length: candidate.length,
+        width: candidate.width,
+        depth: candidate.depth,
+      }),
   );
   alternateCandidates.sort(compareAlternateVersions);
+
+  if (alternateCandidates.length > 0 && (missingDimensions || normalizedVersionId === -1)) {
+    const firstAlt = alternateCandidates[0];
+    console.debug(`🔍 Selected alternate for gameId=${gameId}, versionId=${normalizedVersionId}: ${firstAlt.versionKey} (${firstAlt.length}" × ${firstAlt.width}" × ${firstAlt.depth}")`);
+  }
 
   const alternateVersions =
     missingDimensions || normalizedVersionId === -1
@@ -422,6 +448,7 @@ const buildVersionEntry = ({
     numplays: item.numplays ?? 0,
     correctionUrl,
     versionsUrl,
+    bggDefaultDimensions: Boolean(versionData?.bggDefaultDimensions), // Pass through the flag
   };
 };
 
@@ -432,11 +459,10 @@ const mergeCollectionWithDetails = (collectionItems, gameLookup, versionLookup) 
     const gameId = item.gameId;
     const game = gameLookup.get(gameId);
     const selectedVersionsRaw =
-      item.versions && item.versions.length > 0 ? item.versions : [{ versionId: -1 }];
+      item.versions && item.versions.length > 0 ? item.versions : [{ versionId: -1, versionKey: buildVersionKey(gameId, -1) }];
 
-    selectedVersionsRaw.forEach(({ versionId }) => {
-      const key = `${gameId}:${versionId}`;
-      const versionData = versionId !== -1 ? versionLookup.get(key) : null;
+    selectedVersionsRaw.forEach(({ versionId, versionKey }) => {
+      const versionData = versionId !== -1 ? versionLookup.get(versionKey) : null;
 
       const versionEntry = buildVersionEntry({
         item,
@@ -495,10 +521,9 @@ export const fetchUserCollectionWithDetails = async ({
     missingIds = fetchResult.missingIds;
 
     fetchedGames.forEach((game, gameId) => setGame(gameId, game));
-    fetchedVersions.forEach((version, key) => {
-      const [gameId, versionId] = key.split(':').map((part) => Number.parseInt(part, 10));
-      if (!Number.isNaN(gameId) && !Number.isNaN(versionId)) {
-        setVersion(gameId, versionId, version);
+    fetchedVersions.forEach((version) => {
+      if (version.gameId && version.versionId !== -1 && version.versionKey) {
+        setVersion(version.versionKey, version);
       }
     });
   }

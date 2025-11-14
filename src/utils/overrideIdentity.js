@@ -1,3 +1,4 @@
+
 const toInteger = (value) => {
   const number = Number(value);
   return Number.isInteger(number) ? number : null;
@@ -30,7 +31,7 @@ export const createExcludedOverrideEntry = (game) => {
 
   return {
     ...identity,
-    name: game?.name || String(identity.gameId),
+    name: game?.displayName || game?.gameName || `ID:${identity.gameId}`,
     versionName: game?.versionName || null,
   };
 };
@@ -52,7 +53,7 @@ export const createOrientationOverrideEntry = (game, orientation) => {
 
   return {
     ...identity,
-    name: game?.name || String(identity.gameId),
+    name: game?.displayName || game?.gameName || `ID:${identity.gameId}`,
     versionName: game?.versionName || null,
     orientation: normalizedOrientation,
   };
@@ -82,7 +83,7 @@ export const createDimensionOverrideEntry = (game, rawDimensions) => {
 
   return {
     ...identity,
-    name: game?.name || String(identity.gameId),
+    name: game?.displayName || game?.gameName || `ID:${identity.gameId}`,
     versionName: game?.versionName || null,
     length,
     width,

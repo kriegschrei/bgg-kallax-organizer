@@ -1,5 +1,9 @@
 import schema from '../../schemas/requests/games/post-payload.schema.json' with { type: 'json' };
+import enumsSchema from '../../schemas/$defs/enums.schema.json' with { type: 'json' };
 import ajv from './ajvInstance.js';
+
+// Add the enums schema to AJV's registry so it can resolve references
+ajv.addSchema(enumsSchema);
 
 const validate = ajv.compile(schema);
 

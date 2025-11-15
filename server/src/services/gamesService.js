@@ -404,6 +404,7 @@ export const processGamesRequest = async ({
   const collectionResult = await fetchUserCollectionWithDetails({
     username,
     includeStatuses,
+    excludeStatuses,
     includeExpansions: includeExpansionsFlag,
     onProgress,
     requestId,

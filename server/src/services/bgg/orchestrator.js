@@ -23,18 +23,19 @@ const COLLECTION_MAX_RETRIES = 5;
 const BATCH_SIZE = 20;
 const COLLECTION_RETRY_DELAY_BASE_MS = 2000;
 
-const buildCollectionKey = (username, includeStatuses = [], includeExpansions = true) => {
+const buildCollectionKey = (username, includeStatuses = [], excludeStatuses = [], includeExpansions = true) => {
   const includeKeySegment = includeStatuses.slice().sort().join('|') || 'none';
-  return `user:${username}:includes:${includeKeySegment}:expansions:${includeExpansions}`;
+  const excludeKeySegment = excludeStatuses.slice().sort().join('|') || 'none';
+  return `user:${username}:includes:${includeKeySegment}:excludes:${excludeKeySegment}:expansions:${includeExpansions}`;
 };
 
-const buildCollectionUrl = (username, includeStatuses = []) => {
+const buildCollectionUrl = (username, excludeStatuses = []) => {
   const params = new URLSearchParams({
     username,
     version: '1',
   });
 
-  includeStatuses.forEach((status) => params.append(status, '1'));
+  excludeStatuses.forEach((status) => params.append(status, '0'));
 
   return `${BGG_API_BASE}/collection?${params.toString()}`;
 };
@@ -520,6 +521,7 @@ const mergeCollectionWithDetails = (collectionItems, gameLookup, versionLookup, 
 export const fetchUserCollectionWithDetails = async ({
   username,
   includeStatuses = [],
+  excludeStatuses = [],
   includeExpansions = true,
   onProgress,
   requestId,
@@ -530,8 +532,8 @@ export const fetchUserCollectionWithDetails = async ({
 
   const progress = typeof onProgress === 'function' ? onProgress : () => {};
 
-  const collectionKey = buildCollectionKey(username, includeStatuses, includeExpansions);
-  const collectionUrl = buildCollectionUrl(username, includeStatuses);
+  const collectionKey = buildCollectionKey(username, includeStatuses, excludeStatuses, includeExpansions);
+  const collectionUrl = buildCollectionUrl(username, excludeStatuses);
 
   if (onProgress && requestId) {
     progress(requestId, 'Fetching collection from BoardGameGeek...', { step: 'collection_fetch' });

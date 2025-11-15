@@ -1,6 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FaPrint } from 'react-icons/fa';
 import IconButton from './IconButton';
+import { MOBILE_BREAKPOINT } from '../constants/appDefaults';
+import bgcubeLogoSquare from '../assets/bgcube_logo_square.png';
+import kofiSymbol from '../assets/kofi_symbol.svg';
+import patreonLogo from '../assets/patreon_logo.svg';
 
 /**
  * Application header component displaying logo, subtitle, and Ko-fi widget.
@@ -13,26 +17,107 @@ export default function AppHeader({ hasResults = false, isMetric = false, onTogg
     window.print();
   };
 
-  useEffect(() => {
-    // Load Patreon widget script
-    const script = document.createElement('script');
-    script.src = 'https://c6.patreon.com/becomePatronButton.bundle.js';
-    script.async = true;
-    document.body.appendChild(script);
+  const [isMobile, setIsMobile] = useState(() => 
+    typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT
+  );
 
-    return () => {
-      // Cleanup script on unmount
-      const existingScript = document.querySelector('script[src="https://c6.patreon.com/becomePatronButton.bundle.js"]');
-      if (existingScript) {
-        document.body.removeChild(existingScript);
-      }
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
     };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    // Only load Patreon widget script on desktop
+    if (!isMobile) {
+      const script = document.createElement('script');
+      script.src = 'https://c6.patreon.com/becomePatronButton.bundle.js';
+      script.async = true;
+      document.body.appendChild(script);
+
+      return () => {
+        const existingScript = document.querySelector('script[src="https://c6.patreon.com/becomePatronButton.bundle.js"]');
+        if (existingScript) {
+          document.body.removeChild(existingScript);
+        }
+      };
+    }
+  }, [isMobile]);
 
   return (
     <header>
       <div className="header-content">
-        <div className="header-controls">
+        {/* Top bar: Logo + Support buttons */}
+        <div className="header-top-bar">
+          <img 
+            src={isMobile ? bgcubeLogoSquare : '/bgcube_logo.png'} 
+            alt="BGCUBE.app" 
+            className="app-logo" 
+          />
+          <div className="support-widgets">
+            <div className="patreon-widget">
+              {isMobile ? (
+                <a
+                  href="https://www.patreon.com/bePatron?u=44563871"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="patreon-mobile-link"
+                  aria-label="Support on Patreon"
+                >
+                  <img
+                    src={patreonLogo}
+                    alt="Patreon"
+                    className="patreon-logo-icon"
+                  />
+                </a>
+              ) : (
+                <a
+                  href="https://www.patreon.com/bePatron?u=44563871"
+                  data-patreon-widget-type="become-patron-button"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Become a member!
+                </a>
+              )}
+            </div>
+            <div className="kofi-widget">
+              {isMobile ? (
+                <a
+                  href="https://ko-fi.com/A0A11G62JT"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="kofi-mobile-link"
+                  aria-label="Buy Me a Coffee on Ko-fi"
+                >
+                  <img
+                    src={kofiSymbol}
+                    alt="Ko-fi"
+                    className="kofi-symbol-icon"
+                  />
+                </a>
+              ) : (
+                <a
+                  href="https://ko-fi.com/A0A11G62JT"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <img
+                    src="https://storage.ko-fi.com/cdn/kofi6.png?v=6"
+                    alt="Buy Me a Coffee at ko-fi.com"
+                    height="36"
+                  />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Controls bar: Print + Unit toggle */}
+        <div className="header-controls-bar">
           {hasResults && (
             <IconButton
               className="print-button"
@@ -65,7 +150,8 @@ export default function AppHeader({ hasResults = false, isMetric = false, onTogg
             </button>
           </div>
         </div>
-        <img src="/bgcube_logo.png" alt="BGCUBE.app" className="app-logo" />
+
+        {/* Subtitle (hidden on mobile) */}
         <p className="subtitle">
           Organize your{' '}
           <a
@@ -86,31 +172,6 @@ export default function AppHeader({ hasResults = false, isMetric = false, onTogg
             IKEA Kallax shelving units
           </a>
         </p>
-        <div className="support-widgets" aria-live="polite">
-          <div className="patreon-widget">
-            <a
-              href="https://www.patreon.com/bePatron?u=44563871"
-              data-patreon-widget-type="become-patron-button"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Become a member!
-            </a>
-          </div>
-          <div className="kofi-widget">
-            <a
-              href="https://ko-fi.com/A0A11G62JT"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <img
-                src="https://storage.ko-fi.com/cdn/kofi6.png?v=6"
-                alt="Buy Me a Coffee at ko-fi.com"
-                height="36"
-              />
-            </a>
-          </div>
-        </div>
       </div>
     </header>
   );

@@ -90,7 +90,7 @@ export const SORTING_BADGE_BUILDERS = {
     return [
       {
         key: `bgg-rank-${getOverrideKey(game)}`,
-        label: `Rank #${rank}`,
+        label: rank === -1 ? 'N/A' : `Rank #${rank}`,
         field: 'bggRank',
       },
     ];

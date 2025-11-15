@@ -29,6 +29,25 @@ header {
   gap: 0.75rem;
 }
 
+/* Compact top bar layout */
+.header-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.header-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
 .print-button {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.2);
@@ -58,14 +77,12 @@ header {
   color: var(--color-text-primary);
 }
 
+/* Remove absolute positioning - controls are now in header-controls-bar */
 .header-controls {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  position: static;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  z-index: 2;
   flex-direction: row;
 }
 
@@ -188,8 +205,9 @@ header {
   width: min(100%, 320px);
   max-width: 100%;
   display: block;
-  margin: 0 auto;
+  margin: 0;
   aspect-ratio: auto;
+  flex-shrink: 0;
 }
 
 .subtitle {
@@ -222,8 +240,8 @@ header {
   justify-content: center;
   gap: 1rem;
   min-height: 48px;
-  width: 100%;
-  margin-top: 0.5rem;
+  width: auto;
+  margin-top: 0;
   flex-wrap: wrap;
 }
 
@@ -234,6 +252,44 @@ header {
   background: white;
   border-radius: var(--radius-md, 8px);
   padding: 0 4px 0 4px;
+}
+
+.patreon-mobile-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.patreon-mobile-link:hover {
+  opacity: 0.8;
+}
+
+.patreon-logo-icon {
+  width: 36px;
+  height: 36px;
+  display: block;
+}
+
+.kofi-mobile-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+
+.kofi-mobile-link:hover {
+  opacity: 0.8;
+}
+
+.kofi-symbol-icon {
+  width: 36px;
+  height: 36px;
+  display: block;
 }
 
 .kofi-widget {
@@ -1056,15 +1112,40 @@ header {
 
 @media (max-width: 768px) {
   header {
-    padding: 1rem;
+    padding: 0.75rem;
   }
   
   header h1 {
     font-size: 2rem;
   }
   
+  .header-top-bar {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  
+  .app-logo {
+    max-width: 60px;
+    height: auto;
+    flex-shrink: 0;
+  }
+  
+  .support-widgets {
+    margin-top: 0;
+    min-height: auto;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  
+  .header-controls-bar {
+    justify-content: flex-start;
+    padding-top: 0.5rem;
+    width: 100%;
+  }
+  
   .subtitle {
-    font-size: 1rem;
+    display: none;
   }
 }
 

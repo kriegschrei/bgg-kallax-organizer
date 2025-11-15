@@ -473,7 +473,7 @@ function App() {
 
   return (
     <div className="app">
-      <AppHeader />
+      <AppHeader hasResults={!!cubes && cubes.length > 0} />
 
       {error && (
         <div className="error">
@@ -551,6 +551,15 @@ function App() {
           onRemoveDimensionOverride={handleRemoveDimensionOverride}
           overridesReady={settingsHydrated}
           isLoading={loading}
+          stacking={stacking}
+          optimizeSpace={optimizeSpace}
+          includeExpansions={includeExpansions}
+          groupExpansions={groupExpansions}
+          groupSeries={groupSeries}
+          respectSortOrder={respectSortOrder}
+          bypassVersionWarning={bypassVersionWarning}
+          lockRotation={lockRotation}
+          collectionFilters={collectionFilters}
         />
       )}
 

@@ -29,6 +29,38 @@ header {
   gap: 0.75rem;
 }
 
+.print-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  color: var(--color-text-primary);
+}
+
+.print-button:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.05);
+}
+
+.print-button:active {
+  transform: scale(0.95);
+}
+
+.print-button .button-icon {
+  font-size: 1.2rem;
+  color: var(--color-text-primary);
+}
+
 .footer-banner {
   display: flex;
   gap: 1.5rem;
@@ -142,13 +174,30 @@ header {
   opacity: 0.9;
 }
 
+.support-widgets {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  min-height: 48px;
+  width: 100%;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.patreon-widget {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: var(--radius-md, 8px);
+  padding: 0 4px 0 4px;
+}
+
 .kofi-widget {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  width: 100%;
-  margin-top: 0.5rem;
 }
 
 .kofi-widget img {
@@ -453,6 +502,11 @@ header {
 }
 
 .filter-panel--collapsed .filter-panel__body {
+  display: none;
+}
+
+/* Hide print title on screen */
+.filter-panel__print-title {
   display: none;
 }
 
@@ -969,6 +1023,162 @@ header {
   
   .subtitle {
     font-size: 1rem;
+  }
+}
+
+/* Print Styles */
+@media print {
+  /* Hide header and footer */
+  header,
+  .disclaimer-footer {
+    display: none !important;
+  }
+
+  /* Hide print button when printing */
+  .print-button {
+    display: none !important;
+  }
+
+  /* Hide interactive search panel in print - we'll show print-friendly version in Results */
+  .search-panel {
+    display: none !important;
+  }
+
+  /* Expand all filter panels in print - override hidden attribute */
+  .filter-panel--collapsed .filter-panel__body,
+  .filter-panel__body,
+  .filter-panel__body[hidden] {
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Remove hidden attribute styling */
+  .filter-panel__body[hidden] {
+    display: block !important;
+  }
+
+  .filter-panel__header {
+    display: none !important;
+  }
+
+  /* Show filter panel print title (since headers are hidden) */
+  .filter-panel__print-title {
+    display: block !important;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    padding-bottom: 0.2rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  /* Hide buttons and interactive elements */
+  button,
+  .game-action,
+  .override-action-button,
+  .dimension-clear,
+  .badge-toggle,
+  .callout__header,
+  .dimension-edit-actions,
+  .override-dimension-actions,
+  .reset-settings-button,
+  .username-field,
+  .options-row,
+  .collection-filters-warning,
+  .drag-handle,
+  .sort-order-toggle,
+  .tooltip-trigger,
+  .info-icon {
+    display: none !important;
+  }
+
+  /* Hide checkboxes but show enabled sorting rules */
+  .sortable-item input[type='checkbox'] {
+    display: none !important;
+  }
+
+  /* Hide disabled sorting rules in print */
+  .sortable-item.disabled {
+    display: none !important;
+  }
+
+  /* Show enabled sorting rules as simple text */
+  .sortable-item.enabled {
+    display: block !important;
+    padding: 0.2rem 0;
+    margin: 0;
+  }
+
+  .sortable-item.enabled label {
+    display: inline !important;
+    margin: 0;
+    font-size: 0.8rem;
+  }
+
+  /* Ensure callouts are expanded and visible */
+  .callout__content {
+    display: block !important;
+  }
+
+  /* Hide disclosure icons since panels are always expanded */
+  .disclosure-arrow {
+    display: none !important;
+  }
+
+  /* Page setup */
+  @page {
+    margin: 0.5in; /* Tighter margins */
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide interactive elements */
+  .game-actions-row,
+  .override-entry-actions {
+    display: none !important;
+  }
+
+  /* Compact filter panels for print */
+  .filter-panel {
+    margin-bottom: 0.4rem;
+    padding: 0.2rem;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+  }
+
+  .filter-panel__body {
+    padding: 0.4rem !important;
+  }
+
+  .filter-panel__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+    display: block;
+  }
+
+  .preferences-panel,
+  .collection-status-content,
+  .sorting-list {
+    font-size: 0.8rem;
+  }
+
+  .toggle-button-group,
+  .collection-status-grid,
+  .preferences-toggle-grid {
+    gap: 0.4rem;
+  }
+
+  .stacking-row {
+    margin-bottom: 0.3rem;
+  }
+
+  .sortable-item {
+    padding: 0.2rem;
+    margin: 0.1rem 0;
+    font-size: 0.8rem;
   }
 }
 

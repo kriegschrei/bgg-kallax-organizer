@@ -210,6 +210,7 @@ export default function ResultsWarningPanels({
             description={description}
             items={panel.items}
             renderItem={(game) => panel.renderItem(game, panel.context)}
+            className={panel.id === 'oversized' ? 'warning-callout--oversized' : ''}
           />
         );
       })}

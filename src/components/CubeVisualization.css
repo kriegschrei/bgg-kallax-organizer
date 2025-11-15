@@ -287,8 +287,139 @@
 }
 
 @media print {
+  /* Hide badges section */
   .game-badges-section {
     display: none !important;
+  }
+
+  /* Hide all interactive buttons */
+  .game-action,
+  .dimension-clear,
+  .badge-toggle {
+    display: none !important;
+  }
+
+  /* Ensure dimension editor forms are hidden */
+  .dimension-edit-form {
+    display: none !important;
+  }
+
+  /* Each cube visualization gets its own page (starting from page 2) */
+  .cube-visualization {
+    page-break-before: always;
+    page-break-inside: avoid;
+    margin-bottom: 0;
+  }
+
+  /* First cube should start on page 2 (after page 1 with logo/stats/warnings/options) */
+  .cube-visualization:first-of-type {
+    page-break-before: always;
+  }
+
+  .visualization .visualization-container > * {
+    gap: 0 !important;
+  }
+
+  /* Keep cube-front on left and games on right for print */
+  .visualization-container {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0 !important;
+    margin: 0;
+    page-break-inside: avoid;
+  }
+
+  /* Make cube visualization fill the page better */
+  .cube-visualization {
+    margin-bottom: 0;
+    padding: 0.5rem;
+  }
+
+  .cube-visualization h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    padding: 0;
+  }
+
+  /* Ensure game list items don't break awkwardly */
+  .game-list-item {
+    padding: 0.4rem;
+    margin: 0.2rem 0;
+    font-size: 0.8rem;
+    page-break-inside: avoid;
+  }
+
+  .game-title {
+    font-size: 0.9rem;
+  }
+
+  .game-base-name {
+    font-size: 0.85rem;
+  }
+
+  .game-version {
+    font-size: 0.75rem;
+  }
+
+  .game-dimension-row {
+    font-size: 0.7rem;
+    margin-top: 0.2rem;
+  }
+
+  .game-dimension-chip {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .front-view {
+    font-size: 0.85rem;
+  }
+
+  .front-view h4 {
+    font-size: 0.9rem;
+    margin: 0.3rem 0;
+  }
+
+  .dimension-label {
+    font-size: 0.75rem;
+    margin-top: 0.3rem;
+  }
+
+  /* Ensure cube visualization fits on one page - tighter spacing */
+  .list-view {
+    max-height: none;
+  }
+
+  /* Default: single column layout (vertical list) */
+  .list-view ol {
+    margin: 0;
+    padding: 0;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.3rem !important;
+  }
+
+  /* Two columns only if there are more than PRINT_TWO_COLUMN_GAME_THRESHOLD games */
+  .list-view ol.list-view--two-columns {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    column-gap: 0.5rem !important;
+    row-gap: 0.3rem !important;
+  }
+
+  .list-view li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0;
+  }
+
+  .cube-visualization.card {
+    padding: 0.5rem;
+  }
+
+  /* Make front view more compact */
+  .cube-svg {
+    max-width: 100%;
+    height: auto;
   }
 }
 

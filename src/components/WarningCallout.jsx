@@ -15,6 +15,7 @@ function WarningCallout({
   items = [],
   renderItem,
   children,
+  className,
 }) {
   const hasList =
     Array.isArray(items) && items.length > 0 && typeof renderItem === 'function';
@@ -28,6 +29,7 @@ function WarningCallout({
       icon={icon}
       title={title}
       count={count}
+      className={className}
     >
       {description ? <div className="callout__description">{description}</div> : null}
       {children}

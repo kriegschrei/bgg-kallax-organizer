@@ -20,6 +20,7 @@ function FilterPanel({ panelKey, title, collapsed = false, onToggle, children })
         <span className="filter-panel__title">{title}</span>
       </button>
       <div className="filter-panel__body" id={panelId} hidden={collapsed}>
+        <span className="filter-panel__print-title">{title}</span>
         {children}
       </div>
     </section>

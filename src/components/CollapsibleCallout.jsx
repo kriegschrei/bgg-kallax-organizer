@@ -9,11 +9,16 @@ function CollapsibleCallout({
   title,
   count,
   children,
+  className,
 }) {
-  const wrapperClassName =
-    variant && variant !== 'warning' ? `callout callout--${variant}` : 'callout';
+  const baseClassName = variant && variant !== 'warning' ? `callout callout--${variant}` : 'callout';
+  const wrapperClassName = className ? `${baseClassName} ${className}` : baseClassName;
   const toggleIcon = renderToggleIcon ? renderToggleIcon(expanded) : null;
 
+  // Always render content for oversized panel (CSS will control visibility in print)
+  const isOversizedPanel = className?.includes('warning-callout--oversized');
+  const shouldRenderContent = expanded || isOversizedPanel;
+  
   return (
     <div className={wrapperClassName}>
       <button type="button" className="callout__header" onClick={onToggle} aria-expanded={expanded}>
@@ -23,7 +28,7 @@ function CollapsibleCallout({
           {title} ({count})
         </strong>
       </button>
-      {expanded && <div className="callout__content">{children}</div>}
+      {shouldRenderContent && <div className="callout__content">{children}</div>}
     </div>
   );
 }

@@ -17,31 +17,8 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { SORTING_FIELD_DEFINITIONS } from '../constants/appDefaults';
 import './Sorting.css';
-
-const AVAILABLE_FIELDS = [
-  { field: 'gameName', label: 'Game Name' },
-  { field: 'bggRank', label: 'BGG Rank' },
-  { field: 'bggWeight', label: 'BGG Weight (Complexity)' },
-  { field: 'bggRating', label: 'BGG Rating' },
-  { field: 'categories', label: 'Categories' },
-  { field: 'families', label: 'Families (Themes) / Languages' },
-  { field: 'mechanics', label: 'Mechanics' },
-  { field: 'numplays', label: 'Number of Plays' },
-  { field: 'versionName', label: 'Version Name' },
-  { field: 'minPlayers', label: 'Min Players' },
-  { field: 'maxPlayers', label: 'Max Players' },
-  { field: 'bestPlayerCount', label: 'Best Player Count (Community)' },
-  { field: 'minPlaytime', label: 'Min Playtime' },
-  { field: 'maxPlaytime', label: 'Max Playtime' },
-  { field: 'age', label: 'Minimum Age (Publisher)' },
-  { field: 'communityAge', label: 'Minimum Recommended Community Age' },
-  { field: 'languageDependence', label: 'Language Dependence' },
-  { field: 'volume', label: 'Volume' },
-  { field: 'area', label: 'Area' },
-  { field: 'gamePublishedYear', label: 'Game Published Year' },
-  { field: 'versionPublishedYear', label: 'Version Published Year' },
-];
 
 function SortableItem({ id, sortingRule, onToggle, onToggleOrder, disabled = false }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
@@ -54,7 +31,7 @@ function SortableItem({ id, sortingRule, onToggle, onToggleOrder, disabled = fal
     transition,
   };
 
-  const fieldData = AVAILABLE_FIELDS.find((field) => field.field === sortingRule.field);
+  const fieldData = SORTING_FIELD_DEFINITIONS.find((field) => field.field === sortingRule.field);
 
   return (
     <div

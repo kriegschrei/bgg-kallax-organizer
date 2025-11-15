@@ -8,54 +8,37 @@ export const DEFAULT_COLLAPSED_BADGE_LIMIT = 4;
 
 export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
-export const DEFAULT_SORTING_RULES = [
-  { field: 'gameName', enabled: true, order: 'asc' },
-  { field: 'versionName', enabled: false, order: 'asc' },
-  { field: 'gameId', enabled: false, order: 'asc' },
-  { field: 'versionId', enabled: false, order: 'asc' },
-  { field: 'bggRank', enabled: false, order: 'asc' },
-  { field: 'minPlayers', enabled: false, order: 'asc' },
-  { field: 'maxPlayers', enabled: false, order: 'asc' },
-  { field: 'bestPlayerCount', enabled: false, order: 'asc' },
-  { field: 'minPlaytime', enabled: false, order: 'asc' },
-  { field: 'maxPlaytime', enabled: false, order: 'asc' },
-  { field: 'age', enabled: false, order: 'asc' },
-  { field: 'communityAge', enabled: false, order: 'asc' },
-  { field: 'weight', enabled: false, order: 'asc' },
-  { field: 'bggRating', enabled: false, order: 'desc' },
-  { field: 'categories', enabled: false, order: 'asc' },
-  { field: 'families', enabled: false, order: 'asc' },
-  { field: 'mechanics', enabled: false, order: 'asc' },
+/**
+ * Master definition of all sorting fields.
+ * This is the single source of truth for sorting field definitions.
+ * Contains field name, display label, and default sorting configuration.
+ */
+export const SORTING_FIELD_DEFINITIONS = [
+  { field: 'gameName', label: 'Game Name', defaultEnabled: true, defaultOrder: 'asc' },
+  { field: 'versionName', label: 'Version Name', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'bggRank', label: 'BGG Rank', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'bggWeight', label: 'BGG Weight (Complexity)', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'bggRating', label: 'BGG Rating', defaultEnabled: false, defaultOrder: 'desc' },
+  { field: 'categories', label: 'Categories', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'families', label: 'Families (Themes) / Languages', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'mechanics', label: 'Mechanics', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'numplays', label: 'Number of Plays', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'minPlayers', label: 'Min Players', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'maxPlayers', label: 'Max Players', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'bestPlayerCount', label: 'Best Player Count (Community)', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'minPlaytime', label: 'Min Playtime', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'maxPlaytime', label: 'Max Playtime', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'age', label: 'Minimum Age (Publisher)', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'communityAge', label: 'Minimum Recommended Community Age', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'languageDependence', label: 'Language Dependence', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'volume', label: 'Volume', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'area', label: 'Area', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'weight', label: 'Weight (Physical)', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'gamePublishedYear', label: 'Game Published Year', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'versionPublishedYear', label: 'Version Published Year', defaultEnabled: false, defaultOrder: 'asc' },
 ];
 
-export const DEFAULT_SORTING_BY_FIELD = DEFAULT_SORTING_RULES.reduce((accumulator, rule) => {
-  accumulator[rule.field] = rule;
-  return accumulator;
-}, {});
 
-export const DEFAULT_ENABLED_SORTING_FIELDS = DEFAULT_SORTING_RULES.filter(
-  (rule) => rule.enabled
-).map((rule) => rule.field);
-
-export const SORTING_LABELS = {
-  gameName: 'Game Name',
-  versionName: 'Version Name',
-  gameId: 'Game ID',
-  versionId: 'Version ID',
-  bggRank: 'BGG Rank',
-  minPlayers: 'Min Players',
-  maxPlayers: 'Max Players',
-  bestPlayerCount: 'Best Player Count',
-  minPlaytime: 'Min Playtime',
-  maxPlaytime: 'Max Playtime',
-  age: 'Age',
-  communityAge: 'Community Age',
-  weight: 'Weight',
-  bggRating: 'BGG Rating',
-  categories: 'Categories',
-  families: 'Families',
-  mechanics: 'Mechanics',
-};
 
 export const COLLECTION_STATUSES = [
   { key: 'own', label: 'Own' },
@@ -81,7 +64,11 @@ export const DEFAULT_FILTER_PANEL_STATE = FILTER_PANEL_KEYS.reduce((acc, key) =>
 }, {});
 
 export const createDefaultSortingRules = () =>
-  DEFAULT_SORTING_RULES.map((rule) => ({ ...rule }));
+  SORTING_FIELD_DEFINITIONS.map((def) => ({
+    field: def.field,
+    enabled: def.defaultEnabled,
+    order: def.defaultOrder,
+  }));
 
 export const createDefaultCollectionFilters = () => ({
   ...DEFAULT_COLLECTION_FILTERS,

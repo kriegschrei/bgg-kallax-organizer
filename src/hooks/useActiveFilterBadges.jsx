@@ -3,8 +3,7 @@ import { FaArrowDown, FaArrowUp } from 'react-icons/fa';
 
 import {
   COLLECTION_STATUSES,
-  DEFAULT_SORTING_BY_FIELD,
-  SORTING_LABELS,
+  SORTING_FIELD_DEFINITIONS,
 } from '../constants/appDefaults';
 
 /**
@@ -67,8 +66,11 @@ const buildSortingLabels = (options, pushLabel) => {
   const disabledDefaultLabels = [];
 
   options.sorting.forEach((rule) => {
-    const defaultConfig = DEFAULT_SORTING_BY_FIELD[rule.field];
-    const baseLabel = SORTING_LABELS[rule.field] || rule.field;
+    const fieldDef = SORTING_FIELD_DEFINITIONS.find((f) => f.field === rule.field);
+    const defaultConfig = fieldDef
+      ? { field: fieldDef.field, enabled: fieldDef.defaultEnabled, order: fieldDef.defaultOrder }
+      : null;
+    const baseLabel = fieldDef?.label || rule.field;
     const ArrowIcon = rule.order === 'desc' ? FaArrowDown : FaArrowUp;
 
     if (rule.enabled) {

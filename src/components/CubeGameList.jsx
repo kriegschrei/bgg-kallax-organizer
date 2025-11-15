@@ -1,6 +1,7 @@
 import React from 'react';
 import GameListItem from './GameListItem';
 import { getGameColor } from '../utils/cubeVisualization';
+import { PRINT_TWO_COLUMN_GAME_THRESHOLD } from '../constants/appDefaults';
 
 /**
  * Renders a list of games for a cube with color coding and interactive controls.
@@ -41,10 +42,11 @@ function CubeGameList({
   buildBadgesForGame,
 }) {
   const games = Array.isArray(cube.games) ? cube.games : [];
+  const hasManyGames = games.length > PRINT_TWO_COLUMN_GAME_THRESHOLD;
 
   return (
     <div className="list-view">
-      <ol>
+      <ol className={hasManyGames ? 'list-view--two-columns' : ''}>
         {games.map((game, index) => {
           const backgroundColor = getGameColor(index, games.length);
           const borderColor = backgroundColor.replace('80%', '60%');

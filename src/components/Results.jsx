@@ -3,6 +3,7 @@ import CubeVisualization from './CubeVisualization';
 import ResultsStats from './ResultsStats';
 import ResultsOverrides from './ResultsOverrides';
 import ResultsWarningPanels from './ResultsWarningPanels';
+import PrintOptionsPanel from './PrintOptionsPanel';
 import DisclosureIcon from './DisclosureIcon';
 import {
   formatGameDimensions,
@@ -33,6 +34,15 @@ export default function Results({
   overridesReady = true,
   isLoading = false,
   sorting = [],
+  stacking,
+  optimizeSpace,
+  includeExpansions,
+  groupExpansions,
+  groupSeries,
+  respectSortOrder,
+  bypassVersionWarning,
+  lockRotation,
+  collectionFilters,
 }) {
   const statsSummaryItems = useMemo(
     () => [
@@ -76,7 +86,10 @@ export default function Results({
 
   return (
     <div className="results">
- 
+      <div className="print-warnings-logo">
+        <img src="/bgcube_logo.png" alt="BGCube.app" />
+      </div>
+
       <ResultsStats items={statsSummaryItems} />
 
       <ResultsOverrides
@@ -105,6 +118,20 @@ export default function Results({
         warningGroups={warningGroups}
         fitOversized={fitOversized}
         renderDisclosureIcon={renderDisclosureIcon}
+      />
+
+      <PrintOptionsPanel
+        stacking={stacking}
+        optimizeSpace={optimizeSpace}
+        includeExpansions={includeExpansions}
+        groupExpansions={groupExpansions}
+        groupSeries={groupSeries}
+        respectSortOrder={respectSortOrder}
+        fitOversized={fitOversized}
+        bypassVersionWarning={bypassVersionWarning}
+        lockRotation={lockRotation}
+        collectionFilters={collectionFilters}
+        sorting={sorting}
       />
 
       <div className="cubes-container">

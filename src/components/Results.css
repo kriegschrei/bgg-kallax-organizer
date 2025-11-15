@@ -278,6 +278,136 @@
   }
 }
 
+/* Print Cover Page Styles */
+.print-cover-page {
+  display: none; /* Hidden on screen */
+  page-break-after: always;
+  page-break-inside: avoid;
+  padding: 1rem 0;
+}
+
+.print-cover-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.print-logo-image {
+  max-width: 300px;
+  height: auto;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.print-cover-section {
+  margin-bottom: 1.5rem;
+  page-break-inside: avoid;
+}
+
+.print-cover-section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-primary);
+  border-bottom: 2px solid var(--color-border-muted);
+  padding-bottom: 0.5rem;
+}
+
+.print-cover-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.print-cover-item {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.print-cover-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+  color: var(--color-text-subtle);
+}
+
+.print-cover-value {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.print-cover-subsection {
+  margin-bottom: 0.75rem;
+}
+
+.print-cover-subtitle {
+  display: inline-block;
+  font-weight: 600;
+  margin-right: 0.5rem;
+  color: var(--color-text-primary);
+}
+
+.print-cover-status-list {
+  color: var(--color-text-primary);
+}
+
+.print-cover-sorting-list {
+  margin: 0;
+  padding-left: 1.5rem;
+  list-style-type: decimal;
+}
+
+.print-cover-sorting-item {
+  margin: 0.5rem 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.print-cover-sorting-label {
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.print-cover-sorting-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-text-subtle);
+  font-size: 0.9rem;
+}
+
+.print-sorting-icon {
+  font-size: 0.85rem;
+}
+
+.print-cover-note {
+  color: var(--color-text-subtle);
+  font-style: italic;
+  margin: 0;
+}
+
+/* Hide print logo and options panel on screen */
+.print-warnings-logo,
+.print-options-panel {
+  display: none;
+}
+
+/* Hide oversized panel content on screen when collapsed, show in print */
+.results-warnings .callout.warning-callout--oversized:not([aria-expanded="true"]) .callout__content {
+  display: none;
+}
+
+@media print {
+  .results-warnings .callout.warning-callout--oversized .callout__content {
+    display: block !important;
+  }
+}
+
 @media (max-width: 640px) {
   .stats-summary {
     grid-template-columns: 1fr;
@@ -415,6 +545,154 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+/* Print Styles */
+@media print {
+  /* Hide print cover page - we're putting everything on page 1 */
+  .print-cover-page {
+    display: none !important;
+  }
+
+  /* Page 1 starts with logo - no empty page */
+  .print-warnings-logo {
+    page-break-after: avoid;
+    margin-bottom: 0.5rem;
+  }
+
+  .stats-summary {
+    page-break-inside: avoid;
+    page-break-after: avoid;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Keep oversized warnings together with stats on page 1 */
+  .results-warnings {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Print options panel appears after warnings on page 1 */
+  .print-options-panel {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Cubes start on page 2 */
+  .cubes-container {
+    page-break-before: always;
+  }
+
+  /* Hide ResultsOverrides when printing */
+  .results-overrides {
+    display: none !important;
+  }
+
+  /* Show print logo at top when printing */
+  .print-warnings-logo {
+    display: block !important;
+    text-align: center;
+  }
+
+  .print-warnings-logo img {
+    max-width: 150px; /* Smaller for tight layout */
+    height: auto;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide all warning panels except oversized */
+  .results-warnings .callout {
+    display: none !important;
+  }
+
+  /* Show only the oversized panel */
+  .results-warnings .callout.warning-callout--oversized {
+    display: block !important;
+  }
+
+  /* Force oversized panel header to show content (expanded state) */
+  .results-warnings .callout.warning-callout--oversized .callout__header {
+    pointer-events: none;
+  }
+
+  /* Force oversized panel content to be visible (expanded) in print */
+  .results-warnings .callout.warning-callout--oversized .callout__content {
+    display: block !important;
+  }
+
+  /* Ensure stats are visible and don't break */
+  .stats-summary {
+    display: grid !important;
+  }
+
+  /* Ensure warnings are visible */
+  .callout {
+    page-break-inside: avoid;
+  }
+
+  .callout__header {
+    cursor: default;
+  }
+
+  /* Hide override action buttons */
+  .override-action-button {
+    display: none !important;
+  }
+
+  /* Ensure override lists are visible */
+  .override-list-item {
+    page-break-inside: avoid;
+  }
+
+  /* Force cubes container to start on page 2 */
+  .cubes-container {
+    page-break-before: always;
+  }
+
+  /* Reduce margins and padding to avoid blank pages - very tight */
+  .results {
+    margin-top: 0;
+  }
+
+  .stats-summary.card {
+    padding: 0.2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat {
+    padding: 0.3rem;
+    font-size: 0.9rem;
+  }
+
+  .stat-value {
+    font-size: 1.2rem;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+  }
+
+  .callout {
+    margin-bottom: 0.4rem;
+    padding: 0.3rem;
+  }
+
+  .callout__content {
+    padding: 0 0.5rem 0.5rem 0.5rem;
+  }
+
+  .callout__description {
+    margin-bottom: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .callout__list {
+    font-size: 0.8rem;
+    padding-left: 1.25rem;
   }
 }
 

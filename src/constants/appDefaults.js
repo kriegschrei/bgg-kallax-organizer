@@ -6,6 +6,8 @@ export const STACKING_OPTIONS = ['horizontal', 'vertical'];
 
 export const DEFAULT_COLLAPSED_BADGE_LIMIT = 4;
 
+export const PRINT_TWO_COLUMN_GAME_THRESHOLD = 11;
+
 export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 
 /**

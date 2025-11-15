@@ -20,7 +20,7 @@ function CollapsibleCallout({
   const shouldRenderContent = expanded || isOversizedPanel;
   
   return (
-    <div className={wrapperClassName}>
+    <div className={wrapperClassName} aria-expanded={expanded}>
       <button type="button" className="callout__header" onClick={onToggle} aria-expanded={expanded}>
         {toggleIcon}
         <strong>

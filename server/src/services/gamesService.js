@@ -56,7 +56,7 @@ const dedupeVersionEntries = (entries) => {
   });
 };
 
-const detectMissingVersionSelections = (entries) => {
+const detectnoSelectedVersionSelections = (entries) => {
   const missing = new Map();
 
   entries.forEach((entry) => {
@@ -165,7 +165,7 @@ const cloneDimensionSource = (dimension) => {
   };
 };
 
-const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
+const buildGameFromVersionEntry = (entry, noSelectedVersionInfo) => {
   const {
     dimensions,
     volume,
@@ -262,7 +262,7 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
     game,
     entry.gameId,
     entry.versionId !== -1 ? entry.versionId : 'default',
-    missingVersionInfo,
+    noSelectedVersionInfo,
   );
 
   // URLs are already set from orchestrator, use them directly
@@ -271,6 +271,36 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
 
   game.usedAlternateVersionDims = usedAlternate;
   game.bggDefaultDimensions = Boolean(entry.bggDefaultDimensions); // Flag to indicate BGG defaults were filtered
+  
+  // Determine warning flags based on dimension source and availability
+  // Check entry.dimensions directly (not cloned version) to detect if version dimension attempt existed
+  // cloneDimensionSource returns null when all dimensions are missing, so we need to check the source
+  const hasVersionDimensions = entry.dimensions != null;
+  const versionDimensionsMissing = entry.dimensions?.missing === true || 
+    (entry.dimensions != null && !hasValidDimensions(entry.dimensions));
+  const hasGuessedDimensions = guessedDimensions !== null;
+
+  // allVersionsMissingDimensions: version exists but missing, default used, no guessed
+  game.allVersionsMissingDimensions = Boolean(
+    selectedDimensionSource === 'default' &&
+    hasVersionDimensions &&
+    versionDimensionsMissing &&
+    !hasGuessedDimensions
+  );
+
+  // selectedVersionMissingDimensions: version exists but missing, guessed used
+  game.selectedVersionMissingDimensions = Boolean(
+    selectedDimensionSource === 'guessed' &&
+    hasVersionDimensions &&
+    versionDimensionsMissing
+  );
+
+  // guessedDueToNoVersion: no version selected, guessed used
+  game.guessedDueToNoVersion = Boolean(
+    selectedDimensionSource === 'guessed' &&
+    game.noSelectedVersion
+  );
+  
   if (usedAlternate && alternateVersion) {
     game.alternateVersionId = alternateVersion.versionId;
     game.alternateVersionName = alternateVersion.name || null;
@@ -287,9 +317,9 @@ const buildGameFromVersionEntry = (entry, missingVersionInfo) => {
   return game;
 };
 
-const buildGamesFromVersionEntries = (entries, missingVersionMap) =>
+const buildGamesFromVersionEntries = (entries, noSelectedVersionMap) =>
   entries.map((entry) => {
-    const missingInfo = missingVersionMap.get(entry.gameId);
+    const missingInfo = noSelectedVersionMap.get(entry.gameId);
     return buildGameFromVersionEntry(entry, missingInfo);
   });
 
@@ -445,10 +475,10 @@ export const processGamesRequest = async ({
     return noUniqueResult;
   }
 
-  const missingVersionGames = detectMissingVersionSelections(uniqueEntries);
+  const noSelectedVersionGames = detectnoSelectedVersionSelections(uniqueEntries);
 
-  if (!bypassVersionWarning && missingVersionGames.size > 0) {
-    const warningGames = Array.from(missingVersionGames.values()).sort((a, b) =>
+  if (!bypassVersionWarning && noSelectedVersionGames.size > 0) {
+    const warningGames = Array.from(noSelectedVersionGames.values()).sort((a, b) =>
       a.name.localeCompare(b.name),
     );
     const warningMessage = `${warningGames.length} game${
@@ -457,7 +487,7 @@ export const processGamesRequest = async ({
     const secondaryMessage =
       'We can try to guess dimensions by checking the most recent English version first. This can take a while and may still require manual adjustments later.';
 
-    const missingVersionsResult = {
+    const noSelectedVersionsResult = {
       status: 'missing_versions',
       requestId,
       message: warningMessage,
@@ -467,15 +497,15 @@ export const processGamesRequest = async ({
 
     // Store result in progress state for polling
     progress(requestId, 'Missing game versions detected. Waiting for user confirmation...', {
-      ...missingVersionsResult,
+      ...noSelectedVersionsResult,
       step: 'warning',
       warningType: 'missing_versions',
     });
 
-    return missingVersionsResult;
+    return noSelectedVersionsResult;
   }
 
-  const allGames = buildGamesFromVersionEntries(uniqueEntries, missingVersionGames);
+  const allGames = buildGamesFromVersionEntries(uniqueEntries, noSelectedVersionGames);
 
   console.log(`✅ Processed ${allGames.length} games`);
   progress(requestId, `Processed ${allGames.length} games`, {

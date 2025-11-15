@@ -1,8 +1,4 @@
-
-const toInteger = (value) => {
-  const number = Number(value);
-  return Number.isInteger(number) ? number : null;
-};
+import { toInteger, toPositiveNumber } from './helpers';
 
 export const ORIENTATION_OPTIONS = new Set(['horizontal', 'vertical']);
 
@@ -23,6 +19,11 @@ export const resolveGameIdentity = (game) => {
   };
 };
 
+/**
+ * Creates an excluded override entry from a game object.
+ * @param {Object} game - The game object
+ * @returns {Object|null} Override entry object or null if invalid
+ */
 export const createExcludedOverrideEntry = (game) => {
   const identity = resolveGameIdentity(game);
   if (!identity) {
@@ -36,6 +37,12 @@ export const createExcludedOverrideEntry = (game) => {
   };
 };
 
+/**
+ * Creates an orientation override entry from a game object and orientation.
+ * @param {Object} game - The game object
+ * @param {string} orientation - The orientation ('horizontal' or 'vertical')
+ * @returns {Object|null} Override entry object or null if invalid
+ */
 export const createOrientationOverrideEntry = (game, orientation) => {
   const identity = resolveGameIdentity(game);
   if (!identity) {
@@ -59,14 +66,12 @@ export const createOrientationOverrideEntry = (game, orientation) => {
   };
 };
 
-const toPositiveNumber = (value) => {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) {
-    return null;
-  }
-  return Number(number.toFixed(3));
-};
-
+/**
+ * Creates a dimension override entry from a game object and raw dimensions.
+ * @param {Object} game - The game object
+ * @param {Object} rawDimensions - Raw dimensions object with length, width, depth/height
+ * @returns {Object|null} Override entry object or null if invalid
+ */
 export const createDimensionOverrideEntry = (game, rawDimensions) => {
   const identity = resolveGameIdentity(game);
   if (!identity) {
@@ -75,7 +80,8 @@ export const createDimensionOverrideEntry = (game, rawDimensions) => {
 
   const length = toPositiveNumber(rawDimensions?.length);
   const width = toPositiveNumber(rawDimensions?.width);
-  const height = toPositiveNumber(rawDimensions?.depth ?? rawDimensions?.height);
+  const heightRaw = toPositiveNumber(rawDimensions?.depth ?? rawDimensions?.height);
+  const height = heightRaw !== null ? Number(heightRaw.toFixed(3)) : null;
 
   if (length === null || width === null || height === null) {
     return null;

@@ -98,19 +98,19 @@ export const getFallbackVersionLabel = (game) => {
 
 
 
-export const setupGameVersionMetadata = (game, gameId, versionId, missingVersionInfo) => {
+export const setupGameVersionMetadata = (game, gameId, versionId, noSelectedVersionInfo) => {
   // Use versionId directly, or game.versionId if available
   game.selectedVersionId = Number.isInteger(game.versionId) && game.versionId !== -1 
     ? game.versionId 
     : (versionId && versionId !== 'default' ? versionId : null);
   
   // URLs should already be set from orchestrator
-  // If missingVersionInfo exists, use its URLs
-  if (missingVersionInfo) {
-    game.versionsUrl = missingVersionInfo.versionsUrl || game.versionsUrl || null;
+  // If noSelectedVersionInfo exists, use its URLs
+  if (noSelectedVersionInfo) {
+    game.versionsUrl = noSelectedVersionInfo.versionsUrl || game.versionsUrl || null;
   }
   
-  game.missingVersion = !!missingVersionInfo;
+  game.noSelectedVersion = !!noSelectedVersionInfo;
   game.usedAlternateVersionDims = false;
 };
 

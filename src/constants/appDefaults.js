@@ -1,5 +1,13 @@
 export const MOBILE_BREAKPOINT = 768;
 
+export const DEFAULT_STACKING = 'vertical';
+
+export const STACKING_OPTIONS = ['horizontal', 'vertical'];
+
+export const DEFAULT_COLLAPSED_BADGE_LIMIT = 4;
+
+export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+
 export const DEFAULT_SORTING_RULES = [
   { field: 'gameName', enabled: true, order: 'asc' },
   { field: 'versionName', enabled: false, order: 'asc' },

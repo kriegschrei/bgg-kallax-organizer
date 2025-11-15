@@ -120,11 +120,13 @@ export const handleGamesRequest = async (req, res) => {
     });
 
   // Return 202 Accepted immediately
-  return res.status(202).json({
-    requestId,
-    token,
-    progressUrl,
-    message: 'Request accepted and processing started',
-  });
+  return res.status(202)
+    .set('Retry-After', '1') // Suggest 1 second delay before first poll
+    .json({
+      requestId,
+      token,
+      progressUrl,
+      message: 'Request accepted and processing started',
+    });
 };
 

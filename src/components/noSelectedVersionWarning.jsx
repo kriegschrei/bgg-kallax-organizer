@@ -1,7 +1,7 @@
 import React from 'react';
-import './MissingVersionsWarning.css';
+import './noSelectedVersionWarning.css';
 
-export default function MissingVersionsWarning({
+export default function NoSelectedVersionWarning({
   warning = { message: '', details: '', games: [] },
   onContinue = () => {},
   onCancel = () => {},

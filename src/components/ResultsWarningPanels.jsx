@@ -5,16 +5,11 @@ import {
   FaExclamationTriangle,
   FaBoxOpen,
   FaRulerCombined,
-  FaQuestionCircle ,
+  FaQuestionCircle,
 } from 'react-icons/fa';
 import WarningCallout from './WarningCallout';
 import { buildWarningPanels, createWarningPanelState } from '../utils/resultsWarnings';
-
-/**
- * Picks the first available URL from a game object based on provided keys.
- */
-const pickFirstUrl = (game, keys = []) =>
-  keys.map((key) => game?.[key]).find((value) => typeof value === 'string' && value.trim());
+import { pickFirstUrl } from '../utils/helpers';
 
 /**
  * Renders a linked game name or plain text if no URL is available.
@@ -94,8 +89,8 @@ const WARNING_PANEL_CONFIG = [
     }),
   },
   {
-    id: 'guessedVersions',
-    dataKey: 'guessedVersions',
+    id: 'guessedDueToNoVersion',
+    dataKey: 'guessedDueToNoVersion',
     variant: 'info',
     Icon: FaInfoCircle,
     title: 'Missing Version',
@@ -106,8 +101,8 @@ const WARNING_PANEL_CONFIG = [
     renderItem: createGameRenderer({ linkKeys: ['versionsUrl'] }),
   },
   {
-    id: 'selectedVersionFallback',
-    dataKey: 'selectedVersionFallback',
+    id: 'selectedVersionMissingDimensions',
+    dataKey: 'selectedVersionMissingDimensions',
     variant: 'success',
     Icon: FaTools,
     title: 'Version Missing Size',
@@ -119,8 +114,8 @@ const WARNING_PANEL_CONFIG = [
     }),
   },
   {
-    id: 'missingDimensions',
-    dataKey: 'missingDimensions',
+    id: 'allVersionsMissingDimensions',
+    dataKey: 'allVersionsMissingDimensions',
     variant: 'error',
     Icon: FaExclamationTriangle,
     title: 'No Sizes Found',

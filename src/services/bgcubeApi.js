@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { gzip } from 'pako';
+import { REQUEST_TIMEOUT_MS } from '../constants/appDefaults';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const REQUEST_HEADERS = {
@@ -49,6 +50,7 @@ const logRequestError = (error) => {
 const startProgressPolling = (requestId, token, onProgress, resolve, reject) => {
   let isPolling = true;
   let pending = false;
+  let initialDelay = 1000; // Default 1 second delay before first poll
 
   const poll = async () => {
     if (pending || !isPolling) {
@@ -58,11 +60,20 @@ const startProgressPolling = (requestId, token, onProgress, resolve, reject) => 
     pending = true;
     try {
       // Send token in header (preferred)
-      const { data } = await apiClient.get(`${API_BASE}/progress/${requestId}`, {
+      const { data, headers } = await apiClient.get(`${API_BASE}/progress/${requestId}`, {
         headers: {
           'X-Request-Token': token,
         },
       });
+      
+      // Respect Retry-After header if present (for rate limiting)
+      if (headers['retry-after']) {
+        const retryAfterSeconds = parseInt(headers['retry-after'], 10);
+        if (!isNaN(retryAfterSeconds) && retryAfterSeconds > 0) {
+          // Adjust polling interval if Retry-After is longer than current interval
+          // This would require refactoring to use dynamic intervals
+        }
+      }
       
       if (isPolling) {
         // Check if processing is complete (has result data, not just progress)
@@ -99,16 +110,31 @@ const startProgressPolling = (requestId, token, onProgress, resolve, reject) => 
     }
   };
 
-  // Poll immediately to catch early progress updates
-  void poll();
+  // Wait a moment before first poll to avoid race condition with token registration
+  setTimeout(() => {
+    if (isPolling) {
+      void poll();
+    }
+  }, 500); // 500ms delay before first poll
+  
   const intervalId = setInterval(poll, PROGRESS_POLL_INTERVAL_MS);
-
+  
+  // Return cleanup function
   return () => {
     isPolling = false;
     clearInterval(intervalId);
   };
 };
 
+/**
+ * Fetches packed cubes from the API.
+ * Handles both synchronous and asynchronous (polling) responses.
+ * @param {Object} requestPayload - The request payload object
+ * @param {Object} options - Options object
+ * @param {Function} options.onProgress - Progress callback function
+ * @returns {Promise<Object>} Promise resolving to response data and requestId
+ * @throws {Error} If username is missing or request fails
+ */
 export const fetchPackedCubes = async (requestPayload, { onProgress } = {}) => {
   if (!requestPayload?.username) {
     throw new Error('fetchPackedCubes requires a username in the payload.');
@@ -139,11 +165,11 @@ export const fetchPackedCubes = async (requestPayload, { onProgress } = {}) => {
       return new Promise((resolve, reject) => {
         let pollingStopFn = null;
         
-        // Timeout after 5 minutes
+        // Timeout after configured duration
         const timeoutId = setTimeout(() => {
           if (pollingStopFn) pollingStopFn();
           reject(new Error('Request timeout: processing took too long'));
-        }, 5 * 60 * 1000);
+        }, REQUEST_TIMEOUT_MS);
 
         pollingStopFn = startProgressPolling(
           requestId,

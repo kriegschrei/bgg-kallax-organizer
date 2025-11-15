@@ -1,50 +1,23 @@
 import { toArray, sortByName } from './results';
 
 /**
- * Analyzes the dimensions array to determine which warning category a game belongs to.
- * @param {Array} dimensionsArray - Array of dimension objects
- * @returns {string|null} - 'selectedVersionFallback', 'guessedVersions', 'missingDimensions', or null
+ * Collects games into warning groups based on dimension issues.
+ * Uses boolean flags set by the backend instead of analyzing dimension arrays.
+ * @param {Object} options - Configuration object
+ * @param {Array} options.cubes - Array of cube objects
+ * @param {Array} options.oversizedGames - Array of oversized games
+ * @param {boolean} options.includeCubeId - Whether to include cube ID in game data
+ * @returns {Object} Object containing arrays of games for each warning type
  */
-const classifyGameByDimensions = (dimensionsArray) => {
-  if (!Array.isArray(dimensionsArray) || dimensionsArray.length === 0) {
-    return null;
-  }
-
-  // Find dimensions by type
-  const versionDim = dimensionsArray.find((d) => d?.type === 'version');
-  const guessedDim = dimensionsArray.find((d) => d?.type === 'guessed');
-  const defaultDim = dimensionsArray.find((d) => d?.type === 'default');
-
-  // Rule 1: selectedVersionFallback
-  // If first dimension is type "version" and missing: true, but there is a "guessed" dimension type
-  if (versionDim?.missing === true && guessedDim) {
-    return 'selectedVersionFallback';
-  }
-
-  // Rule 2: guessedVersions
-  // If there is no dimension of type "version", and we have a "guessed" type of dimension
-  if (!versionDim && guessedDim) {
-    return 'guessedVersions';
-  }
-
-  // Rule 3: missingDimensions
-  // If dimension type "version" has missing: true and the next one is of type "default" and there is no "guessed"
-  if (versionDim?.missing === true && defaultDim && !guessedDim) {
-    return 'missingDimensions';
-  }
-
-  return null;
-};
-
 export const collectWarningGroups = ({
   cubes = [],
   oversizedGames = [],
   includeCubeId = true,
 } = {}) => {
   const bggDefaultDimensions = [];
-  const guessedVersions = [];
-  const selectedVersionFallback = [];
-  const missingDimensions = [];
+  const guessedDueToNoVersion = [];
+  const selectedVersionMissingDimensions = [];
+  const allVersionsMissingDimensions = [];
 
   toArray(cubes).forEach((cube) => {
     const cubeId = cube?.id ?? null;
@@ -58,36 +31,36 @@ export const collectWarningGroups = ({
           correctionUrl: game?.correctionUrl ?? null,
           versionsUrl: game?.versionsUrl ?? null,
         });
-      } else {
-        const classification = classifyGameByDimensions(game.dimensions);
-
-        if (classification === 'selectedVersionFallback') {
-          selectedVersionFallback.push({
-            ...baseGameData,
-            versionsUrl: game?.versionsUrl ?? null,
-            correctionUrl: game?.correctionUrl ?? null,
-          });
-        } else if (classification === 'guessedVersions') {
-          guessedVersions.push({
-            ...baseGameData,
-            versionsUrl: game?.versionsUrl ?? null,
-          });
-        } else if (classification === 'missingDimensions') {
-          missingDimensions.push({
-            ...baseGameData,
-            correctionUrl: game?.correctionUrl ?? null,
-            versionsUrl: game?.versionsUrl ?? null,
-          });
-        }
-        // If classification is null, the game has correct version dimensions, so no warning needed
+      } 
+      // Use boolean flags set by backend instead of analyzing dimensions
+      if (game.allVersionsMissingDimensions === true) {
+        allVersionsMissingDimensions.push({
+          ...baseGameData,
+          correctionUrl: game?.correctionUrl ?? null,
+          versionsUrl: game?.versionsUrl ?? null,
+        });
+      } 
+      if (game.selectedVersionMissingDimensions === true) {
+        selectedVersionMissingDimensions.push({
+          ...baseGameData,
+          versionsUrl: game?.versionsUrl ?? null,
+          correctionUrl: game?.correctionUrl ?? null,
+        });
       }
+      if (game.guessedDueToNoVersion === true) {
+        guessedDueToNoVersion.push({
+          ...baseGameData,
+          versionsUrl: game?.versionsUrl ?? null,
+        });
+      }
+      // If none of the flags are true, the game has correct version dimensions, so no warning needed
     });
   });
 
   bggDefaultDimensions.sort(sortByName);
-  guessedVersions.sort(sortByName);
-  selectedVersionFallback.sort(sortByName);
-  missingDimensions.sort(sortByName);
+  guessedDueToNoVersion.sort(sortByName);
+  selectedVersionMissingDimensions.sort(sortByName);
+  allVersionsMissingDimensions.sort(sortByName);
 
   const oversizedList = toArray(oversizedGames)
     .map((game) => ({
@@ -100,9 +73,9 @@ export const collectWarningGroups = ({
 
   return {
     bggDefaultDimensions,
-    guessedVersions,
-    selectedVersionFallback,
-    missingDimensions,
+    guessedDueToNoVersion,
+    selectedVersionMissingDimensions,
+    allVersionsMissingDimensions,
     oversized: oversizedList,
   };
 };

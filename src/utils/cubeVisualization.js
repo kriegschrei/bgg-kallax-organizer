@@ -1,10 +1,21 @@
 import { resolveGameIdentity } from './overrideIdentity';
 import { getPrimaryDimension } from './dimensions';
 
+/**
+ * Generates a color for a game item based on its index.
+ * @param {number} index - The index of the game
+ * @param {number} total - Total number of games
+ * @returns {string} HSL color string
+ */
 export function getGameColor(index, total) {
   return `hsl(${(index * 360) / total}, 70%, 80%)`;
 }
 
+/**
+ * Splits a full game name into base name and version.
+ * @param {string} fullName - The full game name potentially containing version in parentheses
+ * @returns {Object} Object with name and version properties
+ */
 export function splitNameAndVersion(fullName) {
   if (typeof fullName !== 'string') {
     return { name: '', version: null };
@@ -207,6 +218,12 @@ export const SORTING_BADGE_BUILDERS = {
   },
 };
 
+/**
+ * Builds badge objects for a game based on active sorting fields.
+ * @param {Object} game - The game object
+ * @param {string[]} activeSortingFields - Array of active sorting field names
+ * @returns {Array} Array of badge objects with field, label, and key properties
+ */
 export function buildBadgesForGame(game, activeSortingFields = []) {
   if (!Array.isArray(activeSortingFields) || activeSortingFields.length === 0) {
     return [];

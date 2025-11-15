@@ -340,11 +340,11 @@ const buildVersionEntry = ({
         missing: true,
       };
   
-  const missingDimensions = derivedDimensions.missing;
-  const volume = !missingDimensions && versionData && isPositiveFinite(versionData.volume)
+  const allVersionsMissingDimensions = derivedDimensions.missing;
+  const volume = !allVersionsMissingDimensions && versionData && isPositiveFinite(versionData.volume)
     ? versionData.volume
     : -1;
-  const area = !missingDimensions && versionData && isPositiveFinite(versionData.area)
+  const area = !allVersionsMissingDimensions && versionData && isPositiveFinite(versionData.area)
     ? versionData.area
     : -1;
   const versionKey = versionData?.versionKey || buildVersionKey(gameId, normalizedVersionId);
@@ -369,13 +369,13 @@ const buildVersionEntry = ({
   );
   alternateCandidates.sort(compareAlternateVersions);
 
-  if (alternateCandidates.length > 0 && (missingDimensions || normalizedVersionId === -1)) {
+  if (alternateCandidates.length > 0 && (allVersionsMissingDimensions || normalizedVersionId === -1)) {
     const firstAlt = alternateCandidates[0];
     console.debug(`🔍 Selected alternate for gameId=${gameId}, versionId=${normalizedVersionId}: ${firstAlt.versionKey} (${firstAlt.length}" × ${firstAlt.width}" × ${firstAlt.depth}")`);
   }
 
   const alternateVersions =
-    missingDimensions || normalizedVersionId === -1
+    allVersionsMissingDimensions || normalizedVersionId === -1
       ? alternateCandidates.length > 0
         ? [
             (() => {

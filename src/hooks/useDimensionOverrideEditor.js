@@ -8,6 +8,14 @@ const INITIAL_STATE = {
   error: '',
 };
 
+/**
+ * Hook to manage dimension override editor state and actions.
+ * @param {Object} options - Configuration object
+ * @param {boolean} options.overridesReady - Whether overrides are ready
+ * @param {boolean} options.isLoading - Whether a request is in progress
+ * @param {Function} options.onSaveDimensionOverride - Handler for saving dimension override
+ * @returns {Object} Object containing editor state and handlers
+ */
 export function useDimensionOverrideEditor({
   overridesReady,
   isLoading,

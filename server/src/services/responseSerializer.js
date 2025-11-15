@@ -50,7 +50,7 @@ const buildDimensions = (game) => {
   // If version dimension is missing but game has a versionId, include it as missing
   // This allows the frontend to detect missing dimensions correctly
   if (!sources.version && game.versionId !== undefined && game.versionId !== -1) {
-    const missingVersionEntry = {
+    const noSelectedVersionEntry = {
       type: 'version',
       length: null,
       width: null,
@@ -58,7 +58,7 @@ const buildDimensions = (game) => {
       weight: null,
       missing: true,
     };
-    entries.unshift(missingVersionEntry); // Add at the beginning to maintain priority order
+    entries.unshift(noSelectedVersionEntry); // Add at the beginning to maintain priority order
   }
 
   if (entries.length === 0) {
@@ -165,10 +165,13 @@ const transformGameForResponse = (game) => {
     numplays: toIntegerOrFallback(game.numplays, 0),
     volume: Number.isFinite(game.volume) ? game.volume : -1,
     area: Number.isFinite(game.area) ? game.area : -1,
-    missingVersion: Boolean(game.missingVersion),
+    noSelectedVersion: Boolean(game.noSelectedVersion),
     versionsUrl: game.versionsUrl || null,
     usedAlternateVersionDims: Boolean(game.usedAlternateVersionDims),
     bggDefaultDimensions: Boolean(game.bggDefaultDimensions),
+    allVersionsMissingDimensions: Boolean(game.allVersionsMissingDimensions),
+    selectedVersionMissingDimensions: Boolean(game.selectedVersionMissingDimensions),
+    guessedDueToNoVersion: Boolean(game.guessedDueToNoVersion),
     correctionUrl: game.correctionUrl || null,
     orientation: buildOrientation(game),
   };
@@ -208,7 +211,7 @@ const buildCubeStats = (cube) => {
 const buildDimensionSummary = (cubes) => {
   const summary = {
     guessedVersionCount: 0,
-    selectedVersionFallbackCount: 0,
+    selectedVersionMissingDimensionsCount: 0,
     missingDimensionCount: 0,
     exceedingCapacityCount: 0,
   };
@@ -219,7 +222,7 @@ const buildDimensionSummary = (cubes) => {
         summary.guessedVersionCount += 1;
       }
       if (game.usedAlternateVersionDims) {
-        summary.selectedVersionFallbackCount += 1;
+        summary.selectedVersionMissingDimensionsCount += 1;
       }
       if (checkMissingDimensions(game.dimensions)) {
         summary.missingDimensionCount += 1;

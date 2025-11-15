@@ -1,10 +1,14 @@
 import { useState, useCallback } from 'react';
 
+/**
+ * Hook to manage results state (cubes, stats, warnings, errors, progress).
+ * @returns {Object} Object containing all results state and setters
+ */
 export const useResultsState = () => {
   const [cubes, setCubes] = useState(null);
   const [stats, setStats] = useState(null);
   const [oversizedGames, setOversizedGames] = useState([]);
-  const [missingVersionWarning, setMissingVersionWarning] = useState(null);
+  const [noSelectedVersionWarning, setnoSelectedVersionWarning] = useState(null);
   const [lastRequestConfig, setLastRequestConfig] = useState(null);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState('');
@@ -13,7 +17,7 @@ export const useResultsState = () => {
     setCubes(null);
     setStats(null);
     setOversizedGames([]);
-    setMissingVersionWarning(null);
+    setnoSelectedVersionWarning(null);
     setLastRequestConfig(null);
     setError(null);
     setProgress('');
@@ -26,8 +30,8 @@ export const useResultsState = () => {
     setStats,
     oversizedGames,
     setOversizedGames,
-    missingVersionWarning,
-    setMissingVersionWarning,
+    noSelectedVersionWarning,
+    setnoSelectedVersionWarning,
     lastRequestConfig,
     setLastRequestConfig,
     error,

@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import { hasValidDimensions } from '../../utils/dimensions';
 
 const DB_NAME = 'bgcube-user-data';
 const DB_VERSION = 3;
@@ -70,13 +71,6 @@ async function deleteById(storeName, id) {
   }
   const db = await getDb();
   await db.delete(storeName, id);
-}
-
-function hasValidDimensions({ length, width, depth, height }) {
-  const normalizedDepth = typeof depth === 'number' ? depth : height;
-  return [length, width, normalizedDepth].every(
-    (value) => typeof value === 'number' && !Number.isNaN(value) && value > 0,
-  );
 }
 
 export async function getExcludedGames() {

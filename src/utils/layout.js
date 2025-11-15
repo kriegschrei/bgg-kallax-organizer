@@ -1,4 +1,4 @@
-const DEFAULT_COLLAPSED_BADGE_LIMIT = 4;
+import { DEFAULT_COLLAPSED_BADGE_LIMIT } from '../constants/appDefaults';
 
 export const getCollapsedBadgeLimit = (width) => {
   if (!Number.isFinite(width) || width <= 0) {

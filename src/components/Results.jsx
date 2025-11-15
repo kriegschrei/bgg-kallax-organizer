@@ -1,32 +1,20 @@
 import React, { useMemo, useCallback } from 'react';
-import { FaChevronRight, FaChevronDown } from 'react-icons/fa';
 import CubeVisualization from './CubeVisualization';
 import ResultsStats from './ResultsStats';
 import ResultsOverrides from './ResultsOverrides';
 import ResultsWarningPanels from './ResultsWarningPanels';
-import { formatGameDimensions, getScrollableListClassName } from '../utils/results';
+import DisclosureIcon from './DisclosureIcon';
+import {
+  formatGameDimensions,
+  getScrollableListClassName,
+  formatStatValue,
+  createStatItem,
+} from '../utils/results';
 import { formatEditorDimensions } from '../utils/dimensions';
 import { collectWarningGroups } from '../utils/resultsWarnings';
 import { useOverrideData } from '../hooks/useOverrideData';
 import { useDimensionOverrideEditor } from '../hooks/useDimensionOverrideEditor';
 import './Results.css';
-
-const formatStatValue = (value, fallback, suffix = '') => {
-  const isNumeric = typeof value === 'number' && Number.isFinite(value);
-  const isDefined = value !== null && value !== undefined && value !== '';
-
-  if (!isNumeric && !isDefined) {
-    return fallback;
-  }
-
-  const formatted = isNumeric ? value : value;
-  return suffix ? `${formatted}${suffix}` : formatted;
-};
-
-const createStatItem = (label, value, fallback, suffix) => ({
-  label,
-  value: formatStatValue(value, fallback, suffix),
-});
 
 export default function Results({
   cubes,
@@ -55,18 +43,7 @@ export default function Results({
     ],
     [stats?.avgGamesPerCube, stats?.totalUtilization, stats?.totalCubes, stats?.totalGames]
   );
-  const renderDisclosureIcon = useCallback(
-    (expanded) => (
-      <span className="disclosure-arrow">
-        {expanded ? (
-          <FaChevronDown className="disclosure-arrow-icon" aria-hidden="true" />
-        ) : (
-          <FaChevronRight className="disclosure-arrow-icon" aria-hidden="true" />
-        )}
-      </span>
-    ),
-    []
-  );
+  const renderDisclosureIcon = useCallback((expanded) => <DisclosureIcon expanded={expanded} />, []);
 
   const {
     excludedLookup,

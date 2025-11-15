@@ -1,4 +1,5 @@
 import { COLLECTION_STATUSES } from '../constants/appDefaults';
+import { toInteger, toPositiveNumber } from './helpers';
 
 const STATUS_KEYS = COLLECTION_STATUSES.map((status) => status.key);
 const SORT_FIELDS = new Set([
@@ -22,19 +23,6 @@ const SORT_FIELDS = new Set([
 ]);
 const ORIENTATION_VALUES = new Set(['horizontal', 'vertical']);
 
-const toInteger = (value) => {
-  const number = Number(value);
-  return Number.isInteger(number) ? number : null;
-};
-
-const toPositiveNumber = (value) => {
-  const number = Number(value);
-  if (!Number.isFinite(number)) {
-    return null;
-  }
-  return number > 0 ? number : null;
-};
-
 export const buildStatusesPayload = (selections = {}) => {
   const result = {};
   let includeCount = 0;
@@ -56,6 +44,12 @@ export const buildStatusesPayload = (selections = {}) => {
   return result;
 };
 
+/**
+ * Builds sort payload from sorting rules array.
+ * Filters to only enabled rules with valid fields and orders.
+ * @param {Array} sortingRules - Array of sorting rule objects
+ * @returns {Array} Array of sort payload objects
+ */
 export const buildSortPayload = (sortingRules = []) =>
   sortingRules
     .filter(
@@ -148,6 +142,9 @@ export const buildOverridesPayload = ({
   return overrides;
 };
 
+/**
+ * Array of boolean flag field names used in request payload.
+ */
 const BOOLEAN_FIELDS = [
   'lockRotation',
   'optimizeSpace',
@@ -159,6 +156,18 @@ const BOOLEAN_FIELDS = [
   'bypassVersionWarning',
 ];
 
+/**
+ * Builds the complete request payload for the API.
+ * @param {Object} options - Configuration object
+ * @param {string} options.username - BoardGameGeek username
+ * @param {string} options.stacking - Stacking preference
+ * @param {Object} options.statusSelections - Collection status selections
+ * @param {Array} options.sorting - Sorting rules array
+ * @param {Object} options.overrides - Overrides object
+ * @param {Object} options.flags - Boolean flags object
+ * @returns {Object} Complete request payload object
+ * @throws {Error} If username is missing or invalid
+ */
 export const buildRequestPayload = ({
   username,
   stacking,
@@ -204,9 +213,20 @@ export const buildRequestPayload = ({
   return payload;
 };
 
+/**
+ * Checks if any status selection is set to 'include'.
+ * @param {Object} statusSelections - Status selections object
+ * @returns {boolean} True if at least one status is 'include'
+ */
 export const hasIncludeSelection = (statusSelections = {}) =>
   STATUS_KEYS.some((key) => statusSelections[key] === 'include');
 
+/**
+ * Derives status selections from collection filters.
+ * Only includes 'include' or 'exclude' values, filters out 'neutral'.
+ * @param {Object} collectionFilters - Collection filters object
+ * @returns {Object} Status selections object
+ */
 export const deriveStatusSelections = (collectionFilters = {}) => {
   const selections = {};
 
@@ -220,5 +240,9 @@ export const deriveStatusSelections = (collectionFilters = {}) => {
   return selections;
 };
 
+/**
+ * Gets array of all valid status keys.
+ * @returns {Array} Array of status key strings
+ */
 export const getStatusKeys = () => [...STATUS_KEYS];
 

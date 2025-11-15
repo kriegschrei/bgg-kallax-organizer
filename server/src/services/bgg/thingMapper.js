@@ -143,11 +143,11 @@ const deriveExpansionInfo = (item) => {
 
 const computeDimensionsMeta = ({ length, width, depth }) => {
   const dims = [length, width, depth].map((value) => (Number.isFinite(value) ? value : -1));
-  const missingDimensions = dims.some((value) => value <= 0);
+  const allVersionsMissingDimensions = dims.some((value) => value <= 0);
 
-  if (missingDimensions) {
+  if (allVersionsMissingDimensions) {
     return {
-      missingDimensions: true,
+      allVersionsMissingDimensions: true,
       volume: -1,
       area: -1,
     };
@@ -158,7 +158,7 @@ const computeDimensionsMeta = ({ length, width, depth }) => {
   const area = sorted[0] * sorted[1];
 
   return {
-    missingDimensions: false,
+    allVersionsMissingDimensions: false,
     volume,
     area,
   };
@@ -298,7 +298,7 @@ export const mapVersionItems = (item, thingGameId) => {
         depth,
         weight: parseFloat(version?.weight?.$?.value, -1),
         language: languageLink?.$?.value || null,
-        missingDimensions: dimensionsMeta.missingDimensions, // Keep for backward compatibility in cache
+        allVersionsMissingDimensions: dimensionsMeta.allVersionsMissingDimensions, // Keep for backward compatibility in cache
         volume: dimensionsMeta.volume,
         area: dimensionsMeta.area,
         bggDefaultDimensions: isBggDefaultDimensions, // Flag to indicate BGG defaults were filtered

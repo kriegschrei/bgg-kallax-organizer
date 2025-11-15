@@ -70,10 +70,13 @@
                   "numplays": { "type": "integer", "default": 0 },
                   "volume": { "type": "number" },
                   "area": { "type": "number" },
-                  "missingVersion": { "type": "boolean" },
+                  "noSelectedVersion": { "type": "boolean" },
                   "versionsUrl": { "type": "string", "format": "uri" },
                   "usedAlternateVersionDims": { "type": "boolean" },
                   "bggDefaultDimensions": { "type": "boolean" },
+                  "allVersionsMissingDimensions": { "type": "boolean" },
+                  "selectedVersionMissingDimensions": { "type": "boolean" },
+                  "guessedDueToNoVersion": { "type": "boolean" },
                   "correctionUrl": { "type": "string", "format": "uri" },
                   "orientation": { "$ref": "../../$defs/types.schema.json#/$defs/orientation" }
                 },
@@ -81,7 +84,7 @@
                   "versionKey","gameId","versionId","gameName","versionName","displayName","dimensions","position",
                   "packedDims","oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
                   "bestPlayerCount","minPlaytime","maxPlaytime","minAge","communityAge","bggWeight","bggRating","numplays",
-                  "missingVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","gameType",
+                  "noSelectedVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","gameType",
                   "gamePublishedYear","versionPublishedYear"
                 ]
               }
@@ -96,11 +99,11 @@
         "additionalProperties": false,
         "properties": {
           "guessedVersionCount": { "type": "integer" },
-          "selectedVersionFallbackCount": { "type": "integer" },
+          "selectedVersionMissingDimensionsCount": { "type": "integer" },
           "missingDimensionCount": { "type": "integer" },
           "exceedingCapacityCount": { "type": "integer" }
         },
-        "required": ["guessedVersionCount","selectedVersionFallbackCount","missingDimensionCount","exceedingCapacityCount"]
+        "required": ["guessedVersionCount","selectedVersionMissingDimensionsCount","missingDimensionCount","exceedingCapacityCount"]
       },
       "oversizedGames": {
         "type": "array",

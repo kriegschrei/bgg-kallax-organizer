@@ -4,10 +4,25 @@ import { fetchPackedCubes } from '../services/bgcubeApi';
 import { saveLastResult } from '../services/storage/indexedDb';
 import { buildRequestPayload } from '../utils/requestPayload';
 
+/**
+ * Clones an array of items, creating shallow copies of each item.
+ * @param {Array} items - Array of items to clone
+ * @returns {Array} Cloned array with shallow copies of items
+ */
 const cloneList = (items = []) => (Array.isArray(items) ? items.map((item) => ({ ...item })) : []);
 
+/**
+ * Checks if a response was successful (has cubes array).
+ * @param {Object} response - The response object
+ * @returns {boolean} True if response has cubes array
+ */
 const wasSuccessful = (response) => response && Array.isArray(response.cubes);
 
+/**
+ * Creates submission state object from options.
+ * @param {Object} options - Configuration options
+ * @returns {Object} Submission state object
+ */
 const createSubmissionState = ({
   username,
   statusSelections,
@@ -52,6 +67,11 @@ const createSubmissionState = ({
   };
 };
 
+/**
+ * Hook to manage collection request handlers (submit, cancel, continue).
+ * @param {Object} options - Configuration object with all required handlers and state
+ * @returns {Object} Object containing handleSubmit, handleWarningCancel, and handleWarningContinue
+ */
 const useCollectionRequestHandlers = (options) => {
   const {
     username,
@@ -75,7 +95,7 @@ const useCollectionRequestHandlers = (options) => {
     setCubes,
     setOversizedGames,
     setProgress,
-    setMissingVersionWarning,
+    setnoSelectedVersionWarning,
     setFiltersCollapsed,
     setIsFilterDrawerOpen,
     setStats,
@@ -89,7 +109,7 @@ const useCollectionRequestHandlers = (options) => {
     setCubes(null);
     setOversizedGames([]);
     setProgress('Fetching your collection from BoardGameGeek...');
-    setMissingVersionWarning(null);
+    setnoSelectedVersionWarning(null);
     setFiltersCollapsed(true);
     setIsFilterDrawerOpen(false);
   }, [
@@ -98,7 +118,7 @@ const useCollectionRequestHandlers = (options) => {
     setCubes,
     setOversizedGames,
     setProgress,
-    setMissingVersionWarning,
+    setnoSelectedVersionWarning,
     setFiltersCollapsed,
     setIsFilterDrawerOpen,
   ]);
@@ -142,7 +162,7 @@ const useCollectionRequestHandlers = (options) => {
     return true;
   }, [username, hasIncludeStatuses, setError]);
 
-  const handleMissingVersionsResponse = useCallback(
+  const handlenoSelectedVersionsResponse = useCallback(
     (response, trimmedUsername) => {
       if (response?.status !== 'missing_versions') {
         return false;
@@ -150,10 +170,10 @@ const useCollectionRequestHandlers = (options) => {
 
       setLoading(false);
       setProgress('');
-      setMissingVersionWarning({ ...response, username: trimmedUsername });
+      setnoSelectedVersionWarning({ ...response, username: trimmedUsername });
       return true;
     },
-    [setLoading, setProgress, setMissingVersionWarning],
+    [setLoading, setProgress, setnoSelectedVersionWarning],
   );
 
   const handleNoResultsResponse = useCallback(
@@ -222,7 +242,7 @@ const useCollectionRequestHandlers = (options) => {
           },
         });
 
-        if (handleMissingVersionsResponse(response, submissionState.username)) {
+        if (handlenoSelectedVersionsResponse(response, submissionState.username)) {
           return;
         }
 
@@ -255,7 +275,7 @@ const useCollectionRequestHandlers = (options) => {
       dimensionOverridesList,
       setLastRequestConfig,
       setProgress,
-      handleMissingVersionsResponse,
+      handlenoSelectedVersionsResponse,
       handleNoResultsResponse,
       applyResponse,
       handleError,
@@ -263,12 +283,12 @@ const useCollectionRequestHandlers = (options) => {
   );
 
   const handleWarningCancel = useCallback(() => {
-    setMissingVersionWarning(null);
+    setnoSelectedVersionWarning(null);
     setProgress('');
     setError(
       'Processing cancelled. Please select versions for the highlighted games on BoardGameGeek and try again.',
     );
-  }, [setError, setMissingVersionWarning, setProgress]);
+  }, [setError, setnoSelectedVersionWarning, setProgress]);
 
   const handleWarningContinue = useCallback(async () => {
     if (!lastRequestConfig) {
@@ -279,7 +299,7 @@ const useCollectionRequestHandlers = (options) => {
     setError(null);
     // Set initial message, but server progress will override it quickly
     setProgress('Starting fallback dimension lookup...');
-    setMissingVersionWarning(null);
+    setnoSelectedVersionWarning(null);
     setOversizedGames([]);
     setStats(null);
     setFiltersCollapsed(true);
@@ -318,7 +338,7 @@ const useCollectionRequestHandlers = (options) => {
     setLoading,
     setError,
     setProgress,
-    setMissingVersionWarning,
+    setnoSelectedVersionWarning,
     setOversizedGames,
     setStats,
     setFiltersCollapsed,

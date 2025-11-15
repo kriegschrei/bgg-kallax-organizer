@@ -34,7 +34,7 @@ export const SORTING_FIELD_DEFINITIONS = [
   { field: 'communityAge', label: 'Minimum Recommended Community Age', defaultEnabled: false, defaultOrder: 'asc' },
   { field: 'languageDependence', label: 'Language Dependence', defaultEnabled: false, defaultOrder: 'asc' },
   { field: 'volume', label: 'Volume', defaultEnabled: false, defaultOrder: 'asc' },
-  { field: 'area', label: 'Area', defaultEnabled: false, defaultOrder: 'asc' },
+  { field: 'area', label: 'Area (Smallest Edge)', defaultEnabled: false, defaultOrder: 'asc' },
   { field: 'weight', label: 'Weight (Physical)', defaultEnabled: false, defaultOrder: 'asc' },
   { field: 'gamePublishedYear', label: 'Game Published Year', defaultEnabled: false, defaultOrder: 'asc' },
   { field: 'versionPublishedYear', label: 'Version Published Year', defaultEnabled: false, defaultOrder: 'asc' },

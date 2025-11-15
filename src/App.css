@@ -29,7 +29,42 @@ header {
   gap: 0.75rem;
 }
 
-/* Compact top bar layout */
+/* Desktop: Two-row layout */
+.header-top-row,
+.header-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+}
+
+.header-spacer {
+  flex: 1;
+}
+
+.header-top-row {
+  align-items: flex-start;
+}
+
+.header-bottom-row {
+  align-items: center;
+}
+
+.header-bottom-row .subtitle {
+  text-align: left;
+  margin: 0;
+  flex-shrink: 0;
+  font-size: 1.2rem;
+}
+
+.header-bottom-row .header-controls-bar {
+  justify-content: flex-end;
+  width: auto;
+  flex-shrink: 0;
+}
+
+/* Mobile: Compact top bar layout */
 .header-top-bar {
   display: flex;
   align-items: center;
@@ -208,6 +243,10 @@ header {
   margin: 0;
   aspect-ratio: auto;
   flex-shrink: 0;
+}
+
+.header-top-row .app-logo {
+  align-self: flex-start;
 }
 
 .subtitle {

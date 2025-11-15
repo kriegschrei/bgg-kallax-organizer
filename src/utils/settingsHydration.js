@@ -42,6 +42,7 @@ export const applyStoredSettings = (storedSettings, setters, refs = {}) => {
     bypassVersionWarning: storedBypassVersionWarning,
     sorting: storedSorting,
     collectionFilters: storedCollectionFilters,
+    useMetricUnits: storedUseMetricUnits,
   } = storedSettings;
 
   if (typeof storedUsername === 'string') {
@@ -105,6 +106,9 @@ export const applyStoredSettings = (storedSettings, setters, refs = {}) => {
         return acc;
       }, {}),
     }));
+  }
+  if (typeof storedUseMetricUnits === 'boolean') {
+    setters.setUseMetricUnits(storedUseMetricUnits);
   }
 };
 

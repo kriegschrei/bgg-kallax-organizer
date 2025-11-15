@@ -1,5 +1,6 @@
 import { resolveGameIdentity } from './overrideIdentity';
 import { getPrimaryDimension } from './dimensions';
+import { formatWeight } from './unitConversion';
 
 /**
  * Generates a color for a game item based on its index.
@@ -187,7 +188,7 @@ export const SORTING_BADGE_BUILDERS = {
       },
     ];
   },
-  weight: (game) => {
+  weight: (game, isMetric = false) => {
     // Get weight from dimensions array
     const primaryDim = getPrimaryDimension(game.dimensions);
     const value = primaryDim?.weight != null && Number.isFinite(primaryDim.weight) ? primaryDim.weight : null;
@@ -197,7 +198,7 @@ export const SORTING_BADGE_BUILDERS = {
     return [
       {
         key: `weight-${getOverrideKey(game)}`,
-        label: `Weight: ${value.toFixed(2)}`,
+        label: `Weight: ${formatWeight(value, isMetric)}`,
         field: 'weight',
       },
     ];
@@ -222,9 +223,10 @@ export const SORTING_BADGE_BUILDERS = {
  * Builds badge objects for a game based on active sorting fields.
  * @param {Object} game - The game object
  * @param {string[]} activeSortingFields - Array of active sorting field names
+ * @param {boolean} isMetric - Whether to display in metric units (default: false)
  * @returns {Array} Array of badge objects with field, label, and key properties
  */
-export function buildBadgesForGame(game, activeSortingFields = []) {
+export function buildBadgesForGame(game, activeSortingFields = [], isMetric = false) {
   if (!Array.isArray(activeSortingFields) || activeSortingFields.length === 0) {
     return [];
   }
@@ -235,7 +237,8 @@ export function buildBadgesForGame(game, activeSortingFields = []) {
     if (!builder) {
       return;
     }
-    const fieldBadges = builder(game);
+    // Pass isMetric to weight builder, others don't need it
+    const fieldBadges = field === 'weight' ? builder(game, isMetric) : builder(game);
     if (!Array.isArray(fieldBadges) || fieldBadges.length === 0) {
       return;
     }

@@ -1,5 +1,6 @@
 import React from 'react';
 import DimensionInput from './DimensionInput';
+import { useUnitPreference } from '../contexts/UnitPreferenceContext';
 
 function DimensionForm({
   className,
@@ -26,10 +27,13 @@ function DimensionForm({
     onChange?.(field, event.target.value);
   };
 
+  const { isMetric } = useUnitPreference();
+  const unitLabel = isMetric ? 'cm' : 'in';
+  
   const dimensionFields = [
-    { key: 'length', label: 'Length (in)' },
-    { key: 'width', label: 'Width (in)' },
-    { key: 'depth', label: 'Depth (in)' },
+    { key: 'length', label: `Length (${unitLabel})` },
+    { key: 'width', label: `Width (${unitLabel})` },
+    { key: 'depth', label: `Depth (${unitLabel})` },
   ];
 
   return (

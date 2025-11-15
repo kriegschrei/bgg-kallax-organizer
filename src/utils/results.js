@@ -1,5 +1,6 @@
+import { formatDimension } from './unitConversion';
 
-export const formatGameDimensions = (dims) => {
+export const formatGameDimensions = (dims, isMetric = false) => {
   if (!dims) {
     return '—';
   }
@@ -12,7 +13,7 @@ export const formatGameDimensions = (dims) => {
   const depth = normalize(dims.depth ?? dims.z ?? null);
 
   const segments = [length, width, depth].map((value) =>
-    value !== null ? `${value.toFixed(2)}"` : '—'
+    value !== null ? formatDimension(value, isMetric, 2) : '—'
   );
 
   return segments.join(' × ');

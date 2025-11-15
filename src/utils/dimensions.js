@@ -1,3 +1,5 @@
+import { formatDimension } from './unitConversion';
+
 export const parsePositiveNumber = (value) => {
   if (typeof value === 'number') {
     return Number.isFinite(value) && value > 0 ? value : null;
@@ -86,11 +88,12 @@ export const resolveDisplayDimensions = (
  * @param {Object} options - Formatting options
  * @param {number} options.precision - Decimal precision (default: 2)
  * @param {string} options.placeholder - Placeholder for missing values (default: '—')
+ * @param {boolean} options.isMetric - Whether to display in metric units (default: false)
  * @returns {string} Formatted dimensions string
  */
 export const formatEditorDimensions = (
   editor,
-  { precision = 2, placeholder = '—' } = {}
+  { precision = 2, placeholder = '—', isMetric = false } = {}
 ) => {
   if (!editor) {
     return `${placeholder} × ${placeholder} × ${placeholder}`;
@@ -98,7 +101,7 @@ export const formatEditorDimensions = (
 
   const formatPart = (value) => {
     const numeric = parsePositiveNumber(value);
-    return numeric !== null ? `${numeric.toFixed(precision)}"` : placeholder;
+    return numeric !== null ? formatDimension(numeric, isMetric, precision) : placeholder;
   };
 
   return `${formatPart(editor.length)} × ${formatPart(editor.width)} × ${formatPart(

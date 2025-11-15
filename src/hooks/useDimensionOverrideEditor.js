@@ -1,4 +1,6 @@
 import { useCallback, useState } from 'react';
+import { useUnitPreference } from '../contexts/UnitPreferenceContext';
+import { convertInchesToCm, convertCmToInches, convertDimensionInputToInches } from '../utils/unitConversion';
 
 const INITIAL_STATE = {
   overrideKey: null,
@@ -22,6 +24,7 @@ export function useDimensionOverrideEditor({
   onSaveDimensionOverride,
 }) {
   const [editorState, setEditorState] = useState(INITIAL_STATE);
+  const { isMetric } = useUnitPreference();
 
   const normalizeDimensionPart = useCallback((value) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -48,14 +51,27 @@ export function useDimensionOverrideEditor({
       return;
     }
 
+    // Convert from inches to cm for display if metric is enabled
+    const convertForDisplay = (value) => {
+      const numeric = normalizeDimensionPart(value);
+      if (!numeric || numeric === '') {
+        return '';
+      }
+      const numValue = parseFloat(numeric);
+      if (!Number.isFinite(numValue)) {
+        return '';
+      }
+      return isMetric ? String(convertInchesToCm(numValue)) : numeric;
+    };
+
     setEditorState({
       overrideKey: game.key,
-      length: normalizeDimensionPart(game.length),
-      width: normalizeDimensionPart(game.width),
-      depth: normalizeDimensionPart(game.depth),
+      length: convertForDisplay(game.length),
+      width: convertForDisplay(game.width),
+      depth: convertForDisplay(game.depth),
       error: '',
     });
-  }, [normalizeDimensionPart]);
+  }, [normalizeDimensionPart, isMetric]);
 
   const closeEditor = useCallback(() => {
     setEditorState(INITIAL_STATE);
@@ -80,22 +96,29 @@ export function useDimensionOverrideEditor({
         return;
       }
 
+      // Convert from display unit (cm if metric) to inches before saving
+      const convertForSave = (value) => {
+        const converted = convertDimensionInputToInches(value, isMetric);
+        return converted !== null ? String(converted) : value;
+      };
+
       const success = await onSaveDimensionOverride(game, {
-        length: editorState.length,
-        width: editorState.width,
-        depth: editorState.depth,
+        length: convertForSave(editorState.length),
+        width: convertForSave(editorState.width),
+        depth: convertForSave(editorState.depth),
       });
 
       if (success) {
         closeEditor();
       } else {
+        const unitLabel = isMetric ? 'cm' : 'inches';
         setEditorState((prev) => ({
           ...prev,
-          error: 'Please enter positive decimal inches for all fields.',
+          error: `Please enter positive decimal ${unitLabel} for all fields.`,
         }));
       }
     },
-    [closeEditor, editorState, isLoading, onSaveDimensionOverride, openEditor, overridesReady]
+    [closeEditor, editorState, isLoading, isMetric, onSaveDimensionOverride, openEditor, overridesReady]
   );
 
   const isEditingGame = useCallback(

@@ -5,8 +5,10 @@ import IconButton from './IconButton';
 /**
  * Application header component displaying logo, subtitle, and Ko-fi widget.
  * @param {boolean} hasResults - Whether there are results to print
+ * @param {boolean} isMetric - Whether metric units are enabled
+ * @param {Function} onToggleMetric - Handler for toggling metric units
  */
-export default function AppHeader({ hasResults = false }) {
+export default function AppHeader({ hasResults = false, isMetric = false, onToggleMetric }) {
   const handlePrint = () => {
     window.print();
   };
@@ -30,15 +32,39 @@ export default function AppHeader({ hasResults = false }) {
   return (
     <header>
       <div className="header-content">
-        {hasResults && (
-          <IconButton
-            className="print-button"
-            onClick={handlePrint}
-            icon={FaPrint}
-            srLabel="Print"
-            title="Print this page"
-          />
-        )}
+        <div className="header-controls">
+          {hasResults && (
+            <IconButton
+              className="print-button"
+              onClick={handlePrint}
+              icon={FaPrint}
+              srLabel="Print"
+              title="Print this page"
+            />
+          )}
+          <div className="unit-toggle-group">
+            <button
+              type="button"
+              className={`unit-toggle-button ${!isMetric ? 'active' : ''}`}
+              onClick={() => isMetric && onToggleMetric && onToggleMetric()}
+              disabled={!isMetric}
+              title="Imperial units (inches, lbs)"
+              aria-pressed={!isMetric}
+            >
+              Imperial
+            </button>
+            <button
+              type="button"
+              className={`unit-toggle-button ${isMetric ? 'active' : ''}`}
+              onClick={() => !isMetric && onToggleMetric && onToggleMetric()}
+              disabled={isMetric}
+              title="Metric units (cm, grams)"
+              aria-pressed={isMetric}
+            >
+              Metric
+            </button>
+          </div>
+        </div>
         <img src="/bgcube_logo.png" alt="BGCUBE.app" className="app-logo" />
         <p className="subtitle">
           Organize your{' '}

@@ -8,6 +8,8 @@ import {
 } from '../utils/cubeVisualization';
 import { resolveGameIdentity } from '../utils/overrideIdentity';
 import { getPrimaryDimension } from '../utils/dimensions';
+import { useUnitPreference } from '../contexts/UnitPreferenceContext';
+import { convertInchesToCm, convertDimensionInputToInches } from '../utils/unitConversion';
 
 const KALLAX_WIDTH = 13;
 const KALLAX_HEIGHT = 13;
@@ -103,6 +105,8 @@ export default function CubeVisualization({
     });
   };
 
+  const { isMetric } = useUnitPreference();
+  
   const openDimensionEditor = (game) => {
     if (interactionsDisabled) {
       return;
@@ -118,22 +122,19 @@ export default function CubeVisualization({
     const primaryDim = getPrimaryDimension(game.dimensions);
     const source = customDims || primaryDim || {};
 
+    // Convert from inches to cm for display if metric is enabled
+    const convertForDisplay = (value) => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return '';
+      }
+      return isMetric ? String(convertInchesToCm(value)) : String(value);
+    };
+
     setDimensionEditor({
       overrideKey,
-      length:
-        typeof source.length === 'number' && Number.isFinite(source.length)
-          ? String(source.length)
-          : '',
-      width:
-        typeof source.width === 'number' && Number.isFinite(source.width)
-          ? String(source.width)
-          : '',
-      depth:
-        typeof source.depth === 'number' && Number.isFinite(source.depth)
-          ? String(source.depth)
-          : typeof source.height === 'number' && Number.isFinite(source.height)
-          ? String(source.height)
-          : '',
+      length: convertForDisplay(source.length),
+      width: convertForDisplay(source.width),
+      depth: convertForDisplay(source.depth ?? source.height),
       error: '',
     });
   };
@@ -157,18 +158,25 @@ export default function CubeVisualization({
       return;
     }
 
+    // Convert from display unit (cm if metric) to inches before saving
+    const convertForSave = (value) => {
+      const converted = convertDimensionInputToInches(value, isMetric);
+      return converted !== null ? String(converted) : value;
+    };
+
     const success = await onSaveDimensionOverride(game, {
-      length: dimensionEditor.length,
-      width: dimensionEditor.width,
-      depth: dimensionEditor.depth,
+      length: convertForSave(dimensionEditor.length),
+      width: convertForSave(dimensionEditor.width),
+      depth: convertForSave(dimensionEditor.depth),
     });
 
     if (success) {
       closeDimensionEditor();
     } else {
+      const unitLabel = isMetric ? 'cm' : 'inches';
       setDimensionEditor((prev) => ({
         ...prev,
-        error: 'Please enter positive decimal inches for all fields.',
+        error: `Please enter positive decimal ${unitLabel} for all fields.`,
       }));
     }
   };

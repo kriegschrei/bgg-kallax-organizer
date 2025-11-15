@@ -10,6 +10,8 @@ import {
 import WarningCallout from './WarningCallout';
 import { buildWarningPanels, createWarningPanelState } from '../utils/resultsWarnings';
 import { pickFirstUrl } from '../utils/helpers';
+import { useUnitPreference } from '../contexts/UnitPreferenceContext';
+import { formatDimension } from '../utils/unitConversion';
 
 /**
  * Renders a linked game name or plain text if no URL is available.
@@ -69,21 +71,26 @@ const createGameRenderer = ({
 /**
  * Configuration for warning panels.
  */
-const WARNING_PANEL_CONFIG = [
+const createWarningPanelConfig = (isMetric) => [
   {
     id: 'bggDefaultDimensions',
     dataKey: 'bggDefaultDimensions',
     variant: 'warning',
     Icon: FaQuestionCircle ,
     title: 'BGG Default Dimensions',
-    getDescription: ({ count }) => (
-      <>
-        {count} game{count !== 1 ? 's' : ''}{' '}
-        {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
-        dimensions of 11.7&quot; × 11.7&quot; × 2.8&quot; were assumed and marked with the warning icon{' '}
-        <FaQuestionCircle className="inline-icon" aria-hidden="true" /> for easy reference.
-      </>
-    ),
+    getDescription: ({ count }) => {
+      const defaultLength = formatDimension(11.7, isMetric);
+      const defaultWidth = formatDimension(11.7, isMetric);
+      const defaultDepth = formatDimension(2.8, isMetric);
+      return (
+        <>
+          {count} game{count !== 1 ? 's' : ''}{' '}
+          {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
+          dimensions of {defaultLength} × {defaultWidth} × {defaultDepth} were assumed and marked with the warning icon{' '}
+          <FaQuestionCircle className="inline-icon" aria-hidden="true" /> for easy reference.
+        </>
+      );
+    },
     renderItem: createGameRenderer({
       linkKeys: ['correctionUrl', 'versionsUrl'],
     }),
@@ -119,14 +126,19 @@ const WARNING_PANEL_CONFIG = [
     variant: 'error',
     Icon: FaExclamationTriangle,
     title: 'No Sizes Found',
-    getDescription: ({ count }) => (
-      <>
-        {count} game{count !== 1 ? 's' : ''}{' '}
-        {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
-        dimensions of 11.7&quot; × 11.7&quot; × 2.8&quot; were assumed and marked with the warning icon{' '}
-        <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
-      </>
-    ),
+    getDescription: ({ count }) => {
+      const defaultLength = formatDimension(11.7, isMetric);
+      const defaultWidth = formatDimension(11.7, isMetric);
+      const defaultDepth = formatDimension(2.8, isMetric);
+      return (
+        <>
+          {count} game{count !== 1 ? 's' : ''}{' '}
+          {count !== 1 ? 'have' : 'has'} a selected BoardGameGeek version without dimensions. Default
+          dimensions of {defaultLength} × {defaultWidth} × {defaultDepth} were assumed and marked with the warning icon{' '}
+          <FaExclamationTriangle className="inline-icon" aria-hidden="true" /> for easy reference.
+        </>
+      );
+    },
     renderItem: createGameRenderer({
       linkKeys: ['correctionUrl', 'versionsUrl'],
     }),
@@ -137,15 +149,20 @@ const WARNING_PANEL_CONFIG = [
     variant: 'warning',
     Icon: FaBoxOpen,
     title: 'Over Capacity',
-    getDescription: ({ fitOversized }) => (
-      <>
-        {fitOversized
-          ? 'The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of 11.7 x 11.7 x 2.8 to fit, but may not actually fit.'
-          : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
-        If you believe the dimensions are incorrect, please click the game name below to submit a
-        dimension correction in BoardGameGeek.
-      </>
-    ),
+    getDescription: ({ fitOversized }) => {
+      const defaultLength = formatDimension(11.7, isMetric);
+      const defaultWidth = formatDimension(11.7, isMetric);
+      const defaultDepth = formatDimension(2.8, isMetric);
+      return (
+        <>
+          {fitOversized
+            ? `The following games have dimensions too large to fit in the Kallax. They have been treated as having dimensions of ${defaultLength} × ${defaultWidth} × ${defaultDepth} to fit, but may not actually fit.`
+            : 'The following games have dimensions too large to fit in the Kallax. They have not been included in the list below.'}{' '}
+          If you believe the dimensions are incorrect, please click the game name below to submit a
+          dimension correction in BoardGameGeek.
+        </>
+      );
+    },
     renderItem: createGameRenderer({
       linkKeys: ['correctionUrl', 'versionsUrl'],
       cubeIdPredicate: (game, { fitOversized }) => Boolean(fitOversized && game?.cubeId),
@@ -153,13 +170,14 @@ const WARNING_PANEL_CONFIG = [
   },
 ];
 
-const PANEL_IDS = WARNING_PANEL_CONFIG.map((config) => config.id);
-
 export default function ResultsWarningPanels({
   warningGroups,
   fitOversized,
   renderDisclosureIcon,
 }) {
+  const { isMetric } = useUnitPreference();
+  const WARNING_PANEL_CONFIG = useMemo(() => createWarningPanelConfig(isMetric), [isMetric]);
+  const PANEL_IDS = useMemo(() => WARNING_PANEL_CONFIG.map((config) => config.id), [WARNING_PANEL_CONFIG]);
   const [panelState, setPanelState] = useState(() => createWarningPanelState(PANEL_IDS));
 
   const togglePanel = useCallback((panelId) => {
@@ -178,7 +196,7 @@ export default function ResultsWarningPanels({
         onTogglePanel: togglePanel,
         panelConfig: WARNING_PANEL_CONFIG,
       }),
-    [fitOversized, panelState, togglePanel, warningGroups]
+    [fitOversized, panelState, togglePanel, warningGroups, WARNING_PANEL_CONFIG]
   );
 
   const totalWarningPanels = warningPanels.length;

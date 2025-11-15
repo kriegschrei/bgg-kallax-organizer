@@ -138,25 +138,7 @@
       "required": ["field", "order"],
       "properties": {
         "field": {
-          "type": "string",
-          "enum": [
-            "gameId",
-            "versionId",
-            "gameName",
-            "versionName",
-            "bggRank",
-            "minPlayers",
-            "maxPlayers",
-            "bestPlayerCount",
-            "minPlaytime",
-            "maxPlaytime",
-            "age",
-            "communityAge",
-            "weight",
-            "bggRating",
-            "gamePublishedYear",
-            "versionPublishedYear"
-          ],
+          "$ref": "https://example.com/schemas/defs/enums.schema.json#/definitions/sortField",
           "errorMessage": { "enum": "Sort field must be one of the supported keys." }
         },
         "order": {

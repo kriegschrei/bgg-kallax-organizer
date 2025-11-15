@@ -170,7 +170,7 @@ export default function GameListItem({
             {formatDimension(displayDims.x, isMetric)} × {formatDimension(displayDims.y, isMetric)} × {formatDimension(displayDims.z, isMetric)}
           </span>
         </span>
-        {bggDefaultDimensions && !usedAlternateVersionDims && (
+        {bggDefaultDimensions && (
           <FaQuestionCircle
             className="dimension-icon bgg-default-icon"
             title={`BoardGameGeek default dimensions (${formatDimension(11.7, isMetric)} × ${formatDimension(11.7, isMetric)} × ${formatDimension(2.8, isMetric)}) were used`}
@@ -191,7 +191,7 @@ export default function GameListItem({
             aria-hidden="true"
           />
         )}
-        {(allVersionsMissingDimensions || (bggDefaultDimensions && !usedAlternateVersionDims)) && (
+        {allVersionsMissingDimensions && (
           <FaExclamationTriangle
             className="dimension-icon warning-icon"
             title="Dimensions not available in BGG"

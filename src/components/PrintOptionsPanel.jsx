@@ -44,11 +44,6 @@ function PrintOptionsPanel({
               <strong>Group expansions with base game:</strong> Enabled
             </div>
           )}
-          {groupSeries && (
-            <div className="print-option-item">
-              <strong>Group series:</strong> Enabled
-            </div>
-          )}
           {fitOversized && (
             <div className="print-option-item">
               <strong>Fit oversized games:</strong> Enabled

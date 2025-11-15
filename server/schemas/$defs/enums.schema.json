@@ -29,7 +29,9 @@
           "bggRating",
           "mechanics",
           "categories",
-          "families"
+          "families",
+          "gamePublishedYear",
+          "versionPublishedYear"
         ]
       },
       "sortOrder": {

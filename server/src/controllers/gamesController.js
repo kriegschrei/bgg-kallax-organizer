@@ -62,6 +62,7 @@ const ensureUsernameString = (value) => {
 
 export const handleGamesRequest = async (req, res) => {
   const payload = req.body ?? {};
+  await logGamesRequest(payload);
   const { valid, errors } = validateGamesPayload(payload);
 
   if (!valid) {
@@ -79,7 +80,6 @@ export const handleGamesRequest = async (req, res) => {
   const progressUrl = `/api/progress/${requestId}`;
 
   const normalizedPayload = { ...payload, username };
-  await logGamesRequest(normalizedPayload);
 
   registerRequest(requestId);
 

@@ -103,14 +103,6 @@ const PreferencesPanel = ({
         tooltip: 'Keep expansions with their base game in the same cube when possible',
       },
       {
-        id: 'groupSeries',
-        label: 'Group series',
-        checked: preferenceState.groupSeries,
-        onChange: preferenceState.onGroupSeriesChange,
-        disabled: loading || preferenceState.optimizeSpace,
-        tooltip: 'Keep games from the same series/family together in the same cube when possible',
-      },
-      {
         id: 'fitOversized',
         label: 'Fit oversized games',
         checked: preferenceState.fitOversized,

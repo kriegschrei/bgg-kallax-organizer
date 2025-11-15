@@ -14,7 +14,6 @@ import {
 const buildPreferenceLabels = (options, pushLabel) => {
   pushLabel(options.includeExpansions, 'includeExpansions', 'Include expansions');
   pushLabel(options.groupExpansions, 'groupExpansions', 'Group expansions');
-  pushLabel(options.groupSeries, 'groupSeries', 'Group series');
   pushLabel(options.respectSortOrder, 'respectSortOrder', 'Respect sorting order');
   pushLabel(options.optimizeSpace, 'optimizeSpace', 'Optimize for space');
   pushLabel(options.fitOversized, 'fitOversized', 'Fit oversized games');

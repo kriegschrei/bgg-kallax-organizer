@@ -1,0 +1,53 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/defs/enums.schema.json",
+    "definitions": {
+      "includeExclude": {
+        "type": "string",
+        "enum": ["include", "exclude"]
+      },
+      "stacking": {
+        "type": "string",
+        "enum": ["horizontal", "vertical"]
+      },
+      "sortField": {
+        "type": "string",
+        "enum": [
+          "gameId",
+          "versionId",
+          "gameName",
+          "versionName",
+          "bggRank",
+          "minPlayers",
+          "maxPlayers",
+          "bestPlayerCount",
+          "minPlaytime",
+          "maxPlaytime",
+          "age",
+          "communityAge",
+          "weight",
+          "bggRating",
+          "mechanics",
+          "categories",
+          "families"
+        ]
+      },
+      "sortOrder": {
+        "type": "string",
+        "enum": ["asc", "desc"]
+      },
+      "dimensionType": {
+        "type": "string",
+        "enum": ["user", "version", "guessed", "default"]
+      },
+      "gameType": {
+        "type": "string",
+        "enum": [
+          "boardgame",
+          "boardgameexpansion",
+          "boardgameaccessory"
+        ]
+      }
+    }
+  }
+  

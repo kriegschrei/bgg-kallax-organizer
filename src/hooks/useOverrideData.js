@@ -5,6 +5,14 @@ import {
   mapOrientationOverrideDisplay,
 } from '../utils/resultsOverrides';
 
+/**
+ * Hook to process and organize override data (excluded games, orientation, dimensions).
+ * @param {Object} options - Configuration object
+ * @param {Array} options.excludedGames - Array of excluded game entries
+ * @param {Array} options.orientationOverrides - Array of orientation override entries
+ * @param {Array} options.dimensionOverrides - Array of dimension override entries
+ * @returns {Object} Object containing lookups and sorted override arrays
+ */
 export const useOverrideData = ({
   excludedGames = [],
   orientationOverrides = [],

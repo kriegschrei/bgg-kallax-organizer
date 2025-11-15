@@ -1,0 +1,142 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/responses/games/post-response.schema.json",
+    "title": "Post Games Response",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "cubes": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "integer" },
+            "stats": { "$ref": "../../$defs/types.schema.json#/$defs/cubeStats" },
+            "games": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "gameId": { "type": "integer" },
+                  "versionId": { "type": "integer" },
+                  "versionKey": { "type": "string" },
+                  "gameName": { "type": "string" },
+                  "versionName": { "type": "string" },
+                  "displayName": { "type": "string" },
+                  "collectionId": { "type": "integer" },
+                  "gamePublishedYear": { "type": "integer" },
+                  "versionPublishedYear": { "type": "integer" },
+                  "gameType": { "$ref": "../../$defs/enums.schema.json#/definitions/gameType" },
+                  "subType": { "$ref": "../../$defs/enums.schema.json#/definitions/gameType" },
+                  "statuses": {
+                    "type": "object",
+                    "properties": {
+                      "own": { "type": "boolean" },
+                      "prevowned": { "type": "boolean" },
+                      "fortrade": { "type": "boolean" },
+                      "want": { "type": "boolean" },
+                      "wanttobuy": { "type": "boolean" },
+                      "wanttoplay": { "type": "boolean" },
+                      "wishlist": { "type": "boolean" },
+                      "preordered": { "type": "boolean" }
+                    }
+                  },
+                  "thumbnail": { "type": "string", "format": "uri" },
+                  "image": { "type": "string", "format": "uri" },
+                  "dimensions": {
+                    "type": "array",
+                    "items": { "$ref": "../../$defs/types.schema.json#/$defs/dimension" }
+                  },
+                  "position": { "$ref": "../../$defs/types.schema.json#/$defs/position" },
+                  "packedDims": { "$ref": "../../$defs/types.schema.json#/$defs/packedDims" },
+                  "oversized": { "$ref": "../../$defs/types.schema.json#/$defs/oversized" },
+                  "categories": { "type": "array", "items": { "type": "string" } },
+                  "mechanics": { "type": "array", "items": { "type": "string" } },
+                  "families": { "type": "array", "items": { "type": "string" } },
+                  "bggRank": { "type": "integer" },
+                  "minPlayers": { "type": "integer" },
+                  "maxPlayers": { "type": "integer" },
+                  "bestPlayerCount": { "type": "integer" },
+                  "minPlaytime": { "type": "integer" },
+                  "maxPlaytime": { "type": "integer" },
+                  "minAge": { "type": "integer" },
+                  "communityAge": { "type": "integer" },
+                  "languageDependence": { "type": "integer" },
+                  "bggWeight": { "type": "number" },
+                  "bggRating": { "type": "number" },
+                  "isExpansion": { "type": "boolean" },
+                  "numplays": { "type": "integer", "default": 0 },
+                  "volume": { "type": "number" },
+                  "area": { "type": "number" },
+                  "noSelectedVersion": { "type": "boolean" },
+                  "versionsUrl": { "type": "string", "format": "uri" },
+                  "usedAlternateVersionDims": { "type": "boolean" },
+                  "bggDefaultDimensions": { "type": "boolean" },
+                  "allVersionsMissingDimensions": { "type": "boolean" },
+                  "selectedVersionMissingDimensions": { "type": "boolean" },
+                  "guessedDueToNoVersion": { "type": "boolean" },
+                  "correctionUrl": { "type": "string", "format": "uri" },
+                  "orientation": { "$ref": "../../$defs/types.schema.json#/$defs/orientation" }
+                },
+                "required": [
+                  "versionKey","gameId","versionId","gameName","versionName","displayName","dimensions","position",
+                  "packedDims","oversized","categories","mechanics","families","bggRank","minPlayers","maxPlayers",
+                  "bestPlayerCount","minPlaytime","maxPlaytime","minAge","communityAge","bggWeight","bggRating","numplays",
+                  "noSelectedVersion","versionsUrl","usedAlternateVersionDims","correctionUrl","orientation","gameType",
+                  "gamePublishedYear","versionPublishedYear"
+                ]
+              }
+            }
+          },
+          "required": ["id","stats","games"]
+        }
+      },
+      "stats": { "$ref": "../../$defs/types.schema.json#/$defs/statsSummary" },
+      "dimensionSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "guessedVersionCount": { "type": "integer" },
+          "selectedVersionMissingDimensionsCount": { "type": "integer" },
+          "missingDimensionCount": { "type": "integer" },
+          "exceedingCapacityCount": { "type": "integer" }
+        },
+        "required": ["guessedVersionCount","selectedVersionMissingDimensionsCount","missingDimensionCount","exceedingCapacityCount"]
+      },
+      "oversizedGames": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "gameName": { "type": ["string", "null"] },
+            "versionName": { "type": ["string", "null"] },
+            "displayName": { "type": "string" },
+            "status": {
+              "type": "string",
+              "enum": ["stuffed", "excluded"]
+            },
+            "cubeId": { "type": "integer" },
+            "correctionUrl": { "type": ["string", "null"], "format": "uri" },
+            "versionsUrl": { "type": ["string", "null"], "format": "uri" },
+            "baseGameId": { "type": ["integer", "null"] },
+            "dimensions": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "length": { "type": ["number", "null"] },
+                "width": { "type": ["number", "null"] },
+                "depth": { "type": ["number", "null"] }
+              }
+            }
+          },
+          "required": ["id", "gameName", "versionName", "displayName", "status"]
+        }
+      }
+    },
+    "required": ["cubes","stats","dimensionSummary","oversizedGames"]
+  }
+  

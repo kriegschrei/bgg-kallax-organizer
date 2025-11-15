@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
 
+/**
+ * Hook to manage hydration state (settings hydrated, last result hydrated, has stored data).
+ * @returns {Object} Object containing hydration state and setters
+ */
 export const useHydrationState = () => {
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [lastResultHydrated, setLastResultHydrated] = useState(false);

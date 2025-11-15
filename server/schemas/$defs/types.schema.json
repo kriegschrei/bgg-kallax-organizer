@@ -1,0 +1,80 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/schemas/defs/types.schema.json",
+    "$defs": {
+      "dimension": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "$ref": "enums.schema.json#/definitions/dimensionType" },
+          "length": { "type": ["number", "null"] },
+          "width": { "type": ["number", "null"] },
+          "depth": { "type": ["number", "null"] },
+          "weight": { "type": ["number", "null"] },
+          "missing": { "type": "boolean" }
+        },
+        "required": ["type", "length", "width", "depth", "weight", "missing"]
+      },
+      "position": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" }
+        },
+        "required": ["x", "y"]
+      },
+      "packedDims": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "number" },
+          "y": { "type": "number" },
+          "z": { "type": "number" }
+        },
+        "required": ["x", "y", "z"]
+      },
+      "orientation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "forced": { "type": ["string", "null"], "enum": ["horizontal", "vertical", null] },
+          "applied": { "type": "string", "enum": ["horizontal", "vertical"] }
+        },
+        "required": ["forced", "applied"]
+      },
+      "oversized": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "x": { "type": "boolean" },
+          "y": { "type": "boolean" },
+          "isOversized": { "type": "boolean" }
+        },
+        "required": ["x", "y", "isOversized"]
+      },
+      "cubeStats": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "totalGames": { "type": "integer" },
+          "totalUtilization": { "type": "number" },
+          "areaUsed": { "type": "number" },
+          "areaCapacity": { "type": "number" }
+        },
+        "required": ["totalGames", "totalUtilization", "areaUsed", "areaCapacity"]
+      },
+      "statsSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "totalGames": { "type": "integer" },
+          "totalCubes": { "type": "integer" },
+          "avgGamesPerCube": { "type": "number" },
+          "totalUtilization": { "type": "number" }
+        },
+        "required": ["totalGames", "totalCubes", "avgGamesPerCube", "totalUtilization"]
+      }
+    }
+  }
+  

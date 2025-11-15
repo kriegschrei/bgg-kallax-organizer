@@ -1,13 +1,21 @@
 import { useCallback, useState } from 'react';
 
 const INITIAL_STATE = {
-  gameId: null,
+  overrideKey: null,
   length: '',
   width: '',
   depth: '',
   error: '',
 };
 
+/**
+ * Hook to manage dimension override editor state and actions.
+ * @param {Object} options - Configuration object
+ * @param {boolean} options.overridesReady - Whether overrides are ready
+ * @param {boolean} options.isLoading - Whether a request is in progress
+ * @param {Function} options.onSaveDimensionOverride - Handler for saving dimension override
+ * @returns {Object} Object containing editor state and handlers
+ */
 export function useDimensionOverrideEditor({
   overridesReady,
   isLoading,
@@ -41,7 +49,7 @@ export function useDimensionOverrideEditor({
     }
 
     setEditorState({
-      gameId: game.id,
+      overrideKey: game.key,
       length: normalizeDimensionPart(game.length),
       width: normalizeDimensionPart(game.width),
       depth: normalizeDimensionPart(game.depth),
@@ -67,7 +75,7 @@ export function useDimensionOverrideEditor({
         return;
       }
 
-      if (editorState.gameId !== game.id) {
+      if (editorState.overrideKey !== game.key) {
         openEditor(game);
         return;
       }
@@ -91,8 +99,8 @@ export function useDimensionOverrideEditor({
   );
 
   const isEditingGame = useCallback(
-    (gameId) => editorState.gameId === gameId,
-    [editorState.gameId]
+    (overrideKey) => editorState.overrideKey === overrideKey,
+    [editorState.overrideKey]
   );
 
   return {

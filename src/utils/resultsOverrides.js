@@ -1,11 +1,13 @@
-const toArray = (value) => (Array.isArray(value) ? value : []);
+import { toArray, sortByName } from './results';
 
-const sortByName = (a, b) => {
-  const nameA = typeof a?.name === 'string' ? a.name : '';
-  const nameB = typeof b?.name === 'string' ? b.name : '';
-  return nameA.localeCompare(nameB);
-};
-
+/**
+ * Builds lookup maps for excluded games, orientation overrides, and dimension overrides.
+ * @param {Object} options - Configuration object
+ * @param {Array} options.excludedGames - Array of excluded game entries
+ * @param {Array} options.orientationOverrides - Array of orientation override entries
+ * @param {Array} options.dimensionOverrides - Array of dimension override entries
+ * @returns {Object} Object containing excludedLookup, orientationLookup, and dimensionLookup
+ */
 export const buildOverrideLookups = ({
   excludedGames = [],
   orientationOverrides = [],
@@ -16,26 +18,34 @@ export const buildOverrideLookups = ({
   const dimensionLookup = {};
 
   toArray(excludedGames).forEach((game) => {
-    if (game?.id) {
-      excludedLookup[game.id] = game;
+    if (game?.key) {
+      excludedLookup[game.key] = game;
     }
   });
 
   toArray(orientationOverrides).forEach((override) => {
-    if (override?.id) {
-      orientationLookup[override.id] = override.orientation;
+    if (override?.key) {
+      orientationLookup[override.key] = override.orientation;
     }
   });
 
   toArray(dimensionOverrides).forEach((override) => {
-    if (override?.id) {
-      dimensionLookup[override.id] = override;
+    if (override?.key) {
+      dimensionLookup[override.key] = override;
     }
   });
 
   return { excludedLookup, orientationLookup, dimensionLookup };
 };
 
+/**
+ * Builds sorted arrays of override entries.
+ * @param {Object} options - Configuration object
+ * @param {Array} options.excludedGames - Array of excluded game entries
+ * @param {Array} options.orientationOverrides - Array of orientation override entries
+ * @param {Array} options.dimensionOverrides - Array of dimension override entries
+ * @returns {Object} Object containing sorted excluded, orientation, and dimensions arrays
+ */
 export const buildSortedOverrides = ({
   excludedGames = [],
   orientationOverrides = [],

@@ -8,7 +8,7 @@ function OverrideList({ items, renderActions, showDimensions = false }) {
   return (
     <>
       {items.map((item) => (
-        <li key={item.id} className="override-list-item">
+        <li key={item.key} className="override-list-item">
           <div className="override-entry-row">
             <span className="override-entry-name">{item.name}</span>
             <div className="override-entry-actions">

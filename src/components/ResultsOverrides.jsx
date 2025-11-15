@@ -92,7 +92,7 @@ export default function ResultsOverrides({
           />
           <IconButton
             className="override-action-button"
-            onClick={() => onClearOrientationOverride?.(game.id)}
+          onClick={() => onClearOrientationOverride?.(game.key)}
             disabled={!overridesReady || isLoading}
             title="Remove forced orientation"
             icon={<FaTimes aria-hidden="true" className="button-icon" />}
@@ -118,8 +118,8 @@ export default function ResultsOverrides({
         <IconButton
           className="override-action-button"
           onClick={() => {
-            onRemoveDimensionOverride?.(game.id);
-            if (isDimensionEditing(game.id)) {
+            onRemoveDimensionOverride?.(game.key);
+            if (isDimensionEditing(game.key)) {
               onDimensionClose();
             }
           }}
@@ -144,11 +144,11 @@ export default function ResultsOverrides({
     () =>
       dimensionOverrides.map((game) => ({
         ...game,
-        isEditing: isDimensionEditing(game.id),
-        dimensions: isDimensionEditing(game.id)
+        isEditing: isDimensionEditing(game.key),
+        dimensions: isDimensionEditing(game.key)
           ? formatEditorDimensions(dimensionEditorState)
           : formatGameDimensions(game),
-        extraContent: isDimensionEditing(game.id) ? (
+        extraContent: isDimensionEditing(game.key) ? (
           <DimensionForm
             className="override-dimension-form"
             gridClassName="override-dimension-grid"
@@ -201,7 +201,7 @@ export default function ResultsOverrides({
             renderActions={(game) => (
               <IconButton
                 className="override-action-button"
-                onClick={() => onRestoreExcludedGame?.(game.id)}
+                onClick={() => onRestoreExcludedGame?.(game.key)}
                 disabled={!overridesReady || isLoading}
                 title="Remove from excluded list"
                 icon={<FaTimes aria-hidden="true" className="button-icon" />}
@@ -234,7 +234,7 @@ export default function ResultsOverrides({
           renderToggleIcon={renderDisclosureIcon}
           icon={<FaRulerCombined className="inline-icon" aria-hidden="true" />}
           title="Custom dimensions"
-          count={dimensionOverrides.length}
+          count={dimensionOverrides.length} 
           description="Your overrides will be used instead of the dimensions supplied by BoardGameGeek."
           listClassName={getScrollableListClassName(dimensionOverrides.length)}
         >

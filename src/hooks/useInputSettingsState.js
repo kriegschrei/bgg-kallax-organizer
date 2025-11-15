@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import {
   createDefaultCollectionFilters,
   createDefaultFilterPanelState,
-  createDefaultPriorities,
+  createDefaultSortingRules,
 } from '../constants/appDefaults';
 
 export const useInputSettingsState = () => {
@@ -11,14 +11,14 @@ export const useInputSettingsState = () => {
   const [includeExpansions, setIncludeExpansions] = useState(false);
   const [groupExpansions, setGroupExpansions] = useState(false);
   const [groupSeries, setGroupSeries] = useState(false);
-  const [verticalStacking, setVerticalStacking] = useState(true);
+  const [stacking, setStacking] = useState('vertical');
   const [lockRotation, setLockRotation] = useState(false);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
   const [respectSortOrder, setRespectSortOrder] = useState(false);
   const [fitOversized, setFitOversized] = useState(false);
   const [bypassVersionWarning, setBypassVersionWarning] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
-  const [priorities, setPriorities] = useState(createDefaultPriorities);
+  const [sorting, setSorting] = useState(createDefaultSortingRules);
   const [collectionFilters, setCollectionFilters] = useState(createDefaultCollectionFilters);
   const [filterPanelsCollapsed, setFilterPanelsCollapsed] = useState(
     createDefaultFilterPanelState
@@ -30,14 +30,14 @@ export const useInputSettingsState = () => {
     setIncludeExpansions(false);
     setGroupExpansions(false);
     setGroupSeries(false);
-    setVerticalStacking(true);
+    setStacking('vertical');
     setLockRotation(false);
     setOptimizeSpace(false);
     setRespectSortOrder(false);
     setFitOversized(false);
     setBypassVersionWarning(false);
     setFiltersCollapsed(false);
-    setPriorities(createDefaultPriorities());
+    setSorting(createDefaultSortingRules());
     setCollectionFilters(createDefaultCollectionFilters());
     setFilterPanelsCollapsed(createDefaultFilterPanelState());
     setIsFilterDrawerOpen(false);
@@ -52,8 +52,8 @@ export const useInputSettingsState = () => {
     setGroupExpansions,
     groupSeries,
     setGroupSeries,
-    verticalStacking,
-    setVerticalStacking,
+    stacking,
+    setStacking,
     lockRotation,
     setLockRotation,
     optimizeSpace,
@@ -66,8 +66,8 @@ export const useInputSettingsState = () => {
     setBypassVersionWarning,
     filtersCollapsed,
     setFiltersCollapsed,
-    priorities,
-    setPriorities,
+    sorting,
+    setSorting,
     collectionFilters,
     setCollectionFilters,
     filterPanelsCollapsed,

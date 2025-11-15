@@ -1,9 +1,18 @@
 export const MOBILE_BREAKPOINT = 768;
 
-export const DEFAULT_PRIORITIES = [
-  { field: 'name', enabled: true, order: 'asc' },
-  { field: 'categories', enabled: false, order: 'asc' },
-  { field: 'families', enabled: false, order: 'asc' },
+export const DEFAULT_STACKING = 'vertical';
+
+export const STACKING_OPTIONS = ['horizontal', 'vertical'];
+
+export const DEFAULT_COLLAPSED_BADGE_LIMIT = 4;
+
+export const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+
+export const DEFAULT_SORTING_RULES = [
+  { field: 'gameName', enabled: true, order: 'asc' },
+  { field: 'versionName', enabled: false, order: 'asc' },
+  { field: 'gameId', enabled: false, order: 'asc' },
+  { field: 'versionId', enabled: false, order: 'asc' },
   { field: 'bggRank', enabled: false, order: 'asc' },
   { field: 'minPlayers', enabled: false, order: 'asc' },
   { field: 'maxPlayers', enabled: false, order: 'asc' },
@@ -14,21 +23,25 @@ export const DEFAULT_PRIORITIES = [
   { field: 'communityAge', enabled: false, order: 'asc' },
   { field: 'weight', enabled: false, order: 'asc' },
   { field: 'bggRating', enabled: false, order: 'desc' },
+  { field: 'categories', enabled: false, order: 'asc' },
+  { field: 'families', enabled: false, order: 'asc' },
+  { field: 'mechanics', enabled: false, order: 'asc' },
 ];
 
-export const DEFAULT_PRIORITIES_BY_FIELD = DEFAULT_PRIORITIES.reduce((accumulator, priority) => {
-  accumulator[priority.field] = priority;
+export const DEFAULT_SORTING_BY_FIELD = DEFAULT_SORTING_RULES.reduce((accumulator, rule) => {
+  accumulator[rule.field] = rule;
   return accumulator;
 }, {});
 
-export const DEFAULT_ENABLED_PRIORITY_FIELDS = DEFAULT_PRIORITIES.filter(
-  (priority) => priority.enabled
-).map((priority) => priority.field);
+export const DEFAULT_ENABLED_SORTING_FIELDS = DEFAULT_SORTING_RULES.filter(
+  (rule) => rule.enabled
+).map((rule) => rule.field);
 
-export const PRIORITY_LABELS = {
-  name: 'Name',
-  categories: 'Categories',
-  families: 'Families',
+export const SORTING_LABELS = {
+  gameName: 'Game Name',
+  versionName: 'Version Name',
+  gameId: 'Game ID',
+  versionId: 'Version ID',
   bggRank: 'BGG Rank',
   minPlayers: 'Min Players',
   maxPlayers: 'Max Players',
@@ -39,6 +52,9 @@ export const PRIORITY_LABELS = {
   communityAge: 'Community Age',
   weight: 'Weight',
   bggRating: 'BGG Rating',
+  categories: 'Categories',
+  families: 'Families',
+  mechanics: 'Mechanics',
 };
 
 export const COLLECTION_STATUSES = [
@@ -57,15 +73,15 @@ export const DEFAULT_COLLECTION_FILTERS = COLLECTION_STATUSES.reduce((acc, statu
   return acc;
 }, {});
 
-export const FILTER_PANEL_KEYS = ['preferences', 'collections', 'priorities'];
+export const FILTER_PANEL_KEYS = ['preferences', 'collections', 'sorting'];
 
 export const DEFAULT_FILTER_PANEL_STATE = FILTER_PANEL_KEYS.reduce((acc, key) => {
   acc[key] = true;
   return acc;
 }, {});
 
-export const createDefaultPriorities = () =>
-  DEFAULT_PRIORITIES.map((priority) => ({ ...priority }));
+export const createDefaultSortingRules = () =>
+  DEFAULT_SORTING_RULES.map((rule) => ({ ...rule }));
 
 export const createDefaultCollectionFilters = () => ({
   ...DEFAULT_COLLECTION_FILTERS,

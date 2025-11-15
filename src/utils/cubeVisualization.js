@@ -1,7 +1,21 @@
+import { resolveGameIdentity } from './overrideIdentity';
+import { getPrimaryDimension } from './dimensions';
+
+/**
+ * Generates a color for a game item based on its index.
+ * @param {number} index - The index of the game
+ * @param {number} total - Total number of games
+ * @returns {string} HSL color string
+ */
 export function getGameColor(index, total) {
   return `hsl(${(index * 360) / total}, 70%, 80%)`;
 }
 
+/**
+ * Splits a full game name into base name and version.
+ * @param {string} fullName - The full game name potentially containing version in parentheses
+ * @returns {Object} Object with name and version properties
+ */
 export function splitNameAndVersion(fullName) {
   if (typeof fullName !== 'string') {
     return { name: '', version: null };
@@ -26,13 +40,23 @@ export function splitNameAndVersion(fullName) {
   return { name: trimmed, version: null };
 }
 
-export const PRIORITY_BADGE_BUILDERS = {
+const getOverrideKey = (game, fallbackSuffix = '') => {
+  const identity = resolveGameIdentity(game);
+  if (identity?.key) {
+    return identity.key;
+  }
+  const fallback =
+    typeof game?.id === 'string' || typeof game?.id === 'number' ? String(game.id) : 'unknown';
+  return fallbackSuffix ? `${fallback}-${fallbackSuffix}` : fallback;
+};
+
+export const SORTING_BADGE_BUILDERS = {
   categories: (game) =>
     Array.isArray(game.categories)
       ? game.categories
           .filter((category) => typeof category === 'string' && category.trim().length > 0)
           .map((category, index) => ({
-            key: `category-${index}-${category}`,
+            key: `category-${getOverrideKey(game, index)}-${category}`,
             label: category.trim(),
             field: 'categories',
           }))
@@ -42,9 +66,19 @@ export const PRIORITY_BADGE_BUILDERS = {
       ? game.families
           .filter((family) => typeof family === 'string' && family.trim().length > 0)
           .map((family, index) => ({
-            key: `family-${index}-${family}`,
+            key: `family-${getOverrideKey(game, index)}-${family}`,
             label: family.trim(),
             field: 'families',
+          }))
+      : [],
+  mechanics: (game) =>
+    Array.isArray(game.mechanics)
+      ? game.mechanics
+          .filter((mechanic) => typeof mechanic === 'string' && mechanic.trim().length > 0)
+          .map((mechanic, index) => ({
+            key: `mechanic-${getOverrideKey(game, index)}-${mechanic}`,
+            label: mechanic.trim(),
+            field: 'mechanics',
           }))
       : [],
   bggRank: (game) => {
@@ -54,7 +88,7 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `bgg-rank-${game.id}`,
+        key: `bgg-rank-${getOverrideKey(game)}`,
         label: `Rank #${rank}`,
         field: 'bggRank',
       },
@@ -67,7 +101,7 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `min-players-${game.id}`,
+        key: `min-players-${getOverrideKey(game)}`,
         label: `Min Players: ${value}`,
         field: 'minPlayers',
       },
@@ -80,7 +114,7 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `max-players-${game.id}`,
+        key: `max-players-${getOverrideKey(game)}`,
         label: `Max Players: ${value}`,
         field: 'maxPlayers',
       },
@@ -94,7 +128,7 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `best-player-${game.id}`,
+        key: `best-player-${getOverrideKey(game)}`,
         label: `Best Player Count: ${value}`,
         field: 'bestPlayerCount',
       },
@@ -107,7 +141,7 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `min-playtime-${game.id}`,
+        key: `min-playtime-${getOverrideKey(game)}`,
         label: `Min Playtime: ${value}m`,
         field: 'minPlaytime',
       },
@@ -120,20 +154,21 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `max-playtime-${game.id}`,
+        key: `max-playtime-${getOverrideKey(game)}`,
         label: `Max Playtime: ${value}m`,
         field: 'maxPlaytime',
       },
     ];
   },
   age: (game) => {
-    const value = Number.isFinite(game.age) ? game.age : null;
+    // Use minAge from new schema
+    const value = Number.isFinite(game.minAge) ? game.minAge : null;
     if (value === null) {
       return [];
     }
     return [
       {
-        key: `age-${game.id}`,
+        key: `age-${getOverrideKey(game)}`,
         label: `Age: ${value}+`,
         field: 'age',
       },
@@ -146,20 +181,22 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `community-age-${game.id}`,
+        key: `community-age-${getOverrideKey(game)}`,
         label: `Community Age: ${value}+`,
         field: 'communityAge',
       },
     ];
   },
   weight: (game) => {
-    const value = Number.isFinite(game.weight) ? game.weight : null;
+    // Get weight from dimensions array
+    const primaryDim = getPrimaryDimension(game.dimensions);
+    const value = primaryDim?.weight != null && Number.isFinite(primaryDim.weight) ? primaryDim.weight : null;
     if (value === null) {
       return [];
     }
     return [
       {
-        key: `weight-${game.id}`,
+        key: `weight-${getOverrideKey(game)}`,
         label: `Weight: ${value.toFixed(2)}`,
         field: 'weight',
       },
@@ -173,7 +210,7 @@ export const PRIORITY_BADGE_BUILDERS = {
     }
     return [
       {
-        key: `bgg-rating-${game.id}`,
+        key: `bgg-rating-${getOverrideKey(game)}`,
         label: `BGG Rating: ${value.toFixed(2)}`,
         field: 'bggRating',
       },
@@ -181,14 +218,20 @@ export const PRIORITY_BADGE_BUILDERS = {
   },
 };
 
-export function buildBadgesForGame(game, activePriorityFields = []) {
-  if (!Array.isArray(activePriorityFields) || activePriorityFields.length === 0) {
+/**
+ * Builds badge objects for a game based on active sorting fields.
+ * @param {Object} game - The game object
+ * @param {string[]} activeSortingFields - Array of active sorting field names
+ * @returns {Array} Array of badge objects with field, label, and key properties
+ */
+export function buildBadgesForGame(game, activeSortingFields = []) {
+  if (!Array.isArray(activeSortingFields) || activeSortingFields.length === 0) {
     return [];
   }
 
   const badges = [];
-  activePriorityFields.forEach((field) => {
-    const builder = PRIORITY_BADGE_BUILDERS[field];
+  activeSortingFields.forEach((field) => {
+    const builder = SORTING_BADGE_BUILDERS[field];
     if (!builder) {
       return;
     }
@@ -197,7 +240,7 @@ export function buildBadgesForGame(game, activePriorityFields = []) {
       return;
     }
     fieldBadges.forEach((badge, index) => {
-      const fallbackKey = `${field}-${game.id}-${index}`;
+      const fallbackKey = `${field}-${getOverrideKey(game)}-${index}`;
       badges.push({
         field,
         label: badge.label,

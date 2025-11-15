@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { FaChevronDown, FaChevronRight } from 'react-icons/fa';
-
 import useActiveFilterBadges from '../../hooks/useActiveFilterBadges.jsx';
 import FilterControls from './FilterControls';
+import FilterDrawer from '../FilterDrawer';
+import DisclosureIcon from '../DisclosureIcon';
 
 const SearchPanel = ({
   formRef,
@@ -14,15 +14,15 @@ const SearchPanel = ({
   hasIncludeStatuses,
   filterPanelsCollapsed,
   onTogglePanel,
-  verticalStacking,
-  onVerticalStackingChange,
+  stacking,
+  onStackingChange,
   preferenceState,
   collectionFilters,
   onCollectionFilterChange,
   includeStatusList,
   excludeStatusList,
-  priorities,
-  onPrioritiesChange,
+  sorting,
+  onSortingChange,
   optimizeSpace,
   filtersCollapsed,
   onToggleFiltersCollapsed,
@@ -40,7 +40,6 @@ const SearchPanel = ({
   shouldShowInlineUsername,
 }) => {
   const headerRef = useRef(null);
-  const filterDrawerCloseRef = useRef(null);
 
   const badgeOptions = useMemo(
     () => ({
@@ -51,9 +50,9 @@ const SearchPanel = ({
       optimizeSpace,
       fitOversized,
       bypassVersionWarning,
-      verticalStacking,
+      stacking,
       lockRotation,
-      priorities,
+      sorting,
       includeStatusList,
       excludeStatusList,
       collapsedBadgeLimit,
@@ -66,9 +65,9 @@ const SearchPanel = ({
       optimizeSpace,
       fitOversized,
       bypassVersionWarning,
-      verticalStacking,
+      stacking,
       lockRotation,
-      priorities,
+      sorting,
       includeStatusList,
       excludeStatusList,
       collapsedBadgeLimit,
@@ -118,30 +117,6 @@ const SearchPanel = ({
     focusHeader();
   };
 
-  useEffect(() => {
-    if (!isFilterDrawerOpen) {
-      return undefined;
-    }
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        handleCloseDrawer();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isFilterDrawerOpen]);
-
-  useEffect(() => {
-    if (isFilterDrawerOpen) {
-      filterDrawerCloseRef.current?.focus();
-    }
-  }, [isFilterDrawerOpen]);
-
   return (
     <section className={`card search-panel ${isPanelCollapsed ? 'collapsed' : ''}`}>
       <form ref={formRef} onSubmit={onSubmit} className="search-panel-form">
@@ -160,13 +135,7 @@ const SearchPanel = ({
         >
           <div className="search-panel-primary">
             <div className="search-panel-toggle">
-              <span className="disclosure-arrow search-panel-icon" aria-hidden="true">
-                {isPanelCollapsed ? (
-                  <FaChevronRight className="disclosure-arrow-icon" />
-                ) : (
-                  <FaChevronDown className="disclosure-arrow-icon" />
-                )}
-              </span>
+              <DisclosureIcon expanded={!isPanelCollapsed} className="search-panel-icon" />
               <span className="search-panel-label">
                 <strong className="search-panel-title">Options</strong>
                 {activeFilterCount > 0 && (
@@ -230,83 +199,45 @@ const SearchPanel = ({
               hasIncludeStatuses={hasIncludeStatuses}
               filterPanelsCollapsed={filterPanelsCollapsed}
               onTogglePanel={onTogglePanel}
-              verticalStacking={verticalStacking}
-              onVerticalStackingChange={onVerticalStackingChange}
+              stacking={stacking}
+              onStackingChange={onStackingChange}
               preferenceState={preferenceState}
               collectionFilters={collectionFilters}
               onCollectionFilterChange={onCollectionFilterChange}
-              includeStatusList={includeStatusList}
-              excludeStatusList={excludeStatusList}
-              priorities={priorities}
-              onPrioritiesChange={onPrioritiesChange}
+        includeStatusList={includeStatusList}
+        excludeStatusList={excludeStatusList}
+        sorting={sorting}
+        onSortingChange={onSortingChange}
               optimizeSpace={optimizeSpace}
             />
           </div>
         )}
 
         {isMobileLayout && (
-          <>
-            <div
-              className={`filter-drawer-backdrop ${isFilterDrawerOpen ? 'is-visible' : ''}`}
-              onClick={handleCloseDrawer}
-              aria-hidden="true"
-            />
-            <div
-              className={`filter-drawer ${isFilterDrawerOpen ? 'is-open' : ''}`}
-              role="dialog"
-              aria-modal={isFilterDrawerOpen}
-              aria-hidden={!isFilterDrawerOpen}
-              aria-labelledby="filter-drawer-title"
-              id="filter-drawer"
-            >
-              <div className="filter-drawer__header">
-                <h2 id="filter-drawer-title">Options</h2>
-                <button
-                  type="button"
-                  className="filter-drawer__close"
-                  onClick={handleCloseDrawer}
-                  ref={filterDrawerCloseRef}
-                >
-                  Close
-                </button>
-              </div>
-              <div className="filter-drawer__body">
-                <FilterControls
-                  username={username}
-                  onUsernameChange={onUsernameChange}
-                  loading={loading}
-                  onResetSettings={onResetSettings}
-                  hasIncludeStatuses={hasIncludeStatuses}
-                  filterPanelsCollapsed={filterPanelsCollapsed}
-                  onTogglePanel={onTogglePanel}
-                  verticalStacking={verticalStacking}
-                  onVerticalStackingChange={onVerticalStackingChange}
-                  preferenceState={preferenceState}
-                  collectionFilters={collectionFilters}
-                  onCollectionFilterChange={onCollectionFilterChange}
-                  includeStatusList={includeStatusList}
-                  excludeStatusList={excludeStatusList}
-                  priorities={priorities}
-                  onPrioritiesChange={onPrioritiesChange}
-                  optimizeSpace={optimizeSpace}
-                />
-              </div>
-              <div className="filter-drawer__footer">
-                <button
-                  type="submit"
-                  className="filter-drawer__submit search-panel-submit"
-                  disabled={loading || !hasIncludeStatuses}
-                  title={
-                    !hasIncludeStatuses
-                      ? 'Select at least one collection status to organize'
-                      : undefined
-                  }
-                >
-                  {loading ? 'Processing...' : 'Organize Collection'}
-                </button>
-              </div>
-            </div>
-          </>
+          <FilterDrawer
+            isOpen={isFilterDrawerOpen}
+            onClose={handleCloseDrawer}
+            onFocusHeader={focusHeader}
+            filterControlsProps={{
+              username,
+              onUsernameChange,
+              loading,
+              onResetSettings,
+              hasIncludeStatuses,
+              filterPanelsCollapsed,
+              onTogglePanel,
+              stacking,
+              onStackingChange,
+              preferenceState,
+              collectionFilters,
+              onCollectionFilterChange,
+              includeStatusList,
+              excludeStatusList,
+              sorting,
+              onSortingChange,
+              optimizeSpace,
+            }}
+          />
         )}
       </form>
     </section>

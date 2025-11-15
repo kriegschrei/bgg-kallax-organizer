@@ -1,7 +1,8 @@
 import { openDB } from 'idb';
+import { hasValidDimensions } from '../../utils/dimensions';
 
 const DB_NAME = 'bgcube-user-data';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORE_EXCLUDED = 'excludedGames';
 const STORE_ORIENTATION = 'orientationOverrides';
@@ -10,9 +11,9 @@ const STORE_SETTINGS = 'userSettings';
 const STORE_RESULTS = 'lastResults';
 
 const STORE_DEFINITIONS = [
-  { name: STORE_EXCLUDED, options: { keyPath: 'id' } },
-  { name: STORE_ORIENTATION, options: { keyPath: 'id' } },
-  { name: STORE_DIMENSIONS, options: { keyPath: 'id' } },
+  { name: STORE_EXCLUDED, options: { keyPath: 'key' } },
+  { name: STORE_ORIENTATION, options: { keyPath: 'key' } },
+  { name: STORE_DIMENSIONS, options: { keyPath: 'key' } },
   { name: STORE_SETTINGS, options: { keyPath: 'id' } },
   { name: STORE_RESULTS, options: { keyPath: 'id' } },
 ];
@@ -24,9 +25,10 @@ function getDb() {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db) {
         STORE_DEFINITIONS.forEach(({ name, options }) => {
-          if (!db.objectStoreNames.contains(name)) {
-            db.createObjectStore(name, options);
+          if (db.objectStoreNames.contains(name)) {
+            db.deleteObjectStore(name);
           }
+          db.createObjectStore(name, options);
         });
       },
     });
@@ -71,18 +73,12 @@ async function deleteById(storeName, id) {
   await db.delete(storeName, id);
 }
 
-function hasValidDimensions({ length, width, depth }) {
-  return [length, width, depth].every(
-    (value) => typeof value === 'number' && !Number.isNaN(value),
-  );
-}
-
 export async function getExcludedGames() {
   return readAll(STORE_EXCLUDED);
 }
 
 export async function saveExcludedGame(game) {
-  if (!game?.id) {
+  if (!game?.key || typeof game.gameId !== 'number' || typeof game.versionId !== 'number') {
     return;
   }
   await putRecord(STORE_EXCLUDED, game);
@@ -97,7 +93,12 @@ export async function getOrientationOverrides() {
 }
 
 export async function saveOrientationOverride(override) {
-  if (!override?.id || !override?.orientation) {
+  if (
+    !override?.key ||
+    typeof override.gameId !== 'number' ||
+    typeof override.versionId !== 'number' ||
+    !override.orientation
+  ) {
     return;
   }
   await putRecord(STORE_ORIENTATION, override);
@@ -112,7 +113,11 @@ export async function getDimensionOverrides() {
 }
 
 export async function saveDimensionOverride(override) {
-  if (!override?.id) {
+  if (
+    !override?.key ||
+    typeof override.gameId !== 'number' ||
+    typeof override.versionId !== 'number'
+  ) {
     return;
   }
   if (!hasValidDimensions(override)) {
@@ -123,7 +128,8 @@ export async function saveDimensionOverride(override) {
     ...override,
     length: override.length,
     width: override.width,
-    depth: override.depth,
+    depth: override.depth ?? override.height,
+    height: override.height ?? override.depth,
   });
 }
 

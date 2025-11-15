@@ -566,18 +566,6 @@ header {
   flex-shrink: 0;
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-  white-space: nowrap;
-}
-
 .search-panel.card {
   padding: 0;
   overflow: hidden;
@@ -692,23 +680,23 @@ header {
   pointer-events: none;
 }
 
-.search-panel-tag .priority-badge-content {
+.search-panel-tag .sorting-badge-content {
   display: inline-flex;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.priority-badge-icon {
+.sorting-badge-icon {
   font-size: 0.9em;
 }
 
-.priority-entry {
+.sorting-entry {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
 }
 
-.priority-separator {
+.sorting-separator {
   margin: 0 0.2rem;
 }
 

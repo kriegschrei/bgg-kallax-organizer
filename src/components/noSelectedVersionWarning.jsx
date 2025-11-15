@@ -1,7 +1,7 @@
 import React from 'react';
-import './MissingVersionsWarning.css';
+import './noSelectedVersionWarning.css';
 
-export default function MissingVersionsWarning({
+export default function NoSelectedVersionWarning({
   warning = { message: '', details: '', games: [] },
   onContinue = () => {},
   onCancel = () => {},
@@ -22,10 +22,10 @@ export default function MissingVersionsWarning({
             <div className="missing-versions-list">
               <h3>Games without a selected version</h3>
               <ul>
-                {games.map((game) => (
-                  <li key={game.id}>
+                {games.map((game, index) => (
+                  <li key={game.versionKey || game.id || index}>
                     <a href={game.versionsUrl} target="_blank" rel="noopener noreferrer">
-                      {game.name}
+                      {game.displayName || game.gameName || 'Unknown Game'}
                     </a>
                   </li>
                 ))}

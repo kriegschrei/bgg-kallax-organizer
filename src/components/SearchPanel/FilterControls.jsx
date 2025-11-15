@@ -15,10 +15,12 @@ const UserSettingsRow = ({ username, onUsernameChange, loading, onResetSettings 
       <input
         type="text"
         id="username"
+        name="username"
         value={username}
         onChange={(event) => onUsernameChange(event.target.value)}
         placeholder="Enter your BGG username"
         disabled={loading}
+        autoComplete="username"
       />
     </div>
     <div className="options-actions">

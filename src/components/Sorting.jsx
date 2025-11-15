@@ -32,6 +32,7 @@ function SortableItem({ id, sortingRule, onToggle, onToggleOrder, disabled = fal
   };
 
   const fieldData = SORTING_FIELD_DEFINITIONS.find((field) => field.field === sortingRule.field);
+  const checkboxId = `sorting-checkbox-${sortingRule.field}`;
 
   return (
     <div
@@ -51,11 +52,12 @@ function SortableItem({ id, sortingRule, onToggle, onToggleOrder, disabled = fal
       </div>
       <input
         type="checkbox"
+        id={checkboxId}
         checked={sortingRule.enabled}
         onChange={() => onToggle(sortingRule.field)}
         disabled={disabled}
       />
-      <label>{fieldData?.label || sortingRule.field}</label>
+      <label htmlFor={checkboxId}>{fieldData?.label || sortingRule.field}</label>
       <button
         type="button"
         className="sort-order-toggle"

@@ -151,10 +151,12 @@ const SearchPanel = ({
                 <input
                   type="text"
                   id="username-inline"
+                  name="username"
                   value={username}
                   onChange={(event) => onUsernameChange(event.target.value)}
                   placeholder="Enter your BGG username"
                   disabled={loading}
+                  autoComplete="username"
                 />
               </div>
             )}

@@ -6,7 +6,7 @@ import ResultsWarningPanels from './ResultsWarningPanels';
 import PrintOptionsPanel from './PrintOptionsPanel';
 import DisclosureIcon from './DisclosureIcon';
 import {
-  formatGameDimensions,
+  formatGameDimensions as formatGameDimensionsUtil,
   getScrollableListClassName,
   formatStatValue,
   createStatItem,
@@ -15,6 +15,7 @@ import { formatEditorDimensions } from '../utils/dimensions';
 import { collectWarningGroups } from '../utils/resultsWarnings';
 import { useOverrideData } from '../hooks/useOverrideData';
 import { useDimensionOverrideEditor } from '../hooks/useDimensionOverrideEditor';
+import { useUnitPreference } from '../contexts/UnitPreferenceContext';
 import './Results.css';
 
 export default function Results({
@@ -54,6 +55,17 @@ export default function Results({
     [stats?.avgGamesPerCube, stats?.totalUtilization, stats?.totalCubes, stats?.totalGames]
   );
   const renderDisclosureIcon = useCallback((expanded) => <DisclosureIcon expanded={expanded} />, []);
+  const { isMetric } = useUnitPreference();
+  
+  const formatGameDimensions = useCallback(
+    (dims) => formatGameDimensionsUtil(dims, isMetric),
+    [isMetric]
+  );
+  
+  const formatEditorDimensionsWithUnit = useCallback(
+    (editor, options = {}) => formatEditorDimensions(editor, { ...options, isMetric }),
+    [isMetric]
+  );
 
   const {
     excludedLookup,
@@ -111,7 +123,7 @@ export default function Results({
         dimensionEditorState={panelDimensionEditor}
         getScrollableListClassName={getScrollableListClassName}
         formatGameDimensions={formatGameDimensions}
-        formatEditorDimensions={formatEditorDimensions}
+        formatEditorDimensions={formatEditorDimensionsWithUnit}
       />
 
       <ResultsWarningPanels

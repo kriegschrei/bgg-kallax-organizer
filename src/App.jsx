@@ -4,6 +4,7 @@ import NoSelectedVersionWarning from './components/noSelectedVersionWarning';
 import SearchPanel from './components/SearchPanel/SearchPanel';
 import AppHeader from './components/AppHeader';
 import AppFooter from './components/AppFooter';
+import { UnitPreferenceProvider } from './contexts/UnitPreferenceContext';
 import useCollectionRequestHandlers from './hooks/useCollectionRequestHandlers';
 import { saveUserSettings, clearUserSettings, clearLastResult } from './services/storage/indexedDb';
 import useInputSettingsState from './hooks/useInputSettingsState';
@@ -61,6 +62,8 @@ function App() {
     setFilterPanelsCollapsed,
     isFilterDrawerOpen,
     setIsFilterDrawerOpen,
+    useMetricUnits,
+    setUseMetricUnits,
     resetInputSettings,
   } = useInputSettingsState();
   const [excludedGamesMap, setExcludedGamesMap] = useState({});
@@ -139,6 +142,7 @@ function App() {
       setFilterPanelsCollapsed,
       setSorting,
       setCollectionFilters,
+      setUseMetricUnits,
     }),
     [
       setUsername,
@@ -155,6 +159,7 @@ function App() {
       setFilterPanelsCollapsed,
       setSorting,
       setCollectionFilters,
+      setUseMetricUnits,
     ]
   );
 
@@ -211,6 +216,7 @@ function App() {
       bypassVersionWarning,
       collectionFilters,
       filterPanelsCollapsed,
+      useMetricUnits,
     };
 
     saveUserSettings(settingsToPersist).catch((persistError) => {
@@ -233,6 +239,7 @@ function App() {
     bypassVersionWarning,
     collectionFilters,
     filterPanelsCollapsed,
+    useMetricUnits,
   ]);
 
 
@@ -472,8 +479,13 @@ function App() {
   }, []);
 
   return (
-    <div className="app">
-      <AppHeader hasResults={!!cubes && cubes.length > 0} />
+    <UnitPreferenceProvider isMetric={useMetricUnits}>
+      <div className="app">
+        <AppHeader 
+          hasResults={!!cubes && cubes.length > 0}
+          isMetric={useMetricUnits}
+          onToggleMetric={() => setUseMetricUnits(prev => !prev)}
+        />
 
       {error && (
         <div className="error">
@@ -564,7 +576,8 @@ function App() {
       )}
 
       <AppFooter />
-    </div>
+      </div>
+    </UnitPreferenceProvider>
   );
 }
 

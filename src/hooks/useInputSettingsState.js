@@ -24,6 +24,7 @@ export const useInputSettingsState = () => {
     createDefaultFilterPanelState
   );
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [useMetricUnits, setUseMetricUnits] = useState(false);
 
   const resetInputSettings = useCallback(() => {
     setUsername('');
@@ -41,6 +42,7 @@ export const useInputSettingsState = () => {
     setCollectionFilters(createDefaultCollectionFilters());
     setFilterPanelsCollapsed(createDefaultFilterPanelState());
     setIsFilterDrawerOpen(false);
+    setUseMetricUnits(false);
   }, []);
 
   return {
@@ -74,6 +76,8 @@ export const useInputSettingsState = () => {
     setFilterPanelsCollapsed,
     isFilterDrawerOpen,
     setIsFilterDrawerOpen,
+    useMetricUnits,
+    setUseMetricUnits,
     resetInputSettings,
   };
 };

@@ -20,6 +20,8 @@ import IconButton from './IconButton';
 import DisclosureIcon from './DisclosureIcon';
 import { resolveDisplayDimensions, getPrimaryDimension } from '../utils/dimensions';
 import { resolveGameIdentity } from '../utils/overrideIdentity';
+import { useUnitPreference } from '../contexts/UnitPreferenceContext';
+import { formatDimension } from '../utils/unitConversion';
 
 /**
  * Renders a single game item in the cube game list.
@@ -103,6 +105,7 @@ export default function GameListItem({
   const badges = buildBadgesForGame(game);
   const hasBadges = badges.length > 0;
   const isBadgesExpanded = overrideKey ? badgeVisibility[overrideKey] ?? false : false;
+  const { isMetric } = useUnitPreference();
 
   return (
     <li
@@ -164,13 +167,13 @@ export default function GameListItem({
             />
           )}
           <span className="game-dimension-text">
-            {displayDims.x.toFixed(1)}" × {displayDims.y.toFixed(1)}" × {displayDims.z.toFixed(1)}"
+            {formatDimension(displayDims.x, isMetric)} × {formatDimension(displayDims.y, isMetric)} × {formatDimension(displayDims.z, isMetric)}
           </span>
         </span>
         {bggDefaultDimensions && !usedAlternateVersionDims && (
           <FaQuestionCircle
             className="dimension-icon bgg-default-icon"
-            title={`BoardGameGeek default dimensions (11.7" × 11.7" × 2.8") were used`}
+            title={`BoardGameGeek default dimensions (${formatDimension(11.7, isMetric)} × ${formatDimension(11.7, isMetric)} × ${formatDimension(2.8, isMetric)}) were used`}
             aria-hidden="true"
           />
         )}
@@ -200,7 +203,7 @@ export default function GameListItem({
             className="dimension-icon oversized-icon"
             title={`This game may be too large for the cube (${game.oversized?.x ? 'width' : ''}${
               game.oversized?.x && game.oversized?.y ? ' and ' : ''
-            }${game.oversized?.y ? 'height' : ''} > 13")`}
+            }${game.oversized?.y ? 'height' : ''} > ${formatDimension(13, isMetric)})`}
             aria-hidden="true"
           />
         )}

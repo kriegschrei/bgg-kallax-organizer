@@ -38,6 +38,8 @@ function DimensionForm({
         {dimensionFields.map(({ key, label }) => (
           <DimensionInput
             key={key}
+            id={`dimension-${key}`}
+            name={key}
             label={label}
             value={values?.[key] ?? ''}
             onChange={handleFieldChange(key)}

@@ -10,7 +10,10 @@ const REQUEST_TIMEOUT_MS = 120000;
 export const createApp = () => {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({
+    exposedHeaders: ['X-Request-Token'],
+    allowedHeaders: ['Content-Type', 'Content-Encoding', 'X-Request-Token'],
+  }));
   app.use(
     compression({
       filter: compressionFilter,

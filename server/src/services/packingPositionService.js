@@ -1,5 +1,5 @@
 const GRID_PRECISION = 0.1;
-const CUBE_SIZE = 12.8;
+const CUBE_SIZE = 12.5;
 
 export const roundToGrid = (value) => Math.round(value / GRID_PRECISION) * GRID_PRECISION;
 

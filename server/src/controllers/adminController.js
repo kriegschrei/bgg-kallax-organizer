@@ -1,4 +1,4 @@
-import { clearCache, cleanup, getStats } from '../services/cache/index.js';
+import { clearCache, cleanup, getStats, checkForDuplicates } from '../services/cache/index.js';
 
 export const getCacheStatsHandler = (req, res) => {
   try {
@@ -32,6 +32,19 @@ export const cleanupCacheHandler = (req, res) => {
     return res.status(500).json({ error: 'Cleanup failed' });
   } catch (error) {
     console.error('Error running cleanup:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+};
+
+export const checkDuplicatesHandler = (req, res) => {
+  try {
+    const duplicates = checkForDuplicates();
+    if (duplicates) {
+      return res.json(duplicates);
+    }
+    return res.status(500).json({ error: 'Failed to check for duplicates' });
+  } catch (error) {
+    console.error('Error checking for duplicates:', error.message);
     return res.status(500).json({ error: error.message });
   }
 };

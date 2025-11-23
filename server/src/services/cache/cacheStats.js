@@ -1,7 +1,9 @@
 import { db } from './database.js';
 import { memoryCaches } from './memoryCache.js';
+import { CACHE_TTL } from './memoryCache.js';
 
 const CLEANUP_AGE = 7 * 24 * 3600 * 1000; // 7 days
+const STALE_CLEANUP_AGE = 24 * 3600 * 1000; // 24 hours - remove stale entries not accessed in this time
 const DB_MAX_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
 
 // Cleanup old entries
@@ -9,15 +11,29 @@ export function cleanup() {
   try {
     const cutoffTime = Date.now() - CLEANUP_AGE;
     const now = Date.now();
+    const staleCutoff = now - CACHE_TTL; // Entries older than 1 hour are stale
+    const staleAccessCutoff = now - STALE_CLEANUP_AGE; // Remove stale entries not accessed in 24h
 
-    // Clean up old collections
+    // Clean up old collections (older than 7 days)
     const collectionsDeleted = db.prepare('DELETE FROM collections WHERE timestamp < ?').run(cutoffTime).changes;
     
-    // Clean up old games
+    // Clean up old games (older than 7 days)
     const gamesDeleted = db.prepare('DELETE FROM games WHERE timestamp < ?').run(cutoffTime).changes;
     
-    // Clean up old versions
+    // Clean up old versions (older than 7 days)
     const versionsDeleted = db.prepare('DELETE FROM versions WHERE timestamp < ?').run(cutoffTime).changes;
+
+    // Also clean up stale entries that haven't been accessed recently
+    // (stale = older than CACHE_TTL, and not accessed in last 24 hours)
+    const staleGamesDeleted = db.prepare(`
+      DELETE FROM games 
+      WHERE timestamp < ? AND last_accessed < ?
+    `).run(staleCutoff, staleAccessCutoff).changes;
+
+    const staleVersionsDeleted = db.prepare(`
+      DELETE FROM versions 
+      WHERE timestamp < ? AND last_accessed < ?
+    `).run(staleCutoff, staleAccessCutoff).changes;
 
     // Clean up old stats (keep last 30 days)
     const statsCutoff = Date.now() - (30 * 24 * 3600 * 1000);
@@ -58,8 +74,18 @@ export function cleanup() {
       `).run(Math.floor(evictCount / 3));
     }
 
-    console.log(`🧹 Cache cleanup: removed ${collectionsDeleted} collections, ${gamesDeleted} games, ${versionsDeleted} versions, ${statsDeleted} stats`);
-    return { collectionsDeleted, gamesDeleted, versionsDeleted, statsDeleted };
+    const totalGamesDeleted = gamesDeleted + staleGamesDeleted;
+    const totalVersionsDeleted = versionsDeleted + staleVersionsDeleted;
+    
+    console.log(`🧹 Cache cleanup: removed ${collectionsDeleted} collections, ${totalGamesDeleted} games (${gamesDeleted} old + ${staleGamesDeleted} stale), ${totalVersionsDeleted} versions (${versionsDeleted} old + ${staleVersionsDeleted} stale), ${statsDeleted} stats`);
+    return { 
+      collectionsDeleted, 
+      gamesDeleted: totalGamesDeleted, 
+      versionsDeleted: totalVersionsDeleted, 
+      statsDeleted,
+      staleGamesDeleted,
+      staleVersionsDeleted
+    };
   } catch (error) {
     console.error(`Cache cleanup error: ${error.message}`);
     return null;
@@ -107,6 +133,57 @@ export function getStats() {
     return stats;
   } catch (error) {
     console.error(`Error getting cache stats: ${error.message}`);
+    return null;
+  }
+}
+
+// Check for potential duplicates in cache
+export function checkForDuplicates() {
+  try {
+    // Check for games with duplicate keys (shouldn't happen with PRIMARY KEY, but check anyway)
+    const duplicateGames = db.prepare(`
+      SELECT game_id, COUNT(*) as count 
+      FROM games 
+      GROUP BY game_id 
+      HAVING count > 1
+    `).all();
+    
+    // Check for versions with duplicate keys
+    const duplicateVersions = db.prepare(`
+      SELECT key, COUNT(*) as count 
+      FROM versions 
+      GROUP BY key 
+      HAVING count > 1
+    `).all();
+    
+    // Check for games that might have been stored with different types
+    const allGames = db.prepare('SELECT game_id, typeof(game_id) as type FROM games').all();
+    const typeGroups = {};
+    allGames.forEach(g => {
+      const type = g.type || 'unknown';
+      typeGroups[type] = (typeGroups[type] || 0) + 1;
+    });
+    
+    // Check for potential type mismatches (numeric strings vs pure strings)
+    const numericLikeGames = db.prepare(`
+      SELECT game_id 
+      FROM games 
+      WHERE game_id GLOB '[0-9]*' AND game_id NOT GLOB '*[^0-9]*'
+    `).all();
+    
+    return {
+      duplicateGames: duplicateGames.length,
+      duplicateVersions: duplicateVersions.length,
+      gameIdTypes: typeGroups,
+      numericLikeGames: numericLikeGames.length,
+      totalGames: allGames.length,
+      sampleDuplicates: {
+        games: duplicateGames.slice(0, 10),
+        versions: duplicateVersions.slice(0, 10)
+      }
+    };
+  } catch (error) {
+    console.error(`Error checking for duplicates: ${error.message}`);
     return null;
   }
 }

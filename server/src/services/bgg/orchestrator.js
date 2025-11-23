@@ -587,10 +587,35 @@ export const fetchUserCollectionWithDetails = async ({
       progress(requestId, `Organizing game data... ${catchyPhrase}`, { step: 'organizing' });
     }
 
+    // Track which versions are actually used in the collection
+    const collectionVersionKeys = new Set();
+    effectiveCollection.forEach((item) => {
+      item.versions.forEach(({ versionKey }) => {
+        if (versionKey) {
+          collectionVersionKeys.add(versionKey);
+        }
+      });
+    });
+
+    // Cache games
     fetchedGames.forEach((game, gameId) => setGame(gameId, game));
+    
+    // Only cache versions that are:
+    // 1. Used in the collection, OR
+    // 2. Needed for alternate version selection (have valid dimensions)
     fetchedVersions.forEach((version) => {
       if (version.gameId && version.versionId !== -1 && version.versionKey) {
-        setVersion(version.versionKey, version);
+        const isInCollection = collectionVersionKeys.has(version.versionKey);
+        const hasValidDims = hasValidDimensions({
+          length: version.length,
+          width: version.width,
+          depth: version.depth,
+        });
+        
+        // Cache if it's in the collection or has valid dimensions (for alternate selection)
+        if (isInCollection || hasValidDims) {
+          setVersion(version.versionKey, version);
+        }
       }
     });
   } else if (onProgress && requestId) {

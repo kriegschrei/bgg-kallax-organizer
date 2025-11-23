@@ -1,5 +1,24 @@
 import { extractDimensions } from '../utils/gameProcessingHelpers.js';
 import { normalizePositiveNumber } from '../utils/numberUtils.js';
+import { getMaxDepthDimension } from '../utils/packingHelpers.js';
+
+/**
+ * Calculates area from dimensions by sorting and multiplying the two smallest dimensions.
+ * This matches the logic used in computeDimensionsMeta from thingMapper.js.
+ * @param {Object} dimensions - Object with length, width, and depth properties
+ * @returns {number} The calculated area, or -1 if dimensions are invalid
+ */
+const calculateAreaFromDimensions = ({ length, width, depth }) => {
+  const dims = [length, width, depth].map((value) => (Number.isFinite(value) ? value : -1));
+  const allVersionsMissingDimensions = dims.some((value) => value <= 0);
+
+  if (allVersionsMissingDimensions) {
+    return -1;
+  }
+
+  const sorted = [...dims].sort((a, b) => a - b);
+  return sorted[0] * sorted[1];
+};
 
 export const buildOverrideMaps = (overridesPayload) => {
   const excludedIdsSet = new Set(
@@ -105,6 +124,13 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
           weight: overrideDimension.weight,
           missing: false,
         };
+        // Recalculate area from user-provided dimensions for accurate sorting
+        const recalculatedArea = calculateAreaFromDimensions(overrideDimension);
+        if (recalculatedArea > 0) {
+          game.area = recalculatedArea;
+        }
+        // Recalculate maxDepth from user-provided dimensions for accurate packing
+        game.maxDepth = getMaxDepthDimension(overrideDimension, true);
         dimensionSources.user = { ...overrideDimension };
         game.selectedDimensionSource = 'user';
         game.dimensions.missing = false;

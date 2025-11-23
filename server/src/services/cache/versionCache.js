@@ -73,16 +73,25 @@ export function setVersion(versionKey, data) {
     const dataJson = JSON.stringify(data);
     const now = Date.now();
 
+    // Check if entry already exists
+    const existing = db.prepare('SELECT key FROM versions WHERE key = ?').get(versionKey);
+    const isUpdate = existing !== undefined;
+
     // Store in memory
     memoryCaches.versions.set(versionKey, { data, timestamp: now });
 
-    // Store in database
+    // Store in database (normalize IDs to strings for consistency with TEXT columns)
     db.prepare(`
       INSERT OR REPLACE INTO versions (key, game_id, version_id, data, timestamp, last_accessed)
       VALUES (?, ?, ?, ?, ?, ?)
-    `).run(versionKey, gameId, versionId, dataJson, now, now);
+    `).run(versionKey, String(gameId), String(versionId), dataJson, now, now);
 
-    logStat('version', 'set');
+    // Log for debugging
+    if (process.env.DEBUG_CACHE === 'true') {
+      console.debug(`💾 Cache ${isUpdate ? 'UPDATE' : 'INSERT'} version: ${versionKey} (gameId: ${gameId}, versionId: ${versionId})`);
+    }
+
+    logStat('version', isUpdate ? 'update' : 'set');
   } catch (error) {
     console.error(`Cache error (setVersion): ${error.message}`);
     logStat('version', 'error');

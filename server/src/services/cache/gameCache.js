@@ -5,8 +5,11 @@ import { logStat, isStale } from './cacheUtils.js';
 // Get game from cache
 export function getGame(gameId) {
   try {
+    // Normalize gameId to string for consistency (database stores as TEXT)
+    const gameIdStr = String(gameId);
+    
     // Try memory cache first
-    const memCached = memoryCaches.games.get(gameId);
+    const memCached = memoryCaches.games.get(gameIdStr);
     if (memCached && !isStale(memCached.timestamp)) {
       logStat('game', 'hit_memory');
       return memCached.data;
@@ -14,14 +17,14 @@ export function getGame(gameId) {
 
     // Try database
     const stmt = db.prepare('SELECT data, timestamp FROM games WHERE game_id = ?');
-    const row = stmt.get(gameId);
+    const row = stmt.get(gameIdStr);
     
     if (row && !isStale(row.timestamp)) {
       const data = JSON.parse(row.data);
       // Update memory cache
-      memoryCaches.games.set(gameId, { data, timestamp: row.timestamp });
+      memoryCaches.games.set(gameIdStr, { data, timestamp: row.timestamp });
       // Update last accessed
-      db.prepare('UPDATE games SET last_accessed = ? WHERE game_id = ?').run(Date.now(), gameId);
+      db.prepare('UPDATE games SET last_accessed = ? WHERE game_id = ?').run(Date.now(), gameIdStr);
       logStat('game', 'hit_db');
       return data;
     }
@@ -38,19 +41,30 @@ export function getGame(gameId) {
 // Set game in cache
 export function setGame(gameId, data) {
   try {
+    // Normalize gameId to string for consistency (database stores as TEXT)
+    const gameIdStr = String(gameId);
     const dataJson = JSON.stringify(data);
     const now = Date.now();
 
+    // Check if entry already exists
+    const existing = db.prepare('SELECT game_id FROM games WHERE game_id = ?').get(gameIdStr);
+    const isUpdate = existing !== undefined;
+
     // Store in memory
-    memoryCaches.games.set(gameId, { data, timestamp: now });
+    memoryCaches.games.set(gameIdStr, { data, timestamp: now });
 
     // Store in database
-    db.prepare(`
+    const result = db.prepare(`
       INSERT OR REPLACE INTO games (game_id, data, timestamp, last_accessed)
       VALUES (?, ?, ?, ?)
-    `).run(gameId, dataJson, now, now);
+    `).run(gameIdStr, dataJson, now, now);
 
-    logStat('game', 'set');
+    // Log for debugging
+    if (process.env.DEBUG_CACHE === 'true') {
+      console.debug(`💾 Cache ${isUpdate ? 'UPDATE' : 'INSERT'} game: ${gameIdStr} (${typeof gameId} -> string)`);
+    }
+
+    logStat('game', isUpdate ? 'update' : 'set');
   } catch (error) {
     console.error(`Cache error (setGame): ${error.message}`);
     logStat('game', 'error');

@@ -14,12 +14,29 @@ export const MAX_GROUP_AREA = CUBE_AREA * MAX_GROUP_AREA_MULTIPLIER;
 
 /**
  * Gets the safe area value from a game object.
- * Returns the game's area if it's a valid positive number, otherwise returns 0.
+ * Returns the game's area if it's a valid positive number, otherwise calculates from dims2D.
  * @param {Object} game - The game object
  * @returns {number} The game area or 0 if invalid
  */
 export const getSafeGameArea = (game) => {
-  return Number.isFinite(game.area) && game.area > 0 ? game.area : 0;
+  // First try to use pre-calculated area
+  if (Number.isFinite(game.area) && game.area > 0) {
+    return game.area;
+  }
+  
+  // Fallback: calculate from dims2D if available
+  if (game.dims2D?.horizontal && game.dims2D?.vertical) {
+    // Use the larger of the two orientations (primary orientation area)
+    const horizontalArea = game.dims2D.horizontal.x * game.dims2D.horizontal.y;
+    const verticalArea = game.dims2D.vertical.x * game.dims2D.vertical.y;
+    const calculatedArea = Math.max(horizontalArea, verticalArea);
+    
+    if (Number.isFinite(calculatedArea) && calculatedArea > 0) {
+      return calculatedArea;
+    }
+  }
+  
+  return 0;
 };
 
 /**
@@ -44,40 +61,38 @@ export const getMaxDepthDimension = (dimensions, includeDepth = true) => {
 
 /**
  * Selects which cubes to check when placing a game or group.
- * Returns an array of cubes sorted/selected based on optimization and sort order preferences.
+ * Returns cubes in order (earliest first) within the backfill window.
+ * When optimizeSpace is true, backfillPercentage is treated as 100%.
  * @param {Array} cubes - Array of cube objects
- * @param {boolean} optimizeSpace - Whether to optimize for space (sorts by occupied area descending)
- * @param {boolean} respectSortOrder - Whether to respect sort order (only checks last cube)
+ * @param {boolean} optimizeSpace - Whether to optimize for space (forces 100% backfill)
+ * @param {number} backfillPercentage - Percentage of cubes to check back from the end (0-100)
  * @param {Function} calculateOccupiedAreaForCube - Function to calculate occupied area for a cube (fallback if cube.occupiedArea not set)
- * @returns {Array} Array of cubes to check
+ * @returns {Array} Array of cubes to check, in order (earliest first)
  */
 export const selectCubesToCheck = (
   cubes,
   optimizeSpace,
-  respectSortOrder,
+  backfillPercentage,
   calculateOccupiedAreaForCube,
 ) => {
-  if (optimizeSpace) {
-    return [...cubes].sort((a, b) => {
-      const occupiedA = a.occupiedArea !== undefined ? a.occupiedArea : calculateOccupiedAreaForCube(a);
-      const occupiedB = b.occupiedArea !== undefined ? b.occupiedArea : calculateOccupiedAreaForCube(b);
-      return occupiedB - occupiedA;
-    });
-  }
-
-  if (respectSortOrder) {
-    return cubes.length > 0 ? [cubes[cubes.length - 1]] : [];
-  }
-
   if (cubes.length === 0) {
     return [];
   }
 
-  const cubesToCheck = [cubes[cubes.length - 1]];
-  if (cubes.length > 1) {
-    cubesToCheck.unshift(cubes[cubes.length - 2]);
-  }
+  // When optimizing space, always check all cubes (100% backfill)
+  // This ensures optimal bin packing by checking all existing cubes before creating new ones
+  const effectiveBackfillPercentage = optimizeSpace ? 100 : backfillPercentage;
 
-  return cubesToCheck;
+  // Calculate how many cubes to check based on percentage
+  // Ensure at least 1 cube is checked when percentage > 0
+  const numCubesToCheck = effectiveBackfillPercentage === 0
+    ? 1
+    : Math.max(1, Math.ceil(cubes.length * (effectiveBackfillPercentage / 100)));
+
+  // Get the last N cubes, maintaining their original order (earliest first)
+  // This ensures we check cubes sequentially: cube 1, then cube 2, then cube 3...
+  // which allows area-based sorting to work optimally for bin packing
+  const startIndex = Math.max(0, cubes.length - numCubesToCheck);
+  return cubes.slice(startIndex);
 };
 

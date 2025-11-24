@@ -14,7 +14,7 @@ export const useInputSettingsState = () => {
   const [stacking, setStacking] = useState('vertical');
   const [lockRotation, setLockRotation] = useState(false);
   const [optimizeSpace, setOptimizeSpace] = useState(false);
-  const [respectSortOrder, setRespectSortOrder] = useState(false);
+  const [backfillPercentage, setBackfillPercentage] = useState(20);
   const [fitOversized, setFitOversized] = useState(false);
   const [bypassVersionWarning, setBypassVersionWarning] = useState(false);
   const [filtersCollapsed, setFiltersCollapsed] = useState(false);
@@ -34,7 +34,7 @@ export const useInputSettingsState = () => {
     setStacking('vertical');
     setLockRotation(false);
     setOptimizeSpace(false);
-    setRespectSortOrder(false);
+    setBackfillPercentage(20);
     setFitOversized(false);
     setBypassVersionWarning(false);
     setFiltersCollapsed(false);
@@ -60,8 +60,8 @@ export const useInputSettingsState = () => {
     setLockRotation,
     optimizeSpace,
     setOptimizeSpace,
-    respectSortOrder,
-    setRespectSortOrder,
+    backfillPercentage,
+    setBackfillPercentage,
     fitOversized,
     setFitOversized,
     bypassVersionWarning,

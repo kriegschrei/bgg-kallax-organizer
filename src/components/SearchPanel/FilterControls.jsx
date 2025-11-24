@@ -69,6 +69,37 @@ const StackingToggle = ({ stacking, onStackingChange, disabled }) => (
   </div>
 );
 
+const BackfillToleranceSlider = ({ value, onChange, disabled, tooltip }) => {
+  const sliderId = 'backfill-tolerance-slider';
+  
+  return (
+    <div className="backfill-tolerance-row">
+      <div className="backfill-tolerance-label-row">
+        <label htmlFor={sliderId}>
+          Backfill tolerance
+          {tooltip && (
+            <span className="tooltip-icon" title={tooltip}>
+              <FaExclamationTriangle aria-hidden="true" />
+            </span>
+          )}
+        </label>
+        <span className="backfill-tolerance-value">{value}%</span>
+      </div>
+      <input
+        type="range"
+        id={sliderId}
+        min="0"
+        max="100"
+        step="10"
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        disabled={disabled}
+        className="backfill-tolerance-slider"
+      />
+    </div>
+  );
+};
+
 const PreferencesPanel = ({
   collapsed,
   onToggle,
@@ -120,15 +151,6 @@ const PreferencesPanel = ({
           'Disabled: Prefer stacking preference, may rotate some games to fit.\nEnabled: Force games to follow stacking preference',
       },
       {
-        id: 'respectSortOrder',
-        label: 'Respect sorting order',
-        checked: preferenceState.respectSortOrder,
-        onChange: preferenceState.onRespectSortOrderChange,
-        disabled: loading || preferenceState.optimizeSpace,
-        tooltip:
-          'Games will not be backfilled to earlier cubes for better fit to match sorting preferences. May use more space.',
-      },
-      {
         id: 'bypassVersionWarning',
         label: 'Bypass version warning',
         checked: preferenceState.bypassVersionWarning,
@@ -155,6 +177,12 @@ const PreferencesPanel = ({
           stacking={stacking}
           onStackingChange={onStackingChange}
           disabled={loading}
+        />
+        <BackfillToleranceSlider
+          value={preferenceState.backfillPercentage}
+          onChange={preferenceState.onBackfillPercentageChange}
+          disabled={loading || preferenceState.optimizeSpace}
+          tooltip="Higher values allow checking more cubes back for better space utilization while still respecting sort order"
         />
         <SettingsToggleGroup toggles={toggles} />
       </div>

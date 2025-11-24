@@ -182,7 +182,7 @@ const groupGamesBySeries = (games, excludeExpansionGroups = new Set()) => {
   return validGroups;
 };
 
-export const createGameGroups = (games, groupExpansions, groupSeries) => {
+export const createGameGroups = (games, groupExpansions) => {
   const allGameIds = new Set(games.map((g) => g.id));
 
   let expansionGroups = new Map();
@@ -195,13 +195,6 @@ export const createGameGroups = (games, groupExpansions, groupSeries) => {
     console.log(`   📦 Created ${expansionGroups.size} expansion groups`);
   }
 
-  let seriesGroups = new Map();
-
-  if (groupSeries) {
-    seriesGroups = groupGamesBySeries(games, expansionGameIds);
-    console.log(`   📚 Created ${seriesGroups.size} series groups`);
-  }
-
   const finalGroups = new Map();
   const groupedGameIds = new Set();
 
@@ -209,16 +202,6 @@ export const createGameGroups = (games, groupExpansions, groupSeries) => {
     finalGroups.set(`expansion:${groupId}`, groupGames);
     for (const game of groupGames) {
       groupedGameIds.add(game.id);
-    }
-  }
-
-  for (const [familyId, groupGames] of seriesGroups.entries()) {
-    const filteredGames = groupGames.filter((g) => !groupedGameIds.has(g.id));
-    if (filteredGames.length > 1) {
-      finalGroups.set(`series:${familyId}`, filteredGames);
-      for (const game of filteredGames) {
-        groupedGameIds.add(game.id);
-      }
     }
   }
 

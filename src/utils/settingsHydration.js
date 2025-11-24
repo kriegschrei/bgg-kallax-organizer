@@ -35,7 +35,7 @@ export const applyStoredSettings = (storedSettings, setters, refs = {}) => {
     stacking: storedStacking,
     lockRotation: storedLockRotation,
     optimizeSpace: storedOptimizeSpace,
-    respectSortOrder: storedRespectSortOrder,
+    backfillPercentage: storedBackfillPercentage,
     fitOversized: storedFitOversized,
     filtersCollapsed: storedFiltersCollapsed,
     filterPanelsCollapsed: storedFilterPanelsCollapsed,
@@ -66,8 +66,10 @@ export const applyStoredSettings = (storedSettings, setters, refs = {}) => {
   if (typeof storedOptimizeSpace === 'boolean') {
     setters.setOptimizeSpace(storedOptimizeSpace);
   }
-  if (typeof storedRespectSortOrder === 'boolean') {
-    setters.setRespectSortOrder(storedRespectSortOrder);
+  if (typeof storedBackfillPercentage === 'number' && 
+      storedBackfillPercentage >= 0 && 
+      storedBackfillPercentage <= 100) {
+    setters.setBackfillPercentage(storedBackfillPercentage);
   }
   if (typeof storedFitOversized === 'boolean') {
     setters.setFitOversized(storedFitOversized);

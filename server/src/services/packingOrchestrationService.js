@@ -64,12 +64,12 @@ export const prepareGamesForPacking = (games, primaryOrder, fitOversized) => {
   return { validGames, oversizedExcludedGames };
 };
 
-export const processGameGroups = (validGames, groupExpansions, groupSeries) => {
+export const processGameGroups = (validGames, groupExpansions) => {
   let gameGroups = new Map();
   let standaloneGames = [...validGames];
 
-  if (groupExpansions || groupSeries) {
-    const groupingResult = createGameGroups(validGames, groupExpansions, groupSeries);
+  if (groupExpansions) {
+    const groupingResult = createGameGroups(validGames, groupExpansions);
 
     const splitGroups = new Map();
     for (const [groupId, group] of groupingResult.groups.entries()) {
@@ -104,14 +104,11 @@ export const sortGroupsAndStandaloneGames = (gameGroups, standaloneGames, sortRu
     }
 
     if (optimizeSpace) {
+      // When optimizing space, sort ONLY by area descending (ignore sortRules)
       sortedGroups.sort((a, b) => {
         const areaA = getGroupTotalArea(a.group);
         const areaB = getGroupTotalArea(b.group);
-        if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
-
-        const repA = getGroupRepresentative(a.group);
-        const repB = getGroupRepresentative(b.group);
-        return compareGames(repA, repB, sortRules);
+        return areaB - areaA; // No tiebreaker, just area descending
       });
     } else {
       sortedGroups.sort((a, b) => {
@@ -124,12 +121,11 @@ export const sortGroupsAndStandaloneGames = (gameGroups, standaloneGames, sortRu
 
   if (standaloneGames.length > 0) {
     if (optimizeSpace) {
-      // Sort by area descending when optimizing space
+      // When optimizing space, sort ONLY by area descending (ignore sortRules)
       standaloneGames.sort((a, b) => {
         const areaA = getSafeGameArea(a);
         const areaB = getSafeGameArea(b);
-        if (Math.abs(areaA - areaB) > 0.01) return areaB - areaA;
-        return compareGames(a, b, sortRules);
+        return areaB - areaA; // No tiebreaker, just area descending
       });
     } else {
       standaloneGames.sort((a, b) => compareGames(a, b, sortRules));
@@ -234,23 +230,63 @@ export const placeStandaloneGame = (
   lockRotation,
   sortRules,
   optimizeSpace,
-  respectSortOrder,
+  backfillPercentage,
   placed,
 ) => {
   if (placed.has(game.id)) return;
 
   const orientations = buildOrientations(game, primaryOrder, lockRotation);
+  
+  // Calculate minimum game area needed (smallest orientation)
+  // This helps filter cubes that definitely don't have enough space
+  const minGameArea = orientations.length > 0
+    ? Math.min(...orientations.map(o => o.x * o.y))
+    : getSafeGameArea(game) || 0;
 
   let wasPlaced = false;
 
+  // Get cubes to check based on backfill percentage (maintains order - earliest first)
   const cubesToCheck = selectCubesToCheck(
     cubes,
     optimizeSpace,
-    respectSortOrder,
+    backfillPercentage,
     calculateOccupiedAreaForCube,
   );
 
-  for (const cube of cubesToCheck) {
+  // Filter cubes that have enough area for this game
+  // This avoids wasting time trying to place in cubes that are too full
+  const cubesWithSpace = cubesToCheck.filter(cube => {
+    const cubeOccupiedArea = cube.occupiedArea !== undefined 
+      ? cube.occupiedArea 
+      : calculateOccupiedAreaForCube(cube);
+    return cubeOccupiedArea + minGameArea <= CUBE_AREA;
+  });
+
+  // Try each cube starting with the earliest one in the backfill window
+  for (const cube of cubesWithSpace) {
+    // Try aggressive reorganization first (if cube has games)
+    // This improves packing by reorganizing existing games to fit the new one
+    if (cube.games.length > 0) {
+      for (const orientation of orientations) {
+        if (
+          tryAggressiveReorganization(
+            cube,
+            game,
+            orientation.x,
+            orientation.y,
+            sortRules,
+            orientation.label,
+          )
+        ) {
+          placed.add(game.id);
+          wasPlaced = true;
+          break;
+        }
+      }
+      if (wasPlaced) break;
+    }
+
+    // Try normal placement (for empty cubes or if reorganization failed)
     for (const orientation of orientations) {
       if (tryPlaceGame(cube, game, orientation.x, orientation.y, orientation.label)) {
         placed.add(game.id);
@@ -259,29 +295,11 @@ export const placeStandaloneGame = (
       }
     }
     if (wasPlaced) break;
-
-    for (const orientation of orientations) {
-      if (
-        tryAggressiveReorganization(
-          cube,
-          game,
-          orientation.x,
-          orientation.y,
-          sortRules,
-          orientation.label,
-        )
-      ) {
-        placed.add(game.id);
-        wasPlaced = true;
-        break;
-      }
-    }
-    if (wasPlaced) break;
   }
 
+  // Only create new cube if no existing cube could fit the game
   if (!wasPlaced) {
     const newCube = { games: [], rows: [], occupiedArea: 0 };
-
     for (const orientation of orientations) {
       if (tryPlaceGame(newCube, game, orientation.x, orientation.y, orientation.label)) {
         placed.add(game.id);
@@ -298,7 +316,7 @@ export const placeGroups = (
   primaryOrder,
   lockRotation,
   optimizeSpace,
-  respectSortOrder,
+  backfillPercentage,
   placed,
 ) => {
   if (sortedGroups.length === 0) {
@@ -312,14 +330,27 @@ export const placeGroups = (
 
     let groupPlaced = false;
 
+    // Calculate total area needed for the group
+    const groupArea = getGroupTotalArea(group);
+
+    // Get cubes to check based on backfill percentage (maintains order - earliest first)
     const cubesToCheck = selectCubesToCheck(
       cubes,
       optimizeSpace,
-      respectSortOrder,
+      backfillPercentage,
       calculateOccupiedAreaForCube,
     );
 
-    for (const cube of cubesToCheck) {
+    // Filter cubes that have enough area for this group
+    const cubesWithSpace = cubesToCheck.filter(cube => {
+      const cubeOccupiedArea = cube.occupiedArea !== undefined 
+        ? cube.occupiedArea 
+        : calculateOccupiedAreaForCube(cube);
+      return cubeOccupiedArea + groupArea <= CUBE_AREA;
+    });
+
+    // Try each cube starting with the earliest one in the backfill window
+    for (const cube of cubesWithSpace) {
       if (tryPlaceGroup(cube, group, primaryOrder, lockRotation, placed)) {
         groupPlaced = true;
         break;

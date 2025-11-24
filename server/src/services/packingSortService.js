@@ -33,6 +33,9 @@ const getGameSortValue = (game, field) => {
       return normalizeSortValue(game.families?.[0] || '');
     case 'mechanics':
       return normalizeSortValue(game.mechanics?.[0] || '');
+    case 'area':
+      // Use getSafeGameArea to ensure area is calculated correctly
+      return getSafeGameArea(game);
     default:
       return game[field] ?? null;
   }

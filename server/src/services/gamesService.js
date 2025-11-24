@@ -19,8 +19,8 @@ import {
 import { normalizePositiveNumber, isPositiveFinite } from '../utils/numberUtils.js';
 import { getMaxDepthDimension } from '../utils/packingHelpers.js';
 
-const getPrioritiesFromSort = (sort = []) =>
-  Array.isArray(sort)
+const getPrioritiesFromSort = (sort = []) => {
+  const rules = Array.isArray(sort)
     ? sort
         .filter((rule) => rule?.field)
         .map((rule) => ({
@@ -28,6 +28,15 @@ const getPrioritiesFromSort = (sort = []) =>
           order: rule.order === 'desc' ? 'desc' : 'asc',
         }))
     : [];
+  
+  // Default to gameName ascending if no sort rules provided
+  // This ensures games are always sorted, even when sort is empty or undefined
+  if (rules.length === 0) {
+    return [{ field: 'gameName', order: 'asc' }];
+  }
+  
+  return rules;
+};
 
 const normalizeBooleanFlag = (value, defaultValue = false) =>
   typeof value === 'boolean' ? value : defaultValue;
@@ -376,10 +385,12 @@ export const processGamesRequest = async ({
   const stacking = payload.stacking || 'horizontal';
   const lockRotationFlag = normalizeBooleanFlag(payload.lockRotation);
   const optimizeSpaceFlag = normalizeBooleanFlag(payload.optimizeSpace);
-  const respectSortOrderFlag = normalizeBooleanFlag(payload.respectSortOrder);
+  const backfillPercentage = typeof payload.backfillPercentage === 'number' && 
+    payload.backfillPercentage >= 0 && payload.backfillPercentage <= 100
+    ? payload.backfillPercentage
+    : 20;
   const fitOversizedFlag = normalizeBooleanFlag(payload.fitOversized);
   const groupExpansionsFlag = normalizeBooleanFlag(payload.groupExpansions);
-  const groupSeriesFlag = normalizeBooleanFlag(payload.groupSeries);
   const includeExpansionsFlag = normalizeBooleanFlag(payload.includeExpansions);
   const bypassVersionWarning = normalizeBooleanFlag(payload.bypassVersionWarning);
 
@@ -396,7 +407,6 @@ export const processGamesRequest = async ({
     optimizeSpace: optimizeSpaceFlag,
     fitOversized: fitOversizedFlag,
     groupExpansions: groupExpansionsFlag,
-    groupSeries: groupSeriesFlag,
   });
 
   progress(requestId, 'Starting to process your collection...', { step: 'init' });
@@ -541,9 +551,8 @@ export const processGamesRequest = async ({
 
   const shouldGroupExpansions =
     !optimizeSpaceFlag && groupExpansionsFlag && includeExpansionsFlag;
-  const shouldGroupSeries = !optimizeSpaceFlag && groupSeriesFlag;
 
-  if (optimizeSpaceFlag && (groupExpansionsFlag || groupSeriesFlag)) {
+  if (optimizeSpaceFlag && groupExpansionsFlag) {
     console.log('   ℹ️  Optimize for space enabled – grouping options disabled for this run');
   }
 
@@ -553,10 +562,9 @@ export const processGamesRequest = async ({
     stacking,
     lockRotationFlag,
     optimizeSpaceFlag,
-    respectSortOrderFlag,
+    backfillPercentage,
     fitOversizedFlag,
     shouldGroupExpansions,
-    shouldGroupSeries,
   );
 
   progress(requestId, `Complete! Packed into ${packedCubes.length} cubes`, {

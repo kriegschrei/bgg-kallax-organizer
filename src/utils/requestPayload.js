@@ -8,6 +8,8 @@ const SORT_FIELDS = new Set([
   'gameName',
   'versionName',
   'bggRank',
+  'bggWeight',
+  'bggRating',
   'minPlayers',
   'maxPlayers',
   'bestPlayerCount',
@@ -15,11 +17,16 @@ const SORT_FIELDS = new Set([
   'maxPlaytime',
   'age',
   'communityAge',
+  'languageDependence',
   'weight',
-  'bggRating',
+  'volume',
+  'area',
+  'numplays',
   'categories',
   'families',
   'mechanics',
+  'gamePublishedYear',
+  'versionPublishedYear',
 ]);
 const ORIENTATION_VALUES = new Set(['horizontal', 'vertical']);
 
@@ -47,11 +54,12 @@ export const buildStatusesPayload = (selections = {}) => {
 /**
  * Builds sort payload from sorting rules array.
  * Filters to only enabled rules with valid fields and orders.
+ * Always returns at least the default sort (gameName ascending) if no rules are enabled.
  * @param {Array} sortingRules - Array of sorting rule objects
  * @returns {Array} Array of sort payload objects
  */
-export const buildSortPayload = (sortingRules = []) =>
-  sortingRules
+export const buildSortPayload = (sortingRules = []) => {
+  const rules = sortingRules
     .filter(
       (rule) =>
         rule?.enabled === true &&
@@ -62,6 +70,15 @@ export const buildSortPayload = (sortingRules = []) =>
       field: rule.field,
       order: rule.order,
     }));
+  
+  // Always return at least the default sort if no rules are enabled
+  // This ensures the backend always has a sort order to work with
+  if (rules.length === 0) {
+    return [{ field: 'gameName', order: 'asc' }];
+  }
+  
+  return rules;
+};
 
 const buildExcludedVersions = (items = []) =>
   items
@@ -148,7 +165,6 @@ export const buildOverridesPayload = ({
 const BOOLEAN_FIELDS = [
   'lockRotation',
   'optimizeSpace',
-  'respectSortOrder',
   'fitOversized',
   'groupExpansions',
   'groupSeries',
@@ -209,6 +225,13 @@ export const buildRequestPayload = ({
       payload[field] = true;
     }
   });
+
+  // Add backfillPercentage if provided (0-100)
+  if (typeof normalizedFlags.backfillPercentage === 'number' && 
+      normalizedFlags.backfillPercentage >= 0 && 
+      normalizedFlags.backfillPercentage <= 100) {
+    payload.backfillPercentage = normalizedFlags.backfillPercentage;
+  }
 
   return payload;
 };

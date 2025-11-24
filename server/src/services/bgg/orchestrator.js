@@ -322,17 +322,32 @@ const buildVersionEntry = ({
     : null;
   
     const derivedDimensions = versionData
-    ? {
-        length: versionData.length,
-        width: versionData.width,
-        depth: versionData.depth,
-        weight: normalizedWeight,
-        missing: !hasValidDimensions({
+    ? (() => {
+        // Normalize dimensions to ensure length >= width >= depth
+        const rawDims = {
           length: versionData.length,
           width: versionData.width,
           depth: versionData.depth,
-        }),
-      }
+          weight: normalizedWeight,
+          missing: !hasValidDimensions({
+            length: versionData.length,
+            width: versionData.width,
+            depth: versionData.depth,
+          }),
+        };
+        // Only normalize if dimensions are valid (not missing)
+        if (!rawDims.missing && rawDims.length > 0 && rawDims.width > 0 && rawDims.depth > 0) {
+          const sorted = [rawDims.length, rawDims.width, rawDims.depth].sort((a, b) => b - a);
+          return {
+            length: sorted[0], // largest
+            width: sorted[1],  // middle
+            depth: sorted[2],  // smallest
+            weight: normalizedWeight,
+            missing: false,
+          };
+        }
+        return rawDims;
+      })()
     : {
         length: MISSING_DIMENSIONS_PLACEHOLDER.length,
         width: MISSING_DIMENSIONS_PLACEHOLDER.width,

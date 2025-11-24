@@ -287,15 +287,28 @@ export const mapVersionItems = (item, thingGameId) => {
       
       const dimensionsMeta = computeDimensionsMeta({ length, width, depth });
 
+      // Normalize dimensions to ensure length >= width >= depth
+      // Only normalize if dimensions are valid (not missing)
+      let normalizedLength = length;
+      let normalizedWidth = width;
+      let normalizedDepth = depth;
+      
+      if (length > 0 && width > 0 && depth > 0) {
+        const sorted = [length, width, depth].sort((a, b) => b - a);
+        normalizedLength = sorted[0]; // largest
+        normalizedWidth = sorted[1];  // middle
+        normalizedDepth = sorted[2];  // smallest
+      }
+
       return {
         versionId,
         name: displayName,
         gameId,
         versionKey: buildVersionKey(gameId, versionId),
         versionYearPublished: parseInteger(version?.yearpublished?.$?.value, -1),
-        width,
-        length,
-        depth,
+        length: normalizedLength,
+        width: normalizedWidth,
+        depth: normalizedDepth,
         weight: parseFloat(version?.weight?.$?.value, -1),
         language: languageLink?.$?.value || null,
         allVersionsMissingDimensions: dimensionsMeta.allVersionsMissingDimensions, // Keep for backward compatibility in cache

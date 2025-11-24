@@ -1,4 +1,4 @@
-import { extractDimensions } from '../utils/gameProcessingHelpers.js';
+import { extractDimensions, normalizeDimensions } from '../utils/gameProcessingHelpers.js';
 import { normalizePositiveNumber } from '../utils/numberUtils.js';
 import { getMaxDepthDimension } from '../utils/packingHelpers.js';
 
@@ -61,14 +61,23 @@ export const buildOverrideMaps = (overridesPayload) => {
               depth > 0
             );
           })
-          .map((item) => [
-            `${item.game}-${item.version}`,
-            {
+          .map((item) => {
+            const rawDims = {
               length: Number(item.length),
               width: Number(item.width),
               depth: Number(item.depth ?? item.height),
-            },
-          ])
+            };
+            // Normalize dimensions to ensure length >= width >= depth
+            const normalized = normalizeDimensions(rawDims);
+            return [
+              `${item.game}-${item.version}`,
+              {
+                length: normalized.length,
+                width: normalized.width,
+                depth: normalized.depth,
+              },
+            ];
+          })
       : [],
   );
 
@@ -108,13 +117,14 @@ export const applyOverridesToGames = (uniqueGames, overrideMaps) => {
 
       const overrideDims = dimensionOverrideMap.get(game.id);
       if (overrideDims) {
-        const overrideDimension = {
+        // Normalize dimensions to ensure length >= width >= depth
+        const overrideDimension = normalizeDimensions({
           length: Number(overrideDims.length),
           width: Number(overrideDims.width),
           depth: Number(overrideDims.depth),
           weight: null,
           missing: false,
-        };
+        });
         game.bggDimensions = { ...originalDimensions };
         game.userDimensions = { ...overrideDimension };
         game.dimensions = {

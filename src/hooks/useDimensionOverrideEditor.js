@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { useUnitPreference } from '../contexts/UnitPreferenceContext';
 import { convertInchesToCm, convertCmToInches, convertDimensionInputToInches } from '../utils/unitConversion';
 
@@ -25,6 +25,7 @@ export function useDimensionOverrideEditor({
 }) {
   const [editorState, setEditorState] = useState(INITIAL_STATE);
   const { isMetric } = useUnitPreference();
+  const prevIsMetricRef = useRef(isMetric);
 
   const normalizeDimensionPart = useCallback((value) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -71,7 +72,40 @@ export function useDimensionOverrideEditor({
       depth: convertForDisplay(game.depth),
       error: '',
     });
+    prevIsMetricRef.current = isMetric;
   }, [normalizeDimensionPart, isMetric]);
+
+  // Convert editor values when unit preference changes
+  useEffect(() => {
+    // Only convert if editor is open and unit preference actually changed
+    if (editorState.overrideKey && prevIsMetricRef.current !== isMetric) {
+      const convertValue = (value) => {
+        const numeric = parseFloat(value);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+          return value; // Keep invalid values as-is
+        }
+        
+        // Convert from previous unit to new unit
+        if (prevIsMetricRef.current && !isMetric) {
+          // Was metric, now imperial: convert cm to inches
+          return String(convertCmToInches(numeric));
+        } else if (!prevIsMetricRef.current && isMetric) {
+          // Was imperial, now metric: convert inches to cm
+          return String(convertInchesToCm(numeric));
+        }
+        return value;
+      };
+
+      setEditorState((prev) => ({
+        ...prev,
+        length: convertValue(prev.length),
+        width: convertValue(prev.width),
+        depth: convertValue(prev.depth),
+      }));
+      
+      prevIsMetricRef.current = isMetric;
+    }
+  }, [isMetric, editorState.overrideKey]);
 
   const closeEditor = useCallback(() => {
     setEditorState(INITIAL_STATE);

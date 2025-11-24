@@ -1,4 +1,4 @@
-import { checkMissingDimensions } from '../utils/gameProcessingHelpers.js';
+import { checkMissingDimensions, normalizeDimensions } from '../utils/gameProcessingHelpers.js';
 import { calculateStatsSummary, getOversizedStuffedGames } from './packingService.js';
 import { PACKING_DISPLAY_CONSTANTS } from './packingCubeService.js';
 import { getSafeGameArea } from '../utils/packingHelpers.js';
@@ -23,16 +23,16 @@ const buildDimensionEntry = (type, source) => {
     return null;
   }
 
+  // Normalize dimensions to ensure length >= width >= depth
+  const normalized = normalizeDimensions(source);
+
   return {
     type,
-    length: normalizePositiveNumber(source.length),
-    width: normalizePositiveNumber(source.width),
-    depth: normalizePositiveNumber(source.depth),
-    weight: normalizePositiveNumber(source.weight),
-    missing: Boolean(source.missing ?? 
-      (source.length == null || source.length === 0 ||
-       source.width == null || source.width === 0 ||
-       source.depth == null || source.depth === 0)),
+    length: normalized.length,
+    width: normalized.width,
+    depth: normalized.depth,
+    weight: normalized.weight,
+    missing: normalized.missing,
   };
 };
 
@@ -270,10 +270,12 @@ const normalizeOversizedGames = (packedCubes, oversizedExcludedGames) => {
         baseGameId: Number.isInteger(item.baseGameId) ? item.baseGameId : null,
       };
       if (item.dimensions) {
+        // Normalize dimensions to ensure length >= width >= depth
+        const normalized = normalizeDimensions(item.dimensions);
         entry.dimensions = {
-              length: normalizePositiveNumber(item.dimensions.length),
-              width: normalizePositiveNumber(item.dimensions.width),
-              depth: normalizePositiveNumber(item.dimensions.depth),
+          length: normalized.length,
+          width: normalized.width,
+          depth: normalized.depth,
         };
       }
       normalized.push(entry);

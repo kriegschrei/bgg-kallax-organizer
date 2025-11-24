@@ -44,7 +44,49 @@ export const hasValidDimensions = (dimensions) => {
 };
 
 /**
+ * Normalizes dimensions by sorting them to ensure:
+ * - length = largest dimension
+ * - width = second largest dimension
+ * - depth = smallest dimension
+ * 
+ * @param {Object} dimensions - The dimensions object with length, width, depth, and optionally weight and missing
+ * @returns {Object} Normalized dimensions object with sorted dimensions
+ */
+export const normalizeDimensions = (dimensions) => {
+  if (!dimensions) {
+    return dimensions;
+  }
+
+  const length = normalizePositiveNumber(dimensions.length);
+  const width = normalizePositiveNumber(dimensions.width);
+  const depth = normalizePositiveNumber(dimensions.depth);
+
+  // If any dimension is missing/null, return as-is (preserving missing state)
+  if (length == null || width == null || depth == null) {
+    return {
+      length,
+      width,
+      depth,
+      weight: normalizePositiveNumber(dimensions.weight),
+      missing: dimensions.missing ?? checkMissingDimensions({ length, width, depth }),
+    };
+  }
+
+  // Sort dimensions in descending order
+  const sorted = [length, width, depth].sort((a, b) => b - a);
+
+  return {
+    length: sorted[0], // largest
+    width: sorted[1],  // middle
+    depth: sorted[2],  // smallest
+    weight: normalizePositiveNumber(dimensions.weight),
+    missing: dimensions.missing ?? checkMissingDimensions({ length: sorted[0], width: sorted[1], depth: sorted[2] }),
+  };
+};
+
+/**
  * Extracts and normalizes dimensions from a game object.
+ * Dimensions are sorted to ensure length >= width >= depth.
  * @param {Object} game - The game object
  * @returns {Object} Normalized dimensions object with length, width, depth, weight, and missing
  */
@@ -59,17 +101,7 @@ export const extractDimensions = (game) => {
     };
   }
 
-  return {
-    length: normalizePositiveNumber(game.dimensions.length),
-    width: normalizePositiveNumber(game.dimensions.width),
-    depth: normalizePositiveNumber(game.dimensions.depth),
-    weight: normalizePositiveNumber(game.dimensions.weight),
-    missing: game.dimensions.missing ?? checkMissingDimensions({
-      length: game.dimensions.length,
-      width: game.dimensions.width,
-      depth: game.dimensions.depth,
-    }),
-  };
+  return normalizeDimensions(game.dimensions);
 };
 
 export const DEFAULT_DIMENSIONS = {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import CubeFrontView from './CubeFrontView';
 import CubeGameList from './CubeGameList';
 import './CubeVisualization.css';
@@ -9,7 +9,7 @@ import {
 import { resolveGameIdentity } from '../utils/overrideIdentity';
 import { getPrimaryDimension } from '../utils/dimensions';
 import { useUnitPreference } from '../contexts/UnitPreferenceContext';
-import { convertInchesToCm, convertDimensionInputToInches } from '../utils/unitConversion';
+import { convertInchesToCm, convertCmToInches, convertDimensionInputToInches } from '../utils/unitConversion';
 
 const KALLAX_WIDTH = 13;
 const KALLAX_HEIGHT = 13;
@@ -106,6 +106,39 @@ export default function CubeVisualization({
   };
 
   const { isMetric } = useUnitPreference();
+  const prevIsMetricRef = useRef(isMetric);
+  
+  // Convert editor values when unit preference changes
+  useEffect(() => {
+    // Only convert if editor is open and unit preference actually changed
+    if (dimensionEditor.overrideKey && prevIsMetricRef.current !== isMetric) {
+      const convertValue = (value) => {
+        const numeric = parseFloat(value);
+        if (!Number.isFinite(numeric) || numeric <= 0) {
+          return value; // Keep invalid values as-is
+        }
+        
+        // Convert from previous unit to new unit
+        if (prevIsMetricRef.current && !isMetric) {
+          // Was metric, now imperial: convert cm to inches
+          return String(convertCmToInches(numeric));
+        } else if (!prevIsMetricRef.current && isMetric) {
+          // Was imperial, now metric: convert inches to cm
+          return String(convertInchesToCm(numeric));
+        }
+        return value;
+      };
+
+      setDimensionEditor((prev) => ({
+        ...prev,
+        length: convertValue(prev.length),
+        width: convertValue(prev.width),
+        depth: convertValue(prev.depth),
+      }));
+      
+      prevIsMetricRef.current = isMetric;
+    }
+  }, [isMetric, dimensionEditor.overrideKey]);
   
   const openDimensionEditor = (game) => {
     if (interactionsDisabled) {
@@ -137,6 +170,7 @@ export default function CubeVisualization({
       depth: convertForDisplay(source.depth ?? source.height),
       error: '',
     });
+    prevIsMetricRef.current = isMetric;
   };
 
   const handleDimensionFieldChange = (field, value) => {

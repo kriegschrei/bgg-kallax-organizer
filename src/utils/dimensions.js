@@ -32,6 +32,7 @@ export const normalizeDimensionValue = (value, fallback) => {
 /**
  * Gets the primary dimension object from the dimensions array.
  * Prioritizes dimensions in order: user, version, guessed, default.
+ * Skips dimensions that are missing or have invalid values.
  * @param {Array} dimensionsArray - Array of dimension objects
  * @returns {Object|null} Primary dimension object or null if array is empty
  */
@@ -45,12 +46,19 @@ export const getPrimaryDimension = (dimensionsArray) => {
   
   for (const type of priorityOrder) {
     const dim = dimensionsArray.find((d) => d?.type === type);
-    if (dim) {
+    // Use dimension if it has valid values (missing flag is just metadata, not a validity check)
+    if (dim && hasValidDimensions(dim)) {
       return dim;
     }
   }
 
-  // Fallback to first dimension if none match expected types
+  // Fallback: try to find any dimension with valid values (regardless of type)
+  const validDim = dimensionsArray.find((d) => d && hasValidDimensions(d));
+  if (validDim) {
+    return validDim;
+  }
+
+  // Last resort: return first dimension even if missing (for display purposes)
   return dimensionsArray[0];
 };
 
@@ -101,7 +109,12 @@ export const formatEditorDimensions = (
 
   const formatPart = (value) => {
     const numeric = parsePositiveNumber(value);
-    return numeric !== null ? formatDimension(numeric, isMetric, precision) : placeholder;
+    if (numeric === null) {
+      return placeholder;
+    }
+    // Don't convert - editor values are already in the display unit
+    const unit = isMetric ? 'cm' : '"';
+    return `${numeric.toFixed(precision)}${unit}`;
   };
 
   return `${formatPart(editor.length)} × ${formatPart(editor.width)} × ${formatPart(

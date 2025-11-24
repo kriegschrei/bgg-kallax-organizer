@@ -11,6 +11,7 @@ import {
   setupGameVersionMetadata,
   checkMissingDimensions,
   hasValidDimensions,
+  normalizeDimensions,
 } from '../utils/gameProcessingHelpers.js';
 import {
   COLLECTION_STATUS_KEYS,
@@ -89,13 +90,10 @@ const detectnoSelectedVersionSelections = (entries) => {
   return missing;
 };
 
-const toDimensionsObject = (length, width, depth, weight) => ({
-  length,
-  width,
-  depth,
-  weight,
-  missing: checkMissingDimensions({ length, width, depth }),
-});
+const toDimensionsObject = (length, width, depth, weight) => {
+  const normalized = normalizeDimensions({ length, width, depth, weight });
+  return normalized;
+};
 
 const resolveDimensionsForEntry = (entry) => {
   const dims = entry.dimensions || {};
@@ -156,22 +154,14 @@ const cloneDimensionSource = (dimension) => {
     return null;
   }
 
-  const length = normalizePositiveNumber(dimension.length);
-  const width = normalizePositiveNumber(dimension.width);
-  const depth = normalizePositiveNumber(dimension.depth);
+  const normalized = normalizeDimensions(dimension);
 
   // If all dimensions are null/missing, return null instead of an object with null values
-  if (length == null && width == null && depth == null) {
+  if (normalized.length == null && normalized.width == null && normalized.depth == null) {
     return null;
   }
 
-  return {
-    length,
-    width,
-    depth,
-    weight: normalizePositiveNumber(dimension.weight),
-    missing: dimension.missing ?? checkMissingDimensions({ length, width, depth }),
-  };
+  return normalized;
 };
 
 const buildGameFromVersionEntry = (entry, noSelectedVersionInfo) => {

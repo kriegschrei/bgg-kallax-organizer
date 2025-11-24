@@ -18,10 +18,11 @@ import {
 import DimensionForm from './DimensionForm';
 import IconButton from './IconButton';
 import DisclosureIcon from './DisclosureIcon';
-import { resolveDisplayDimensions, getPrimaryDimension } from '../utils/dimensions';
+import { resolveDisplayDimensions, getPrimaryDimension, formatEditorDimensions } from '../utils/dimensions';
 import { resolveGameIdentity } from '../utils/overrideIdentity';
 import { useUnitPreference } from '../contexts/UnitPreferenceContext';
 import { formatDimension } from '../utils/unitConversion';
+import { formatGameDimensions } from '../utils/results';
 
 /**
  * Renders a single game item in the cube game list.
@@ -167,7 +168,9 @@ export default function GameListItem({
             />
           )}
           <span className="game-dimension-text">
-            {formatDimension(displayDims.x, isMetric)} × {formatDimension(displayDims.y, isMetric)} × {formatDimension(displayDims.z, isMetric)}
+            {editingThisGame && dimensionEditor
+              ? formatEditorDimensions(dimensionEditor, { isMetric })
+              : formatGameDimensions(userDims || primaryDim, isMetric)}
           </span>
         </span>
         {bggDefaultDimensions && (

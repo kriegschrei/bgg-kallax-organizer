@@ -14,7 +14,9 @@ import {
 const buildPreferenceLabels = (options, pushLabel) => {
   pushLabel(options.includeExpansions, 'includeExpansions', 'Include expansions');
   pushLabel(options.groupExpansions, 'groupExpansions', 'Group expansions');
-  pushLabel(options.respectSortOrder, 'respectSortOrder', 'Respect sorting order');
+  if (typeof options.backfillPercentage === 'number' && options.backfillPercentage !== 20) {
+    pushLabel(true, 'backfillPercentage', `Backfill tolerance: ${options.backfillPercentage}%`);
+  }
   pushLabel(options.optimizeSpace, 'optimizeSpace', 'Optimize for space');
   pushLabel(options.fitOversized, 'fitOversized', 'Fit oversized games');
   pushLabel(options.bypassVersionWarning, 'bypassVersionWarning', 'Bypass version warning');

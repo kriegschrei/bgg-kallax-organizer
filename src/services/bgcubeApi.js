@@ -26,7 +26,7 @@ const logRequestStart = (payload) => {
   console.log('   Flags:', {
     lockRotation: payload.lockRotation ?? false,
     optimizeSpace: payload.optimizeSpace ?? false,
-    respectSortOrder: payload.respectSortOrder ?? false,
+    backfillPercentage: payload.backfillPercentage ?? 20,
     fitOversized: payload.fitOversized ?? false,
     groupExpansions: payload.groupExpansions ?? false,
     groupSeries: payload.groupSeries ?? false,

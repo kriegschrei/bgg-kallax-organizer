@@ -51,7 +51,7 @@
 
     "lockRotation": { "type": "boolean", "default": false, "errorMessage": { "type": "lockRotation must be true or false." } },
     "optimizeSpace": { "type": "boolean", "default": false, "errorMessage": { "type": "optimizeSpace must be true or false." } },
-    "respectSortOrder": { "type": "boolean", "default": false, "errorMessage": { "type": "respectSortOrder must be true or false." } },
+    "backfillPercentage": { "type": "number", "minimum": 0, "maximum": 100, "default": 20, "errorMessage": { "type": "backfillPercentage must be a number between 0 and 100." } },
     "fitOversized": { "type": "boolean", "default": false, "errorMessage": { "type": "fitOversized must be true or false." } },
     "groupExpansions": { "type": "boolean", "default": false, "errorMessage": { "type": "groupExpansions must be true or false." } },
     "groupSeries": { "type": "boolean", "default": false, "errorMessage": { "type": "groupSeries must be true or false." } },
@@ -121,7 +121,7 @@
     "required": {
       "username": "Username is required."
     },
-    "additionalProperties": "Invalid property in request. Allowed keys: username, statuses, stacking, lockRotation, optimizeSpace, respectSortOrder, fitOversized, groupExpansions, groupSeries, includeExpansions, bypassVersionWarning, sort, overrides."
+    "additionalProperties": "Invalid property in request. Allowed keys: username, statuses, stacking, lockRotation, optimizeSpace, backfillPercentage, fitOversized, groupExpansions, groupSeries, includeExpansions, bypassVersionWarning, sort, overrides."
   },
 
   "$defs": {

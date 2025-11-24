@@ -8,6 +8,7 @@ import {
   getUnplacedGroupGames,
 } from './packingOrchestrationService.js';
 import { compareGames } from './packingSortService.js';
+import { getSafeGameArea } from '../utils/packingHelpers.js';
 
 export const packGamesIntoCubes = (
   games,
@@ -15,10 +16,9 @@ export const packGamesIntoCubes = (
   stacking,
   lockRotation,
   optimizeSpace,
-  respectSortOrder,
+  backfillPercentage,
   fitOversized = false,
   groupExpansions = false,
-  groupSeries = false,
 ) => {
   const primaryOrder = stacking === 'horizontal' ? 'horizontal' : 'vertical';
 
@@ -37,7 +37,6 @@ export const packGamesIntoCubes = (
   const { gameGroups, standaloneGames } = processGameGroups(
     validGames,
     groupExpansions,
-    groupSeries,
   );
 
   // Sort groups and standalone games
@@ -59,14 +58,23 @@ export const packGamesIntoCubes = (
     primaryOrder,
     lockRotation,
     optimizeSpace,
-    respectSortOrder,
+    backfillPercentage,
     placed,
   );
 
   // Get unplaced group games and add to standalone
   const unplacedGroupGames = getUnplacedGroupGames(sortedGroups, placed);
   if (unplacedGroupGames.length > 0) {
-    unplacedGroupGames.sort((a, b) => compareGames(a, b, sortRules));
+    // When optimizing space, sort unplaced group games by area descending ONLY
+    if (optimizeSpace) {
+      unplacedGroupGames.sort((a, b) => {
+        const areaA = getSafeGameArea(a);
+        const areaB = getSafeGameArea(b);
+        return areaB - areaA; // No tiebreaker, just area descending
+      });
+    } else {
+      unplacedGroupGames.sort((a, b) => compareGames(a, b, sortRules));
+    }
     console.log(`   Adding ${unplacedGroupGames.length} unplaced group games to pack individually`);
   }
 
@@ -79,7 +87,7 @@ export const packGamesIntoCubes = (
       lockRotation,
       sortRules,
       optimizeSpace,
-      respectSortOrder,
+      backfillPercentage,
       placed,
     );
   }
@@ -93,7 +101,7 @@ export const packGamesIntoCubes = (
       lockRotation,
       sortRules,
       optimizeSpace,
-      respectSortOrder,
+      backfillPercentage,
       placed,
     );
   }

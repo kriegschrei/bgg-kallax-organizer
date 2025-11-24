@@ -46,8 +46,8 @@ function App() {
     setLockRotation,
     optimizeSpace,
     setOptimizeSpace,
-    respectSortOrder,
-    setRespectSortOrder,
+    backfillPercentage,
+    setBackfillPercentage,
     fitOversized,
     setFitOversized,
     bypassVersionWarning,
@@ -135,7 +135,7 @@ function App() {
       setStacking,
       setLockRotation,
       setOptimizeSpace,
-      setRespectSortOrder,
+      setBackfillPercentage,
       setFitOversized,
       setBypassVersionWarning,
       setFiltersCollapsed,
@@ -152,7 +152,7 @@ function App() {
       setStacking,
       setLockRotation,
       setOptimizeSpace,
-      setRespectSortOrder,
+      setBackfillPercentage,
       setFitOversized,
       setBypassVersionWarning,
       setFiltersCollapsed,
@@ -209,7 +209,7 @@ function App() {
       stacking,
       lockRotation,
       optimizeSpace,
-      respectSortOrder,
+      backfillPercentage,
       fitOversized,
       filtersCollapsed,
       sorting,
@@ -232,7 +232,7 @@ function App() {
     stacking,
     lockRotation,
     optimizeSpace,
-    respectSortOrder,
+    backfillPercentage,
     fitOversized,
     filtersCollapsed,
     sorting,
@@ -297,7 +297,7 @@ function App() {
     stacking,
     lockRotation,
     optimizeSpace,
-    respectSortOrder,
+    backfillPercentage,
     fitOversized,
     groupExpansions,
     groupSeries,
@@ -376,11 +376,8 @@ function App() {
   const handleOptimizeSpaceChange = useCallback(
     (checked) => {
       setOptimizeSpace(checked);
-      if (checked) {
-        setRespectSortOrder(false);
-      }
     },
-    [setOptimizeSpace, setRespectSortOrder]
+    [setOptimizeSpace]
   );
 
   const handleIncludeExpansionsChange = useCallback(
@@ -407,8 +404,8 @@ function App() {
       onFitOversizedChange: setFitOversized,
       lockRotation,
       onLockRotationChange: setLockRotation,
-      respectSortOrder,
-      onRespectSortOrderChange: setRespectSortOrder,
+      backfillPercentage,
+      onBackfillPercentageChange: setBackfillPercentage,
       bypassVersionWarning,
       onBypassVersionWarningChange: setBypassVersionWarning,
     }),
@@ -425,8 +422,8 @@ function App() {
       setFitOversized,
       lockRotation,
       setLockRotation,
-      respectSortOrder,
-      setRespectSortOrder,
+      backfillPercentage,
+      setBackfillPercentage,
       bypassVersionWarning,
       setBypassVersionWarning,
     ]
@@ -522,7 +519,7 @@ function App() {
         includeExpansions={includeExpansions}
         groupExpansions={groupExpansions}
         groupSeries={groupSeries}
-        respectSortOrder={respectSortOrder}
+        backfillPercentage={backfillPercentage}
         fitOversized={fitOversized}
         bypassVersionWarning={bypassVersionWarning}
         lockRotation={lockRotation}
@@ -568,7 +565,7 @@ function App() {
           includeExpansions={includeExpansions}
           groupExpansions={groupExpansions}
           groupSeries={groupSeries}
-          respectSortOrder={respectSortOrder}
+          backfillPercentage={backfillPercentage}
           bypassVersionWarning={bypassVersionWarning}
           lockRotation={lockRotation}
           collectionFilters={collectionFilters}

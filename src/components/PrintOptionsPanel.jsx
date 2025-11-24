@@ -12,7 +12,7 @@ function PrintOptionsPanel({
   includeExpansions,
   groupExpansions,
   groupSeries,
-  respectSortOrder,
+  backfillPercentage,
   fitOversized,
   bypassVersionWarning,
   lockRotation,
@@ -54,9 +54,9 @@ function PrintOptionsPanel({
               <strong>Lock rotation:</strong> Enabled
             </div>
           )}
-          {respectSortOrder && (
+          {typeof backfillPercentage === 'number' && (
             <div className="print-option-item">
-              <strong>Respect sorting order:</strong> Enabled
+              <strong>Backfill tolerance:</strong> {backfillPercentage}%
             </div>
           )}
           {bypassVersionWarning && (

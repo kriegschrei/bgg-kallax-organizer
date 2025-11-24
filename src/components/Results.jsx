@@ -40,7 +40,7 @@ export default function Results({
   includeExpansions,
   groupExpansions,
   groupSeries,
-  respectSortOrder,
+  backfillPercentage,
   bypassVersionWarning,
   lockRotation,
   collectionFilters,
@@ -138,7 +138,7 @@ export default function Results({
         includeExpansions={includeExpansions}
         groupExpansions={groupExpansions}
         groupSeries={groupSeries}
-        respectSortOrder={respectSortOrder}
+        backfillPercentage={backfillPercentage}
         fitOversized={fitOversized}
         bypassVersionWarning={bypassVersionWarning}
         lockRotation={lockRotation}
